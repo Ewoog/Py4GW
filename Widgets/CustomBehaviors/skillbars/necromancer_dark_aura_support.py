@@ -15,6 +15,7 @@ from Widgets.CustomBehaviors.skills.common.i_am_unstoppable_utility import IAmUn
 from Widgets.CustomBehaviors.skills.generic.generic_resurrection_utility import GenericResurrectionUtility
 from Widgets.CustomBehaviors.skills.generic.keep_self_effect_up_utility import KeepSelfEffectUpUtility
 from Widgets.CustomBehaviors.skills.necromancer.blood_bond_utility import BloodBondUtility
+from Widgets.CustomBehaviors.skills.necromancer.dark_aura_utility import DarkAuraUtility
 from Widgets.CustomBehaviors.skills.necromancer.signet_of_lost_souls_utility import SignetOfLostSoulsUtility
 from Widgets.CustomBehaviors.skills.paragon.fall_back_utility import FallBackUtility
 
@@ -28,7 +29,8 @@ class NecromancerSoulTaker_UtilitySkillBar(CustomBehaviorBaseUtility):
         # core skills
         self.soul_taker_utility: CustomSkillUtilityBase = KeepSelfEffectUpUtility(event_bus=self.event_bus, skill=CustomSkill("Soul_Taker"), current_build=in_game_build, score_definition=ScoreStaticDefinition(90))
         self.masochism_utility: CustomSkillUtilityBase = KeepSelfEffectUpUtility(event_bus=self.event_bus, skill=CustomSkill("Masochism"), current_build=in_game_build, score_definition=ScoreStaticDefinition(89))
-        self.dark_aura: CustomSkillUtilityBase = KeepSelfEffectUpUtility(event_bus=self.event_bus, skill=CustomSkill("Dark_Aura"), current_build=in_game_build, score_definition=ScoreStaticDefinition(88))
+        self.dark_aura: CustomSkillUtilityBase = DarkAuraUtility(event_bus=self.event_bus, score_definition=ScoreStaticDefinition(80), current_build=in_game_build, mana_required_to_cast=10)
+
 
         # optional
         self.great_dwarf_weapon_utility: CustomSkillUtilityBase = GreatDwarfWeaponUtility(event_bus=self.event_bus, current_build=in_game_build, score_definition=ScoreStaticDefinition(30))
