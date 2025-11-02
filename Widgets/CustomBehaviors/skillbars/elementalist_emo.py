@@ -41,7 +41,7 @@ class ElementalistEmo_UtilitySkillBar(CustomBehaviorBaseUtility):
                                                                                      skill=CustomSkill("Burning_Speed"),
                                                                                      current_build=in_game_build,
                                                                                      score_definition=ScoreStaticDefinition(
-                                                                                         50), mana_required_to_cast=10,allowed_states=[BehaviorState.FAR_FROM_AGGRO])
+                                                                                         50), mana_required_to_cast=10,allowed_states=[BehaviorState.IN_AGGRO, BehaviorState.CLOSE_TO_AGGRO, BehaviorState.FAR_FROM_AGGRO])
         self.life_attunement_utility: CustomSkillUtilityBase = KeepSelfEffectUpUtility(event_bus=self.event_bus,
                                                                                      skill=CustomSkill("Life_Attunement"),
                                                                                      current_build=in_game_build,
