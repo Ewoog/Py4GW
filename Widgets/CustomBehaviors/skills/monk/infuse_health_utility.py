@@ -29,7 +29,7 @@ class InfuseHealthUtility(CustomSkillUtilityBase):
         self,
         event_bus: EventBus,
         current_build: list[CustomSkill],
-        score_definition: ScorePerHealthGravityDefinition = ScorePerHealthGravityDefinition(8),
+        score_definition: ScorePerHealthGravityDefinition = ScorePerHealthGravityDefinition(10),
         mana_required_to_cast: int = 0,
         allowed_states: list[BehaviorState] = [BehaviorState.IN_AGGRO, BehaviorState.CLOSE_TO_AGGRO, BehaviorState.FAR_FROM_AGGRO],
     ) -> None:

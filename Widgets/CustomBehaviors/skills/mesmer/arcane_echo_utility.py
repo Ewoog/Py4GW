@@ -27,7 +27,7 @@ class ArcaneEchoUtility(CustomSkillUtilityBase):
                     original_skill_to_copy: CustomSkillUtilityBase,
                     new_copied_instance: CustomSkillUtilityBase,
                     arcane_echo_score_definition: ScoreStaticDefinition = ScoreStaticDefinition(82),
-                    allowed_states: list[BehaviorState] = [BehaviorState.IN_AGGRO]
+                    allowed_states: list[BehaviorState] = [BehaviorState.IN_AGGRO, BehaviorState.CLOSE_TO_AGGRO]
             ) -> None:
 
             super().__init__(

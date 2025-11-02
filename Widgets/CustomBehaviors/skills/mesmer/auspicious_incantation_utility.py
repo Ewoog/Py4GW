@@ -25,7 +25,7 @@ class AuspiciousIncantationUtility(CustomSkillUtilityBase):
                  current_build: list[CustomSkill],
                  original_skill_to_cast: CustomSkillUtilityBase,
                  auspicious_score_definition: ScoreStaticDefinition = ScoreStaticDefinition(82),
-                 allowed_states: list[BehaviorState] = [BehaviorState.IN_AGGRO]
+                 allowed_states: list[BehaviorState] = [BehaviorState.IN_AGGRO, BehaviorState.CLOSE_TO_AGGRO]
                  ) -> None:
 
         super().__init__(
