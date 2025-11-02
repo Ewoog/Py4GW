@@ -34,9 +34,9 @@ class ParagonSkills:
         skill.SkillID = GLOBAL_CACHE.Skill.GetID("Aggressive_Refrain")
         skill.SkillType = SkillType.EchoRefrain.value
         skill.TargetAllegiance = Skilltarget.Self.value
-        skill.Nature = SkillNature.Buff.value
-        skill.Conditions.IsOutOfCombat = False
-        skill_data[skill.SkillID] = skill
+        skill.Nature = SkillNature.CustomA.value
+        skill.Conditions.IsOutOfCombat = True
+        skill_data[skill.SkillID] = skill        
 
         skill = CustomSkill()
         skill.SkillID = GLOBAL_CACHE.Skill.GetID("Angelic_Bond")
@@ -60,7 +60,7 @@ class ParagonSkills:
         skill.SkillType = SkillType.Chant.value
         skill.TargetAllegiance = Skilltarget.Self.value
         skill.Nature = SkillNature.Buff.value
-        skill.Conditions.IsOutOfCombat = True
+        skill.Conditions.IsOutOfCombat = False
         skill_data[skill.SkillID] = skill
 
         skill = CustomSkill()
@@ -68,7 +68,7 @@ class ParagonSkills:
         skill.SkillType = SkillType.Chant.value
         skill.TargetAllegiance = Skilltarget.Self.value
         skill.Nature = SkillNature.Buff.value
-        skill.Conditions.IsOutOfCombat = True
+        skill.Conditions.IsOutOfCombat = False
         skill_data[skill.SkillID] = skill
 
         skill = CustomSkill()

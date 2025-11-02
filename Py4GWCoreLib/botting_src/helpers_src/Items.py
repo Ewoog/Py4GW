@@ -25,15 +25,20 @@ class _Items:
         from ...GlobalCache import GLOBAL_CACHE
         
         if not Routines.Checks.Map.MapValid():
+            ConsoleLog("LootItems", "Map is not valid. Cannot loot items.", Console.MessageType.Warning)
             yield from Routines.Yield.wait(1000)  # Wait for map to be valid
             return
             
         if GLOBAL_CACHE.Agent.IsDead(GLOBAL_CACHE.Player.GetAgentID()):
+            ConsoleLog("LootItems", "Player is dead. Cannot loot items.", Console.MessageType.Warning)
             yield from Routines.Yield.wait(1000)  # Wait if dead
             return 
         
         loot_singleton = LootConfig()
         filtered_agent_ids = loot_singleton.GetfilteredLootArray(distance=Range.Earshot.value, multibox_loot=True, allow_unasigned_loot=True)
+        ConsoleLog("LootItems", f"Found {len(filtered_agent_ids)} items to loot.", Console.MessageType.Info)
+        
+        ConsoleLog("LootItems", f"Calling Routines.Yield.Items.LootItems...", Console.MessageType.Info)
         yield from Routines.Yield.Items.LootItems(filtered_agent_ids, pickup_timeout=pickup_timeout)
         
     @_yield_step(label="AddModelToBlacklist", counter_key="ADD_MODEL_TO_BLACKLIST")

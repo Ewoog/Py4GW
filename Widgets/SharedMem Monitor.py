@@ -59,7 +59,7 @@ def main():
                                     PyImGui.text(f"Player Is Ticked: {player.PlayerIsTicked}")
                                     PyImGui.text(f"Party ID: {player.PartyID}")
                                     PyImGui.text(f"Party Position: {player.PartyPosition}")
-                                    PyImGui.text(f"Party Is Leader: {player.PatyIsPartyLeader}")
+                                    PyImGui.text(f"Party Is Leader: {player.PlayerIsPartyLeader}")
                                     timestamp = datetime.fromtimestamp(player.LastUpdated / 1000)
                                     milliseconds = int(timestamp.microsecond / 1000)
                                     PyImGui.text(f"Last Updated: {timestamp.strftime('%H:%M:%S')}.{milliseconds:03d}")

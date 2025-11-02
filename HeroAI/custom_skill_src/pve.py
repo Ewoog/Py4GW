@@ -21,7 +21,8 @@ class PVESkills:
         skill.SkillID = GLOBAL_CACHE.Skill.GetID("Together_as_one")
         skill.SkillType = SkillType.Shout.value
         skill.TargetAllegiance = Skilltarget.Self.value
-        skill.Nature = SkillNature.Interrupt.value
+        skill.Nature = SkillNature.CustomA.value
+        skill.Conditions.IsOutOfCombat = True
         skill_data[skill.SkillID] = skill
 
         skill = CustomSkill()

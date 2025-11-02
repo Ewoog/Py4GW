@@ -205,7 +205,6 @@ class RerollCharacter:
         self.last_known_index = -99
             
 
-reroll_widget = RerollCharacter()
 window_module = ImGui.WindowModule(module_name="RerollCharacter", window_name=MODULE_NAME, window_size=(337, 326), window_flags=PyImGui.WindowFlags.AlwaysAutoResize)
 is_visible = False
 
@@ -257,10 +256,8 @@ def DrawWindow():
     def _item_clicked():
         """Helper function to check if an item was clicked."""
         if PyImGui.is_item_clicked(0):
-            reroll_widget.selected_char_index = index
-            reroll_widget.target_character_name = character.player_name
-            ConsoleLog("Reroll", f"UI Selected target: {character.player_name}", Console.MessageType.Debug)
-            reroll_widget.start_reroll()  
+            GLOBAL_CACHE.Coroutines.append(Routines.Yield.RerollCharacter.Reroll(character.player_name))
+            # ConsoleLog("Reroll", f"UI Selected target: {character.player_name}", Console.MessageType.Debug)
             
     global window_module, tmp_is_selected
     if window_module.first_run:
@@ -388,14 +385,12 @@ def is_in_character_select():
     return in_char_select
 
 def main():
-    global reroll_widget, window_module, character_select, is_visible
+    global window_module, character_select, is_visible
     try:
         character_select = is_in_character_select()
 
         if not character_select and not Routines.Checks.Map.MapValid():
             return
-        
-        reroll_widget.Update()
         
         frame_id = UIManager.GetChildFrameID(1144678641, [0])
         left, top, right, bottom = 0, 0, 0, 0

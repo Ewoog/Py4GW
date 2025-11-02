@@ -7,13 +7,14 @@ from .types import StyleTheme
 class WindowModule:
         _windows : dict[str, 'WindowModule'] = {}
         
-        def __init__(self, module_name="", window_name="", window_size=(100,100), window_pos=(0,0), window_flags=PyImGui.WindowFlags.NoFlag, collapse= False, can_close=False, forced_theme: Optional[StyleTheme] = None):
+        def __init__(self, module_name="", window_name="", window_size=(100,100), window_pos=(0,0), window_flags=PyImGui.WindowFlags.NoFlag, collapse= False, can_close=False, forced_theme: Optional[StyleTheme] = None, resize_on_collapse: bool = False):
             self.module_name = module_name
             
             self.window_name = window_name if window_name else module_name
             self.window_size = window_size
             self.collapse = collapse
-            
+            self.resize_on_collapse = resize_on_collapse
+
             if window_pos == (0,0):
                 overlay = Overlay()
                 screen_width, screen_height = overlay.GetDisplaySize().x, overlay.GetDisplaySize().y
@@ -119,7 +120,8 @@ class WindowModule:
                             if self.__resize or self.window_size[0] < self.__decorated_window_min_size[0] or self.window_size[1] < self.__decorated_window_min_size[1]:
                                 if not has_always_auto_resize:
                                     self.window_size = (max(self.__decorated_window_min_size[0], self.window_size[0]), max(self.__decorated_window_min_size[1], self.window_size[1]))
-                                    PyImGui.set_next_window_size((self.window_size[0], self.window_size[1]), PyImGui.ImGuiCond.Always)            
+                                    PyImGui.set_next_window_size((self.window_size[0], self.window_size[1]), PyImGui.ImGuiCond.Always)    
+                                            
                                 self.__resize = False
                         
                     # push_style_color(PyImGui.ImGuiCol.WindowBg, (0, 0, 0, 0.85))
@@ -132,7 +134,8 @@ class WindowModule:
                         
                     if self.__set_focus:
                         internal_flags &= ~int(PyImGui.WindowFlags.AlwaysAutoResize)
-                        
+                    
+                    PyImGui.set_next_window_collapsed(self.collapse, PyImGui.ImGuiCond.Always)
                     _, open = PyImGui.begin_with_close(name = self.window_name, p_open=self.open, flags=internal_flags)
 
                     # pop_style_color(1)
@@ -209,16 +212,6 @@ class WindowModule:
                     else:
                         state = TextureState.Hovered
                                         
-                # Draw the background
-                has_background = not self.window_flags or ((int(self.window_flags) & int(PyImGui.WindowFlags.NoBackground)) == 0)                
-                if has_background:
-                    ThemeTextures.Empty_Pixel.value.draw_in_drawlist(
-                        x=self.__decorators_left + 15,
-                        y=self.__decorators_top + 5,
-                        size=(self.__decorators_width - 30, self.__decorators_height - 15),
-                        tint=(0,0,0,215)
-                    )
-
                 if self.can_resize:
                     ThemeTextures.Window_Frame_Bottom.value.get_texture().draw_in_drawlist(
                         x=self.__decorators_left + 5,
@@ -294,14 +287,19 @@ class WindowModule:
                 self.__decorators_left = window_pos[0] - 15
                 self.__decorators_top = window_pos[1] - (26)
 
-                self.__decorators_right = self.__decorators_left + self.__decorated_window_min_size[0] + 30
-                self.__decorators_bottom = window_pos[1]
+                if self.resize_on_collapse:
+                    self.__decorators_right = self.__decorators_left + self.__decorated_window_min_size[0] + 30
+                    self.__decorators_bottom = window_pos[1]
+                    PyImGui.set_window_size(1, 1, PyImGui.ImGuiCond.Always)
+                else:
+                    self.__decorators_right = self.__decorators_left + self.window_size[0] + 30
+                    self.__decorators_bottom = window_pos[1]
+                    PyImGui.set_window_size(self.window_size[0], 1, PyImGui.ImGuiCond.Always)
 
                 self.__decorators_width = self.__decorators_right - self.__decorators_left
                 self.__decorators_height = self.__decorators_bottom - self.__decorators_top
                 self.__close_button_rect = (self.__decorators_right - 29, self.__decorators_top + 9, 11, 11)
 
-                PyImGui.set_window_size(1, 1, PyImGui.ImGuiCond.Always)
     
                 state = TextureState.Normal
 

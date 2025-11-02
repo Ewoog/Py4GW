@@ -1,6 +1,8 @@
 #region STATES
 from typing import TYPE_CHECKING, List
 
+from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
+
 if TYPE_CHECKING:
     from Py4GWCoreLib.botting_src.helpers import BottingClass
 
@@ -39,6 +41,7 @@ class _ITEMS:
         self._helpers.Items.auto_id_and_salvage_and_deposit()
         
     def LootItems(self, pickup_timeout = 5000 ):
+        ConsoleLog("Items", "Starting to loot items...")
         self._helpers.Items.loot(pickup_timeout)
 
     def Craft(self, model_id: int, value: int, trade_items_models: list[int], quantity_list: list[int]):

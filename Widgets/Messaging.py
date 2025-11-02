@@ -73,9 +73,9 @@ def DrawWindow():
                 PyImGui.end()
                 return
 
-            command: SharedCommandType = message.Command
-            params: tuple[float] = message.Params
-            extra_data: tuple[str] = message.ExtraData
+            command: SharedCommandType = SharedCommandType(message.Command)
+            params: tuple[float, ...] = tuple(message.Params)
+            extra_data: tuple[str, ...] = tuple(message.ExtraData)
             active = message.Active
             running = message.Running
             timestamp = message.Timestamp
@@ -108,8 +108,8 @@ def DrawWindow():
                 if sender is None or receiver is None:
                     continue
 
-                command: SharedCommandType = message.Command
-                params: tuple[float] = message.Params
+                command: SharedCommandType = SharedCommandType(message.Command)
+                params: tuple[float, ...] = tuple(message.Params)
                 running = message.Running
                 timestamp = message.Timestamp
 
@@ -1301,8 +1301,6 @@ def ProcessMessages():
             GLOBAL_CACHE.Coroutines.append(SkipCutscene(index, message))
         case SharedCommandType.UseSkillCombatPrep:
             GLOBAL_CACHE.Coroutines.append(UseSkillCombatPrep(index, message))
-        case SharedCommandType.ApplySkillbarTemplate:
-            GLOBAL_CACHE.Coroutines.append(ApplySkillbarTemplate(index, message))
         case SharedCommandType.LootEx:
             # privately Handled Command, by Frenkey
             pass

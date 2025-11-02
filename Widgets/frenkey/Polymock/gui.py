@@ -1,3 +1,4 @@
+from datetime import datetime
 import importlib
 from Py4GWCoreLib import *
 
@@ -12,17 +13,24 @@ importlib.reload(data)
 
 class UI:
     _instance = None
-    
+    _initialized = False
+                    
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(UI, cls).__new__(cls)
-            cls.combat = combat.Combat()
-            cls.widget_state = state.WidgetState()
-            cls.expanded = False
-            cls.gui_open = True
-        
+            cls._instance = super().__new__(cls)
         return cls._instance
-                    
+
+    def __init__(self):
+        # only initialize once
+        if self._initialized:
+            return
+        
+        self._initialized = True
+        self.combat = combat.Combat()
+        self.widget_state = state.WidgetState()
+        self.expanded = False
+        self.gui_open = True
+        
     def draw(self):
     
         expanded, gui_open = PyImGui.begin_with_close("Polymock Assistant", self.gui_open, PyImGui.WindowFlags.AlwaysAutoResize)
