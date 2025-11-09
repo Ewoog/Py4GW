@@ -160,13 +160,14 @@ def DrawPrioritizedSkills(cached_data:CacheData):
 
 HeroFlags: list[bool] = [False, False, False, False, False, False, False, False, False]
 AllFlag = False
-CLearFlags = False
+clear_flags = False
 one_time_set_flag = False
+
 def DrawFlags(cached_data:CacheData):
     global capture_flag_all, capture_hero_flag, capture_hero_index
-    global one_time_set_flag, CLearFlags
-
-    if capture_hero_flag:
+    global one_time_set_flag, clear_flags
+    
+    if capture_hero_flag:        
         x, y, _ = Overlay().GetMouseWorldPos()
         if capture_flag_all:
             DrawFlagAll(x, y)
@@ -210,7 +211,7 @@ def DrawFlags(cached_data:CacheData):
         if cached_data.HeroAI_vars.all_player_struct[i].IsFlagged and cached_data.HeroAI_vars.all_player_struct[i].IsActive and not cached_data.HeroAI_vars.all_player_struct[i].IsHero:
             DrawHeroFlag(cached_data.HeroAI_vars.all_player_struct[i].FlagPosX,cached_data.HeroAI_vars.all_player_struct[i].FlagPosY)
 
-    if CLearFlags:
+    if clear_flags:
         for i in range(MAX_NUM_PLAYERS):
             cached_data.HeroAI_vars.shared_memory_handler.set_player_property(i, "IsFlagged", False)
             cached_data.HeroAI_vars.shared_memory_handler.set_player_property(i, "FlagPosX", 0.0)
@@ -218,13 +219,13 @@ def DrawFlags(cached_data:CacheData):
             cached_data.HeroAI_vars.shared_memory_handler.set_player_property(i, "FollowAngle", 0.0)
             GLOBAL_CACHE.Party.Heroes.UnflagHero(i)
         GLOBAL_CACHE.Party.Heroes.UnflagAllHeroes()
-        CLearFlags = False
+        clear_flags = False
             
         
 
 def DrawFlaggingWindow(cached_data:CacheData):
     global HeroFlags, AllFlag, capture_flag_all, capture_hero_flag, capture_hero_index, one_time_set_flag
-    global CLearFlags
+    global clear_flags
     party_size = GLOBAL_CACHE.Party.GetPartySize()
     if party_size == 1:
         PyImGui.text("No Follower or Heroes to Flag.")
@@ -259,7 +260,7 @@ def DrawFlaggingWindow(cached_data:CacheData):
             if party_size >= 8:
                 HeroFlags[6] = ImGui.toggle_button("7", IsHeroFlagged(cached_data,7), 30, 30)
             PyImGui.table_next_column()
-            CLearFlags = ImGui.toggle_button("X", HeroFlags[7],30,30)
+            clear_flags = ImGui.toggle_button("X", HeroFlags[7],30,30)
             PyImGui.end_table()
                 
                 
@@ -547,7 +548,7 @@ ButtonColors = {
     "Resign": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(210,0,20,255)),  
     "PixelStack": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
     "Flag": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
-    "ClearFlags": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
+    "clear_flags": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
     "Celerity": ButtonColor(button_color = Color(129, 33, 188, 255), hovered_color = Color(165, 100, 200, 255), active_color = Color(135, 225, 230, 255),texture_path="Textures\\Consumables\\Trimmed\\Essence_of_Celerity.png"),  
     "GrailOfMight": ButtonColor(button_color=Color(70,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(252,225,115,255), texture_path="Textures\\Consumables\\Trimmed\\Grail_of_Might.png"),
     "ArmorOfSalvation": ButtonColor(button_color = Color(96, 60, 15, 255),hovered_color = Color(187, 149, 38, 255),active_color = Color(225, 150, 0, 255), texture_path="Textures\\Consumables\\Trimmed\\Armor_of_Salvation.png"),

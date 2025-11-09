@@ -50,6 +50,7 @@ class AccountData(Structure):
         ("PlayerLevel", c_uint),
         ("PlayerProfession", c_uint),
         ("PlayerSecondaryProfession", c_uint),
+        ("PlayerMorale", c_uint),
         ("PlayerHP", c_float),
         ("PlayerMaxHP", c_float),
         ("PlayerHealthRegen", c_float),
@@ -105,6 +106,7 @@ class AccountData(Structure):
     PlayerLevel: int
     PlayerProfession: int
     PlayerSecondaryProfession: int
+    PlayerMorale: int
     PlayerHP: float
     PlayerMaxHP: float
     PlayerHealthRegen: float
@@ -307,6 +309,7 @@ class Py4GWSharedMemoryManager:
             player.PlayerLevel = 0
             player.PlayerProfession = 0
             player.PlayerSecondaryProfession = 0
+            player.PlayerMorale = 0
             player.PlayerHP = 0.0
             player.PlayerMaxHP = 0.0
             player.PlayerHealthRegen = 0.0
@@ -511,7 +514,6 @@ class Py4GWSharedMemoryManager:
             agent_id = self.player_instance.id
             login_number = self.GetLoginNumber()
             party_number = self.GetPartyNumber()
-            map_region = self.map_instance.server_region.ToInt()
             playerx, playery, playerz = self.player_instance.agent.x, self.player_instance.agent.y, self.player_instance.agent.z
 
             player.AccountName =self.player_instance.account_name
@@ -523,12 +525,13 @@ class Py4GWSharedMemoryManager:
             player.OwnerPlayerID = 0
             player.HeroID = 0
             player.MapID = self.map_instance.map_id.ToInt()
-            player.MapRegion = map_region
+            player.MapRegion = self.map_instance.server_region.ToInt()
             player.MapDistrict = self.map_instance.district
             player.PlayerID = agent_id
             player.PlayerLevel = self.player_instance.agent.living_agent.level
             player.PlayerProfession = self.player_instance.agent.living_agent.profession.Get()
             player.PlayerSecondaryProfession = self.player_instance.agent.living_agent.secondary_profession.Get()
+            player.PlayerMorale = self.player_instance.morale
             player.PlayerHP = self.player_instance.agent.living_agent.hp
             player.PlayerMaxHP = self.player_instance.agent.living_agent.max_hp
             player.PlayerHealthRegen = self.player_instance.agent.living_agent.hp_regen
@@ -635,6 +638,7 @@ class Py4GWSharedMemoryManager:
             hero.PlayerLevel = hero_agent_instance.living_agent.level
             hero.PlayerProfession = hero_agent_instance.living_agent.profession.Get()
             hero.PlayerSecondaryProfession = hero_agent_instance.living_agent.secondary_profession.Get()
+            hero.PlayerMorale = 0
             hero.PlayerHP = hero_agent_instance.living_agent.hp
             hero.PlayerMaxHP = hero_agent_instance.living_agent.max_hp
             hero.PlayerHealthRegen = hero_agent_instance.living_agent.hp_regen
@@ -746,6 +750,7 @@ class Py4GWSharedMemoryManager:
             pet.PlayerLoginNumber = 0 
             if self.map_instance.instance_type.GetName() == "Outpost":
                 return
+            pet.PlayerMorale = 0
             pet.PlayerHP = agent_instance.living_agent.hp
             pet.PlayerMaxHP = agent_instance.living_agent.max_hp
             pet.PlayerHealthRegen = agent_instance.living_agent.hp_regen

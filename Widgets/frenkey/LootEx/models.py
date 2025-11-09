@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 import json
+import math
 import re
 import base64
 from dataclasses import dataclass, field
@@ -408,33 +409,45 @@ class Item():
         if self.nick_index is None:
             return None
         
+        today = datetime.now()
+        monday_of_current_week = today.date() - timedelta(days=today.weekday())
+        this_week = datetime.combine(monday_of_current_week, datetime.min.time())
+        
         next_nick_date = self.get_next_nick_date()
-        if next_nick_date:
-            today = date.today()
-            delta = next_nick_date - today
-            if delta.days >= 0:
-                return delta.days // 7
+        if next_nick_date is not None:
+            delta = next_nick_date - this_week.date()
             
-        return None        
-
+            if delta.days >= 0:
+                return math.ceil(delta.days / 7)
+            
+        return None     
+       
     def get_next_nick_date(self) -> Optional[date]:
         if self.nick_index is None:
             return None
-        
+
         from Widgets.frenkey.LootEx.data import Data
         data = Data()
+
         start_date = datetime.combine(data.Nick_Cycle_Start_Date, datetime.min.time())
-        
-        today = date.today()
-        monday_of_current_week = today - timedelta(days=today.weekday())
+        today = datetime.now()
+
+        # Monday 00:00 of current week
+        monday_of_current_week = today.date() - timedelta(days=today.weekday())
         dt = datetime.combine(monday_of_current_week, datetime.min.time())
-                
+        
+        # Iterate over possible nick cycles
         for i in range(0, 100):
-            nick_date = start_date + timedelta(weeks=self.nick_index + (i * data.Nick_Cycle_Count))                     
+            nick_date = datetime.combine(start_date + timedelta(weeks=self.nick_index + (i * data.Nick_Cycle_Count)), datetime.min.time())
             
-            if nick_date > dt:
-                return date(nick_date.year, nick_date.month, nick_date.day)
-       
+            # If current time matches the start of this nick cycle
+            if dt == nick_date:
+                return nick_date.date()
+
+            # Or if the cycle starts after current time
+            if nick_date >= today:
+                return nick_date.date()
+
     def has_missing_names(self) -> ServerLanguage | bool:
         if not self.names or not self.names.get(ServerLanguage.English, False):
             return ServerLanguage.English

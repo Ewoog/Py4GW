@@ -698,7 +698,7 @@ class Yield:
             
             from ..Py4GWcorelib import ConsoleLog
             
-            if GLOBAL_CACHE.Map.GetMapID() != outpost_id:
+            if GLOBAL_CACHE.Map.GetMapID() != outpost_id or GLOBAL_CACHE.Map.GetRegion() != region or GLOBAL_CACHE.Map.GetDistrict() != district or GLOBAL_CACHE.Map.GetLanguage() != language:
                 ConsoleLog("TravelToRegion", f"Travelling to {GLOBAL_CACHE.Map.GetMapName(outpost_id)}", log=log)
                 GLOBAL_CACHE.Map.TravelToRegion(outpost_id, region, district, language)
                 yield from Yield.wait(2000)

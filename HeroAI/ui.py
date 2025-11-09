@@ -1,5 +1,6 @@
 
 from collections.abc import Callable
+from enum import IntEnum
 import math
 import os
 import random
@@ -7,28 +8,33 @@ from Py4GW import Console
 import PyImGui
 from HeroAI import windows
 from HeroAI.cache_data import CacheData
+from HeroAI.commands import HeroAICommands
+from HeroAI.constants import MAX_NUM_PLAYERS, NUMBER_OF_SKILLS
 from HeroAI.settings import Settings
-from HeroAI.utils import DrawHeroFlag, IsHeroFlagged
-from HeroAI.windows import DrawFlags, SubmitGameOptions
+from HeroAI.types import GameOptionStruct
+from HeroAI.utils import DrawFlagAll, DrawHeroFlag, IsHeroFlagged
+from HeroAI.windows import CompareAndSubmitGameOptions, SubmitGameOptions
 from Py4GWCoreLib import Agent, ImGui
 from Py4GWCoreLib.Effect import Effects
 from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
 from Py4GWCoreLib.GlobalCache.SharedMemory import AccountData, SharedMessage
 from Py4GWCoreLib.ImGui_src.IconsFontAwesome5 import IconsFontAwesome5
-from Py4GWCoreLib.ImGui_src.Textures import MapTexture, SplitTexture, TextureState, ThemeTexture, ThemeTextures
+from Py4GWCoreLib.ImGui_src.Textures import GameTexture, MapTexture, GameTexture, TextureState, ThemeTexture, ThemeTextures
 from Py4GWCoreLib.ImGui_src.WindowModule import WindowModule
-from Py4GWCoreLib.ImGui_src.types import TEXTURE_FOLDER, StyleTheme
+from Py4GWCoreLib.ImGui_src.types import TEXTURE_FOLDER, Alignment, StyleTheme
 from Py4GWCoreLib.Overlay import Overlay
 from Py4GWCoreLib.Player import Player
 from Py4GWCoreLib.Routines import Routines
 from Py4GWCoreLib.Skill import Skill
 from Py4GWCoreLib.Skillbar import SkillBar
 from Py4GWCoreLib.enums_src.GameData_enums import Allegiance, Attribute, Profession, ProfessionShort
+from Py4GWCoreLib.enums_src.Model_enums import ModelID
 from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
 from Py4GWCoreLib.py4gwcorelib_src.Color import Color
 from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
 from Py4GWCoreLib.py4gwcorelib_src.Timer import ThrottledTimer, Timer
 from Py4GWCoreLib.py4gwcorelib_src.Utils import Utils
+from Py4GW_widget_manager import WidgetHandler
 
 
 class CachedSkillInfo:
@@ -37,6 +43,13 @@ class CachedSkillInfo:
         self.name = GLOBAL_CACHE.Skill.GetNameFromWiki(skill_id)
         self.description = GLOBAL_CACHE.Skill.GetDescription(skill_id)
         self.texture_path = GLOBAL_CACHE.Skill.ExtraData.GetTexturePath(skill_id)
+        
+        if not os.path.exists(self.texture_path):
+            self.texture_path = ""
+        
+        if not self.texture_path and self.skill_id != 0:
+            self.texture_path = ThemeTexture.PlaceHolderTexture.texture
+            
         self.is_elite = GLOBAL_CACHE.Skill.Flags.IsElite(skill_id)
         self.is_hex = GLOBAL_CACHE.Skill.Flags.IsHex(skill_id)
         self.is_title = GLOBAL_CACHE.Skill.Flags.IsTitle(skill_id)
@@ -61,17 +74,24 @@ message_cache : dict[str, dict[SharedCommandType, dict[int, tuple]]] = {}
 template_popup_open: bool = False
 template_account: str = ""
 template_code = ""
+configure_consumables_window_open: bool = False
 
-flag_account = ""
+widget_handler = WidgetHandler()
+module_info = None
+
 settings = Settings()
 casting_animation_timer = Timer()
 casting_animation_timer.Start()
 
-def get_frame_texture_for_effect(skill_id: int) -> tuple[(SplitTexture | MapTexture), TextureState, int]:
+commands = HeroAICommands()
+gray_color = Color(150, 150, 150, 255)
+          
+def get_frame_texture_for_effect(skill_id: int) -> tuple[(GameTexture | MapTexture), TextureState, int]:
     is_elite = GLOBAL_CACHE.Skill.Flags.IsElite(skill_id)
     texture_state = TextureState.Normal if not is_elite else TextureState.Active
 
-    theme = ImGui.get_style().Theme
+    theme = ImGui.get_style().Theme if ImGui.get_style().Theme in ImGui.Textured_Themes else StyleTheme.Guild_Wars
+    
     if not theme in ImGui.Textured_Themes:
         theme = StyleTheme.Guild_Wars
 
@@ -134,22 +154,19 @@ def draw_health_bar(width: float, height: float, max_health: float, current_heal
 
     if draw_textures:
         ThemeTextures.HealthBarEmpty.value.get_texture().draw_in_drawlist(
-            background_rect[0],
-            background_rect[1],
-            (background_rect[2], background_rect[3]),
+            background_rect[:2],
+            background_rect[2:],
         )
 
         ThemeTextures.HealthBarFill.value.get_texture().draw_in_drawlist(
-            progress_rect[0],
-            progress_rect[1],
-            (progress_rect[2], progress_rect[3]),
+            progress_rect[:2],
+            progress_rect[2:],
         )
 
         if current_health * max_health != max_health:
             ThemeTextures.HealthBarCursor.value.get_texture().draw_in_drawlist(
-                cursor_rect[0],
-                cursor_rect[1],
-                (cursor_rect[2], cursor_rect[3]),
+                cursor_rect[:2],
+                cursor_rect[2:],
             )
 
     display_label = str(int(current_health * max_health))
@@ -174,8 +191,7 @@ def draw_health_bar(width: float, height: float, max_health: float, current_heal
 
             for i in range(int(pips)):
                 pip_texture.value.get_texture().draw_in_drawlist(
-                    pip_pos + (i * 8),
-                    item_rect[1],
+                    (pip_pos + (i * 8), item_rect[1]),
                     (10 * (height / 16), height),
                 )
 
@@ -184,14 +200,12 @@ def draw_health_bar(width: float, height: float, max_health: float, current_heal
 
             for i in range(abs(int(pips))):
                 pip_texture.value.get_texture().draw_in_drawlist(
-                    pip_pos - (i * 8),
-                    item_rect[1],
+                    (pip_pos - (i * 8), item_rect[1]),
                     (10 * (height / 16), height),
                 )
 
         ThemeTextures.ProgressBarFrame.value.get_texture().draw_in_drawlist(
-            item_rect[0],
-            item_rect[1],
+            (item_rect[0], item_rect[1]),
             (item_rect[2], item_rect[3]),
         )
     else:
@@ -251,22 +265,19 @@ def draw_energy_bar(width: float, height: float, max_energy: float, current_ener
 
     if draw_textures:
         ThemeTextures.EnergyBarEmpty.value.get_texture().draw_in_drawlist(
-            background_rect[0],
-            background_rect[1],
-            (background_rect[2], background_rect[3]),
+            background_rect[:2],
+            background_rect[2:],
         )
 
         ThemeTextures.EnergyBarFill.value.get_texture().draw_in_drawlist(
-            progress_rect[0],
-            progress_rect[1],
-            (progress_rect[2], progress_rect[3]),
+            progress_rect[:2],
+            progress_rect[2:],
         )
 
         if current_energy * max_energy != max_energy:
             ThemeTextures.EnergyBarCursor.value.get_texture().draw_in_drawlist(
-                cursor_rect[0],
-                cursor_rect[1],
-                (cursor_rect[2], cursor_rect[3]),
+                cursor_rect[:2],
+                cursor_rect[2:],
             )
 
     display_label = str(int(current_energy * max_energy))
@@ -291,8 +302,7 @@ def draw_energy_bar(width: float, height: float, max_energy: float, current_ener
 
             for i in range(int(pips)):
                 pip_texture.value.get_texture().draw_in_drawlist(
-                    pip_pos + (i * 8),
-                    item_rect[1],
+                    (pip_pos + (i * 8), item_rect[1]),
                     (10 * (height / 16), height),
                 )
 
@@ -301,15 +311,13 @@ def draw_energy_bar(width: float, height: float, max_energy: float, current_ener
 
             for i in range(abs(int(pips))):
                 pip_texture.value.get_texture().draw_in_drawlist(
-                    pip_pos - (i * 8),
-                    item_rect[1],
+                    (pip_pos - (i * 8), item_rect[1]),
                     (10 * (height / 16), height),
                 )
 
         ThemeTextures.ProgressBarFrame.value.get_texture().draw_in_drawlist(
-            item_rect[0],
-            item_rect[1],
-            (item_rect[2], item_rect[3]),
+            item_rect[:2],
+            item_rect[2:]
         )
     else:
         pip_char = IconsFontAwesome5.ICON_ANGLE_RIGHT if pips > 0 else IconsFontAwesome5.ICON_ANGLE_LEFT
@@ -467,11 +475,11 @@ def draw_casting_animation(
         PyImGui.draw_list_add_circle(cx, cy, radius, color.color_int, 36, 6.0)
         PyImGui.pop_clip_rect()
 
-
 def draw_skill_bar(height: float, account_data: AccountData, cached_data: CacheData, message_queue: list[tuple[int, SharedMessage]]):
     global skill_cache, messages
     style = ImGui.get_style()
     draw_textures = style.Theme in ImGui.Textured_Themes
+    texture_theme = style.Theme if draw_textures else StyleTheme.Guild_Wars
 
     for slot, skill_id in enumerate(account_data.PlayerSkillIDs):
         
@@ -597,9 +605,8 @@ def draw_skill_bar(height: float, account_data: AccountData, cached_data: CacheD
         hero_options = cached_data.HeroAI_vars.all_game_option_struct[account_data.PartyPosition]
         if not hero_options.Skills[slot].Active:
             hovered = PyImGui.is_item_hovered()
-            ThemeTextures.Cancel.value.get_texture().draw_in_drawlist(
-                PyImGui.get_item_rect_min()[0],
-                PyImGui.get_item_rect_min()[1],
+            ThemeTextures.Cancel.value.get_texture(texture_theme).draw_in_drawlist(
+                PyImGui.get_item_rect_min(),
                 (height, height),
                 state=TextureState.Hovered if hovered else TextureState.Normal
             )
@@ -611,9 +618,8 @@ def draw_skill_bar(height: float, account_data: AccountData, cached_data: CacheD
                     
             if queued_skill_usage:
                 hovered = PyImGui.is_item_hovered()
-                ThemeTextures.Check.value.get_texture().draw_in_drawlist(
-                    PyImGui.get_item_rect_min()[0],
-                    PyImGui.get_item_rect_min()[1],
+                ThemeTextures.Check.value.get_texture(texture_theme).draw_in_drawlist(
+                    PyImGui.get_item_rect_min(),
                     (height, height),
                     state=TextureState.Hovered if hovered else TextureState.Normal
                 )
@@ -649,9 +655,8 @@ def draw_skill_bar(height: float, account_data: AccountData, cached_data: CacheD
         if draw_textures:
             texture_state = TextureState.Normal if not skill.is_elite else TextureState.Active
 
-            ThemeTextures.Skill_Frame.value.get_texture().draw_in_drawlist(
-                item_rect_min[0],
-                item_rect_min[1],
+            ThemeTextures.Skill_Frame.value.get_texture(texture_theme).draw_in_drawlist(
+                item_rect_min[:2],
                 (height, height),
                 state=texture_state
             )
@@ -695,8 +700,7 @@ def draw_buffs_and_upkeeps(account_data: AccountData, skill_size: float = 28):
         if draw_effect_frame:
             frame_texture, texture_state = effect.frame_texture, effect.texture_state
             frame_texture.draw_in_drawlist(
-                item_rect_min[0],
-                item_rect_min[1],
+                item_rect_min[:2],
                 (skill_size, skill_size),
                 state=texture_state
             )
@@ -739,7 +743,9 @@ def draw_buffs_and_upkeeps(account_data: AccountData, skill_size: float = 28):
                     0
                 )
 
-                text_size = PyImGui.calc_text_size(f"{int(remaining/1000)}")
+                remaining_text = f"{remaining/1000:.0f}" if remaining >= 1000 else f"{remaining/1000:.1f}".lstrip("0")
+                    
+                text_size = PyImGui.calc_text_size(remaining_text)
                 offset_x = (skill_size - text_size[0]) / 2
                 offset_y = (skill_size - text_size[1]) / 2
 
@@ -756,13 +762,39 @@ def draw_buffs_and_upkeeps(account_data: AccountData, skill_size: float = 28):
                     item_rect_min[0] + offset_x,
                     item_rect_min[1] + offset_y,
                     style.Text.color_int,
-                    f"{int(remaining/1000)}"
+                    remaining_text
                 )
 
         PyImGui.show_tooltip(
             f"Effect ID: {effect.skill_id}\nName: {effect.name}")
         PyImGui.same_line(0, 0)
+    
+    def draw_morale(morale : int, skill_size: float = skill_size):
+        morale_display = f"{("+" if morale > 100 else "-")}{abs(100 - morale)}%"
+        texture = ThemeTextures.DeathPenalty.value.get_texture() if morale < 100 else ThemeTextures.MoraleBoost.value.get_texture()
+        ImGui.push_font("Regular", 11)            
+        ImGui.dummy(skill_size, skill_size)
+        item_rect_min = PyImGui.get_item_rect_min()
+        item_rect_max = PyImGui.get_item_rect_max()
+        
+        item_rect = (item_rect_min[0], item_rect_min[1], item_rect_max[0] - item_rect_min[0], item_rect_max[1] - item_rect_min[1])
+        texture.draw_in_drawlist(
+            item_rect[:2],
+            (skill_size, skill_size),
+        )
+        text_size = PyImGui.calc_text_size(morale_display)
+        offset_x = (skill_size - text_size[0]) / 2
+        offset_y = (skill_size - text_size[1])
+        PyImGui.draw_list_add_text(
+            item_rect[0] + offset_x,
+            item_rect[1] + offset_y,
+            Color(201, 188, 145, 255).color_int,
+            morale_display
+        )
 
+        ImGui.pop_font()
+        PyImGui.same_line(0, 0)
+    
     if settings.ShowHeroUpkeeps:
         ImGui.dummy(0, 24)
         PyImGui.same_line(0, 0)
@@ -787,6 +819,9 @@ def draw_buffs_and_upkeeps(account_data: AccountData, skill_size: float = 28):
     if settings.ShowHeroEffects:                        
         ImGui.dummy(0, 28)
         PyImGui.same_line(0, 0)
+        
+        if account_data.PlayerMorale != 100 and account_data.PlayerMorale != 0:
+            draw_morale(account_data.PlayerMorale, skill_size)
         
         for index, effect_id in enumerate(account_data.PlayerEffects):
             if effect_id == 0:
@@ -839,24 +874,12 @@ def enter_skill_template_code(account_data : AccountData):
             
         PyImGui.end_popup()
         
-def flag_hero(account_data: AccountData, cached_data: CacheData):    
-    global flag_account
-    
-    windows.capture_flag_all = False
-    windows.capture_hero_flag = True
-    windows.capture_hero_index = account_data.PartyPosition
-    
-    DrawFlags(cached_data)
-    
-    if not windows.capture_hero_flag:
-        flag_account = ""
-    
 def draw_buttons(account_data: AccountData, cached_data: CacheData, message_queue: list[tuple[int, SharedMessage]], btn_size: float = 28):
     global message_cache
     style = ImGui.get_style()
     draw_textures = style.Theme in ImGui.Textured_Themes
     
-    global template_popup_open, template_account, flag_account
+    global template_popup_open, template_account
     is_explorable = GLOBAL_CACHE.Map.IsExplorable()
     if not ImGui.begin_child("##buttons" + account_data.AccountEmail, (84, 58), False,
                              PyImGui.WindowFlags.NoScrollbar | PyImGui.WindowFlags.NoScrollWithMouse):
@@ -864,7 +887,7 @@ def draw_buttons(account_data: AccountData, cached_data: CacheData, message_queu
         return
 
     style = ImGui.get_style()
-    same_map = GLOBAL_CACHE.Map.GetMapID() == account_data.MapID
+    same_map = GLOBAL_CACHE.Map.GetMapID() == account_data.MapID and GLOBAL_CACHE.Map.GetRegion()[0] == account_data.MapRegion and GLOBAL_CACHE.Map.GetDistrict() == account_data.MapDistrict
     player_email = GLOBAL_CACHE.Player.GetAccountEmail()
     account_email = account_data.AccountEmail
 
@@ -909,7 +932,7 @@ def draw_buttons(account_data: AccountData, cached_data: CacheData, message_queu
         item_rect_min = PyImGui.get_item_rect_min()
         if draw_textures:
             ThemeTextures.HeroPanelButtonBase.value.get_texture().draw_in_drawlist(
-                item_rect_min[0], item_rect_min[1], (btn_size, btn_size),
+                item_rect_min, (btn_size, btn_size),
                 state=TextureState.Active if status else TextureState.Normal,
                 tint=(255, 255, 255, 255) if hovered else (200, 200, 200, 255)
             )
@@ -934,9 +957,7 @@ def draw_buttons(account_data: AccountData, cached_data: CacheData, message_queu
         player_x, player_y = GLOBAL_CACHE.Player.GetXY()
         target_id = Player.GetTargetID() or Player.GetAgentID()
 
-        def invite_player():
-            same_map = GLOBAL_CACHE.Map.GetMapID() == account_data.MapID
-            
+        def invite_player():            
             if same_map:
                 GLOBAL_CACHE.Party.Players.InvitePlayer(account_data.CharacterName)
                 
@@ -948,7 +969,7 @@ def draw_buttons(account_data: AccountData, cached_data: CacheData, message_queu
                     GLOBAL_CACHE.Map.GetMapID(),
                     GLOBAL_CACHE.Map.GetRegion()[0],
                     GLOBAL_CACHE.Map.GetDistrict(),
-                    0,
+                    GLOBAL_CACHE.Map.GetLanguage()[0],
                 )
             )
         
@@ -963,8 +984,8 @@ def draw_buttons(account_data: AccountData, cached_data: CacheData, message_queu
         buttons = [
             (
                 "pixel_stack",
-                IconsFontAwesome5.ICON_COMPRESS_ARROWS_ALT,
-                "Pixel Stack",
+                commands.PixelStack.icon,
+                commands.PixelStack.name,
                 SharedCommandType.PixelStack,
                 lambda: GLOBAL_CACHE.ShMem.SendMessage(player_email, account_email, SharedCommandType.PixelStack, (player_x, player_y, 0, 0)),
                 lambda: is_queued(SharedCommandType.PixelStack),
@@ -1029,9 +1050,10 @@ def draw_buttons(account_data: AccountData, cached_data: CacheData, message_queu
         target_id = Player.GetTargetID() or Player.GetAgentID()
         
         def flag_hero_account():
-            global flag_account
-            flag_account = account_data.AccountEmail
-            ConsoleLog("HERO AI", "Flagging hero...")
+            ConsoleLog("HERO AI", "Flagging hero...")                  
+            windows.capture_flag_all = False
+            windows.capture_hero_flag = True
+            windows.capture_hero_index = account_data.PartyPosition  
             return -1
         
         def clear_hero_flag():
@@ -1118,9 +1140,8 @@ def draw_combined_hero_panel(account_data: AccountData, cached_data: CacheData, 
     item_rect = (item_rect_min[0], item_rect_min[1] + 5, item_rect_max[0] - item_rect_min[0], item_rect_max[1] - item_rect_min[1])
     
     ThemeTextures.HeaderLabelBackground.value.get_texture().draw_in_drawlist(
-        item_rect[0],
-        item_rect[1] - 0,
-        (item_rect[2], item_rect[3]),
+        item_rect[:2],
+        item_rect[2:],
         tint=(225, 225, 225, 200) if style.Theme is StyleTheme.Guild_Wars else (255, 255, 255, 255)
     )
     
@@ -1172,7 +1193,7 @@ def draw_combined_hero_panel(account_data: AccountData, cached_data: CacheData, 
     draw_buffs_and_upkeeps(account_data, 28)    
 
 def draw_hero_panel(window: WindowModule, account_data: AccountData, cached_data: CacheData, messages: list[tuple[int, SharedMessage]], open: bool = True):
-    global flag_account, title_names
+    global title_names
     style = ImGui.get_style()
     style.WindowPadding.push_style_var(4, 1)
     
@@ -1248,21 +1269,642 @@ def draw_hero_panel(window: WindowModule, account_data: AccountData, cached_data
         window.process_window()
     
     collapsed = PyImGui.is_window_collapsed()
-    pos = PyImGui.get_window_pos()
     
     window.process_window()
     
-    if window.collapse != collapsed or window.window_pos != pos:
-        window.window_pos = pos
+    if window.collapse != collapsed or window.changed:
         window.collapse = collapsed if style.Theme != StyleTheme.Guild_Wars else window.collapse
             
         if Console.is_window_active():
-            settings.HeroPanelPositions[account_data.AccountEmail] = (int(pos[0]), int(pos[1]), window.collapse)
+            settings.HeroPanelPositions[account_data.AccountEmail] = (int(window.window_pos[0]), int(window.window_pos[1]), int(window.window_size[0]), int(window.window_size[1]), window.collapse)
             settings.save_settings()
         
     window.end()
-    
-    if flag_account == account_data.AccountEmail and flag_account:    
-        flag_hero(account_data, cached_data)      
+            
         
     pass  # Implementation of hero panel drawing logic goes here
+
+def draw_button(id_suffix: str, icon: str, w : float = 0, h : float = 0, active : bool = False, enabled : bool = True) -> bool:       
+    style = ImGui.get_style()
+    draw_textures = style.Theme in ImGui.Textured_Themes    
+    btn_id = f"##{id_suffix}"    
+    clicked = (draw_textures and PyImGui.invisible_button(btn_id, w, h)) or (not draw_textures and ImGui.button(btn_id, w, h))
+
+
+    hovered = PyImGui.is_item_hovered()
+    mouse_down = PyImGui.is_mouse_down(0)
+    item_rect_min = PyImGui.get_item_rect_min()
+    if draw_textures:
+        ThemeTextures.HeroPanelButtonBase.value.get_texture().draw_in_drawlist(
+            item_rect_min, (w, h),
+            state=TextureState.Active if active else TextureState.Normal,
+            tint=(255, 255, 255, 85) if not enabled else (255, 255, 255, 255) if hovered and mouse_down else (200, 200, 200, 255) if hovered else (175, 175, 175, 255)
+        )
+
+    ImGui.push_font("Regular", 10)
+    text_size = PyImGui.calc_text_size(icon)
+    PyImGui.draw_list_add_text(
+        item_rect_min[0] + (w - text_size[0]) / 2,
+        item_rect_min[1] + (h - text_size[1]) / 2,
+        style.Text.color_int if enabled else Color(115, 115, 115, 255).color_int,
+        icon
+    )
+    ImGui.pop_font()   
+    return clicked and enabled
+
+def send_command_to_all_heroes(accounts: list[AccountData], command: SharedCommandType, param: tuple = (), extra_data: tuple = (), include_self: bool = False):
+    account_mail = GLOBAL_CACHE.Player.GetAccountEmail()
+    for account in accounts:
+        if not include_self and account.AccountEmail == account_mail:
+            continue
+        
+        GLOBAL_CACHE.ShMem.SendMessage(
+            account_mail,
+            account.AccountEmail,
+            command,
+            param,
+            ExtraData=extra_data
+        )
+
+consumables = [
+    (ModelID.Essence_Of_Celerity, ("Textures\\Consumables\\Trimmed\\Essence_of_Celerity.png", (ModelID.Essence_Of_Celerity.value, GLOBAL_CACHE.Skill.GetID("Essence_of_Celerity_item_effect"), 0, 0))),
+    (ModelID.Grail_Of_Might, ("Textures\\Consumables\\Trimmed\\Grail_of_Might.png", (ModelID.Grail_Of_Might.value, GLOBAL_CACHE.Skill.GetID("Grail_of_Might_item_effect"), 0, 0))),
+    (ModelID.Armor_Of_Salvation, ("Textures\\Consumables\\Trimmed\\Armor_of_Salvation.png", (ModelID.Armor_Of_Salvation.value, GLOBAL_CACHE.Skill.GetID("Armor_of_Salvation_item_effect"), 0, 0))),
+    
+    (0, ("", (0, 0, 0, 0))),  # Empty slot
+    (0, ("", (0, 0, 0, 0))),  # Empty slot
+    (ModelID.Rainbow_Candy_Cane, ("Textures\\Consumables\\Trimmed\\Rainbow_Candy_Cane.png", (ModelID.Rainbow_Candy_Cane.value, 0, ModelID.Honeycomb.value, 0))),
+    
+    (ModelID.Birthday_Cupcake, ("Textures\\Consumables\\Trimmed\\Birthday_Cupcake.png", (ModelID.Birthday_Cupcake.value, GLOBAL_CACHE.Skill.GetID("Birthday_Cupcake_skill"), 0, 0))),
+    (ModelID.Candy_Apple, ("Textures\\Consumables\\Trimmed\\Candy_Apple.png", (ModelID.Candy_Apple.value, GLOBAL_CACHE.Skill.GetID("Candy_Apple_skill"), 0, 0))),
+    (ModelID.Candy_Corn, ("Textures\\Consumables\\Trimmed\\Candy_Corn.png", (ModelID.Candy_Corn.value, GLOBAL_CACHE.Skill.GetID("Candy_Corn_skill"), 0, 0))),
+    (ModelID.Golden_Egg, ("Textures\\Consumables\\Trimmed\\Golden_Egg.png", (ModelID.Golden_Egg.value, GLOBAL_CACHE.Skill.GetID("Golden_Egg_skill"), 0, 0))),
+    (ModelID.Slice_Of_Pumpkin_Pie, ("Textures\\Consumables\\Trimmed\\Slice_of_Pumpkin_Pie.png", (ModelID.Slice_Of_Pumpkin_Pie.value, GLOBAL_CACHE.Skill.GetID("Pie_Induced_Ecstasy"), 0, 0))),
+    (ModelID.War_Supplies, ("Textures\\Consumables\\Trimmed\\War_Supplies.png", (ModelID.War_Supplies.value, GLOBAL_CACHE.Skill.GetID("Well_Supplied"), 0, 0))),
+    
+    (ModelID.Drake_Kabob, ("Textures\\Consumables\\Trimmed\\Drake_Kabob.png", (ModelID.Drake_Kabob.value, GLOBAL_CACHE.Skill.GetID("Drake_Skin"), 0, 0))),
+    (ModelID.Bowl_Of_Skalefin_Soup, ("Textures\\Consumables\\Trimmed\\Bowl_of_Skalefin_Soup.png", (ModelID.Bowl_Of_Skalefin_Soup.value, GLOBAL_CACHE.Skill.GetID("Skale_Vigor"), 0, 0))),
+    (ModelID.Pahnai_Salad, ("Textures\\Consumables\\Trimmed\\Pahnai_Salad.png", (ModelID.Pahnai_Salad.value, GLOBAL_CACHE.Skill.GetID("Pahnai_Salad_item_effect"), 0, 0))),
+    # (ModelID.Dwarven_Ale, ("Textures\\Consumables\\Trimmed\\Dwarven_Ale.png", (ModelID.Dwarven_Ale.value, GLOBAL_CACHE.Skill.GetID("Dwarven_Ale_item_effect"), 0, 0))),
+]
+
+def _post_pcon_message(params, cached_data: CacheData):
+    self_account = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(cached_data.account_email)
+    if not self_account:
+        return
+    
+    accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+    sender_email = cached_data.account_email
+    for account in accounts:        
+        GLOBAL_CACHE.ShMem.SendMessage(sender_email, account.AccountEmail, SharedCommandType.PCon, params)
+
+#_post_pcon_message((ModelID.Essence_Of_Celerity.value, GLOBAL_CACHE.Skill.GetID("Essence_of_Celerity_item_effect"), 0, 0))
+def draw_consumables_window(cached_data: CacheData):
+    global configure_consumables_window_open
+    style = ImGui.get_style()
+    draw_textures = style.Theme in ImGui.Textured_Themes
+    
+    if not configure_consumables_window_open:
+        return
+    
+    
+    PyImGui.open_popup("Configure Consumables")
+    
+    if PyImGui.begin_popup("Configure Consumables"):        
+        if PyImGui.is_window_appearing():
+            io = PyImGui.get_io()
+            mouse_x, mouse_y = io.mouse_pos_x, io.mouse_pos_y
+            PyImGui.set_window_pos(mouse_x, mouse_y - 170, PyImGui.ImGuiCond.Always)
+            
+        ImGui.text("Consumable configuration window")
+        btn_size = 32
+        style.CellPadding.push_style_var(2, 2)
+        if ImGui.begin_table("##ConTable", 6, PyImGui.TableFlags.SizingStretchProp):
+            PyImGui.table_next_column()
+            
+            for model_id, (texture_path, params) in consumables:        
+                if model_id == 0:
+                    PyImGui.table_next_column()
+                    continue
+                
+                if ImGui.invisible_button(f"##ConConfig {model_id}", btn_size, btn_size):
+                    _post_pcon_message(params, cached_data) 
+                    
+                x,y = PyImGui.get_item_rect_min()
+                ThemeTextures.Inventory_Slots.value.get_texture().draw_in_drawlist((x, y), (btn_size, btn_size))
+                ImGui.DrawTextureInDrawList((x + 2, y + 2), (btn_size - 4, btn_size - 4), texture_path)
+                    
+                ImGui.show_tooltip(f"Use {model_id.name.replace('_', ' ')}")
+                PyImGui.table_next_column()
+                        
+            ImGui.end_table()
+            
+        style.CellPadding.pop_style_var()
+                
+        if PyImGui.is_mouse_clicked(0) and not PyImGui.is_any_item_hovered() and not PyImGui.is_window_hovered():
+            configure_consumables_window_open = False
+            PyImGui.close_current_popup()
+            
+        PyImGui.end_popup()
+        
+    
+    pass  # Implementation of consumables window drawing logic goes here
+
+def draw_command_panel(window: WindowModule, accounts : list[AccountData], cached_data: CacheData):
+    style = ImGui.get_style()
+
+    size = window.window_size
+    style.WindowPadding.push_style_var(5, 5)
+    if window.begin():
+        source_game_option = cached_data.HeroAI_vars.global_control_game_struct
+        game_options = GameOptionStruct()
+        
+        avail = PyImGui.get_content_region_avail()
+        avail_x = avail[0]
+        btn_size = 32
+        table_width = btn_size * 5 + 30
+        if ImGui.begin_child("##GlobalHeroOptionsChild",( table_width, (btn_size  * 2) - 6), False, PyImGui.WindowFlags.NoScrollbar | PyImGui.WindowFlags.NoScrollWithMouse):
+            style.ItemSpacing.push_style_var(0, 0)
+            style.CellPadding.push_style_var(2, 2)
+            if PyImGui.begin_table("GameOptionTable", 5, 0, table_width, btn_size + 2):                 
+                PyImGui.table_next_row()
+                PyImGui.table_next_column()
+                
+                game_options.Following = ImGui.toggle_icon_button(IconsFontAwesome5.ICON_RUNNING + "##Following", source_game_option.Following, btn_size, btn_size)
+                ImGui.show_tooltip("Following")
+                PyImGui.table_next_column()
+                game_options.Avoidance = ImGui.toggle_icon_button(IconsFontAwesome5.ICON_PODCAST + "##Avoidance", source_game_option.Avoidance, btn_size, btn_size)
+                ImGui.show_tooltip("Avoidance")
+                PyImGui.table_next_column()
+                game_options.Looting = ImGui.toggle_icon_button(IconsFontAwesome5.ICON_COINS + "##Looting", source_game_option.Looting, btn_size, btn_size)
+                ImGui.show_tooltip("Looting")
+                PyImGui.table_next_column()
+                game_options.Targeting = ImGui.toggle_icon_button(IconsFontAwesome5.ICON_BULLSEYE + "##Targeting", source_game_option.Targeting, btn_size, btn_size)
+                ImGui.show_tooltip("Targeting")
+                PyImGui.table_next_column()
+                game_options.Combat = ImGui.toggle_icon_button(IconsFontAwesome5.ICON_SKULL_CROSSBONES + "##Combat", source_game_option.Combat, btn_size, btn_size)
+                ImGui.show_tooltip("Combat")        
+                
+                PyImGui.end_table()
+
+
+            style.ButtonPadding.push_style_var(5 if style.Theme not in ImGui.Textured_Themes else 0, 3 if style.Theme not in ImGui.Textured_Themes else 2)
+            if PyImGui.begin_table("SkillsTable", NUMBER_OF_SKILLS, 0, table_width, (btn_size / 3)):
+                PyImGui.table_next_row()
+                PyImGui.table_next_column()
+                skill_size = table_width / NUMBER_OF_SKILLS - 6
+                
+                for i in range(NUMBER_OF_SKILLS):
+                    game_options.Skills[i].Active = ImGui.toggle_button(f"{i + 1}##Skill{i}", source_game_option.Skills[i].Active, skill_size, skill_size)
+                    ImGui.show_tooltip(f"Skill {i + 1}")
+                    PyImGui.table_next_column()
+                        
+                PyImGui.end_table()
+            style.ButtonPadding.pop_style_var()
+                    
+            style.ButtonPadding.pop_style_var()
+            style.ItemSpacing.pop_style_var()
+            style.CellPadding.pop_style_var()
+
+        ImGui.end_child()
+                
+        is_window_active = Console.is_window_active()
+        if is_window_active:
+            CompareAndSubmitGameOptions(cached_data, game_options)
+
+        window.process_window()
+        
+        if window.changed:                
+            if is_window_active:
+                settings.HeroPanelPositions[window.window_name.replace(" ", "_")] = (int(window.window_pos[0]), int(window.window_pos[1]), int(window.window_size[0]), int(window.window_size[1]), False)
+                settings.save_settings()
+            
+    window.end()
+    style.WindowPadding.pop_style_var()
+    
+    pass  # Implementation of command panel drawing logic goes here
+
+hotbars : dict[str, WindowModule] = {}
+configure_hotbar = None
+assign_command_slot = None
+
+def draw_hotbar(hotbar: Settings.CommandHotBar, accounts: list[AccountData]):
+    global configure_hotbar
+    style = ImGui.get_style()
+    window = hotbars.get(hotbar.identifier, None)
+    
+    if not window:
+        ConsoleLog("HERO AI", f"Creating hotbar window: {hotbar.identifier} at position {hotbar.position}")
+        window = WindowModule(hotbar.identifier, hotbar.identifier, window_pos=(hotbar.position[0], hotbar.position[1]), window_flags=PyImGui.WindowFlags(PyImGui.WindowFlags.NoTitleBar | PyImGui.WindowFlags.AlwaysAutoResize), can_close=False)
+        hotbars[hotbar.identifier] = window
+
+    size = window.window_size
+    style.WindowPadding.push_style_var(5, 5)
+    draw_textures = style.Theme in ImGui.Textured_Themes
+    
+    if window.begin():
+        explorable = GLOBAL_CACHE.Map.IsExplorable()
+        
+        is_window_active = Console.is_window_active()
+        btn_size = hotbar.button_size
+        rows = len(hotbar.commands)
+        cols = max(1, max(len(row) for _, row in hotbar.commands.items()) if rows > 0 else 0)
+        cell_spacing = (1, 1)
+        
+        style.CellPadding.push_style_var(cell_spacing[0], cell_spacing[1])
+
+        height = max(btn_size, rows * (btn_size + cell_spacing[1]))
+        width = max(btn_size, cols * (btn_size + cell_spacing[0]) - 1)
+
+        if ImGui.begin_child("##HotbarCommandsChild" + hotbar.identifier, (width, height), False, PyImGui.WindowFlags.NoScrollbar | PyImGui.WindowFlags.NoScrollWithMouse):
+            if PyImGui.is_rect_visible(width, height):
+                if ImGui.begin_table("##HotbarTable" + hotbar.identifier, cols, PyImGui.TableFlags.NoFlag, width=width, height=height):
+                    PyImGui.table_next_row()
+                    PyImGui.table_next_column()
+                    
+                    def draw_cmnd_tooltip(tooltip: str):
+                        if PyImGui.is_item_hovered():
+                            PyImGui.set_next_window_size((250, 0), PyImGui.ImGuiCond.Always)
+                            if ImGui.begin_tooltip():
+                                ImGui.text_wrapped(tooltip)
+                                
+                                ImGui.text_colored(
+                                    "Shift + Left Click to configure hotbar",
+                                    gray_color.color_tuple     ,
+                                    12               
+                                )
+                                
+                                ImGui.text_colored(
+                                    "Ctrl + Left Click to assign command",
+                                    gray_color.color_tuple      ,
+                                    12               
+                                )
+                            
+                                ImGui.end_tooltip()
+
+                    for row, cmd_row in hotbar.commands.items():
+                        for col, cmd_name in cmd_row.items():
+                            cmd = commands.Commands.get(cmd_name, None)
+                            if not cmd:
+                                ImGui.dummy(btn_size, btn_size)
+                                ImGui.push_font("Regular", 24)
+                                text_size = PyImGui.calc_text_size("?")
+                                item_rect_min = PyImGui.get_item_rect_min()
+                                
+                                text_x = item_rect_min[0] + (btn_size - text_size[0]) / 2
+                                text_y = item_rect_min[1] + (btn_size - text_size[1]) / 2 + 2
+                                PyImGui.draw_list_add_text(text_x, text_y, style.Text.color_int, "?")
+                                ImGui.pop_font()
+                                if draw_textures:
+                                    ThemeTextures.Skill_Slot_Empty.value.get_texture().draw_in_drawlist(
+                                        (item_rect_min[0] + 1, item_rect_min[1] + 1),
+                                        (btn_size - 2, btn_size - 2),
+                                        tint=(255, 255, 255, 255) if PyImGui.is_item_hovered() else (200, 200, 200, 255)
+                                    )
+                                else:
+                                    PyImGui.draw_list_add_rect_filled(
+                                        item_rect_min[0] + 1, 
+                                        item_rect_min[1] + 1,
+                                        item_rect_min[0] + btn_size - 2, 
+                                        item_rect_min[1] + btn_size - 2,
+                                        style.Button.opacify(0.3).color_int,
+                                        style.FrameRounding.value1,
+                                        0,
+                                    )
+                                    PyImGui.draw_list_add_rect(
+                                        item_rect_min[0] + 1, 
+                                        item_rect_min[1] + 1,
+                                        item_rect_min[0] + btn_size - 2, 
+                                        item_rect_min[1] + btn_size - 2,
+                                        style.Button.color_int,
+                                        style.FrameRounding.value1,
+                                        0,
+                                        1
+                                    )
+
+                            elif cmd.is_separator:
+                                ImGui.dummy(btn_size, btn_size)
+                                item_rect_min = PyImGui.get_item_rect_min()
+                                if draw_textures:
+                                    ThemeTextures.Skill_Slot_Empty.value.get_texture().draw_in_drawlist(
+                                        (item_rect_min[0] + 1, item_rect_min[1] + 1),
+                                        (btn_size - 2, btn_size - 2),
+                                        tint=(255, 255, 255, 255) if PyImGui.is_item_hovered() else (200, 200, 200, 255)
+                                    )
+                                else:
+                                    PyImGui.draw_list_add_rect_filled(
+                                        item_rect_min[0] + 1, 
+                                        item_rect_min[1] + 1,
+                                        item_rect_min[0] + btn_size - 2, 
+                                        item_rect_min[1] + btn_size - 2,
+                                        style.Button.opacify(0.3).color_int,
+                                        style.FrameRounding.value1,
+                                        0,
+                                    )
+                                    PyImGui.draw_list_add_rect(
+                                        item_rect_min[0] + 1, 
+                                        item_rect_min[1] + 1,
+                                        item_rect_min[0] + btn_size - 2, 
+                                        item_rect_min[1] + btn_size - 2,
+                                        style.Button.color_int,
+                                        style.FrameRounding.value1,
+                                        0,
+                                        1
+                                    )
+                            else:
+                                valid_map_type = True
+                                if cmd.map_types and explorable:
+                                    valid_map_type = "Explorable" in cmd.map_types
+                                    
+                                elif cmd.map_types and not explorable:
+                                    valid_map_type = "Outpost" in cmd.map_types
+                                    
+                                if draw_button(cmd.name, cmd.icon, btn_size, btn_size, False, valid_map_type):
+                                    cmd(accounts)
+                                
+
+                            if PyImGui.is_item_clicked(0) and PyImGui.get_io().key_shift:
+                                configure_hotbar = hotbar
+                            
+                            elif PyImGui.is_item_clicked(0) and PyImGui.get_io().key_ctrl:
+                                global assign_command_slot
+                                assign_command_slot = (hotbar.identifier, row, col)
+                                
+                            draw_cmnd_tooltip(cmd.tooltip if cmd else f"Unknown command '{cmd_name}'")
+                            PyImGui.table_next_column()
+                            
+                    ImGui.end_table()
+                
+        ImGui.end_child()
+        style.CellPadding.pop_style_var()
+
+
+        pos = PyImGui.get_window_pos()
+        
+        if window.changed:
+            if is_window_active and hotbar.identifier in settings.CommandHotBars:
+                settings.CommandHotBars[hotbar.identifier].position = (int(pos[0]), int(pos[1]))
+                settings.save_settings()
+            
+    window.end()
+    style.WindowPadding.pop_style_var()
+    
+def draw_command_select_popup():
+    global assign_command_slot
+    
+    if assign_command_slot is None:
+        return        
+    
+    style = ImGui.get_style()
+    PyImGui.open_popup("Assign Command")
+    PyImGui.set_next_window_size((250, 300), PyImGui.ImGuiCond.Always)
+    
+    if PyImGui.begin_popup("Assign Command"):
+        is_appearing = PyImGui.is_window_appearing()
+        if is_appearing:
+            io = PyImGui.get_io()
+            mouse_x, mouse_y = io.mouse_pos_x, io.mouse_pos_y
+            PyImGui.set_window_pos(mouse_x, mouse_y - 170, PyImGui.ImGuiCond.Always)
+
+        identifier, row, col = assign_command_slot[0], assign_command_slot[1], assign_command_slot[2]
+        
+        hotbar = settings.CommandHotBars.get(identifier, None)
+        if not hotbar:
+            assign_command_slot = None
+            PyImGui.close_current_popup()
+            return
+
+        ImGui.text(f"Command Slot [{assign_command_slot[1]}|{assign_command_slot[2]}]")
+
+        if ImGui.begin_child("##CommandSelectChild", (0, 0), True):
+            for cmd_name, cmd in commands.Commands.items():
+                PyImGui.begin_group()
+                draw_button(cmd.name, cmd.icon, 32, 32)
+                PyImGui.same_line(0, 5)
+                ImGui.text_aligned(cmd_name, 0, 32, Alignment.MidLeft, 14)
+                PyImGui.end_group()
+
+                if PyImGui.is_item_clicked(0):
+                    hotbar.commands[row][col] = cmd.name
+                    settings.save_settings()
+                    
+                    assign_command_slot = None
+                    PyImGui.close_current_popup()
+                    
+                ImGui.show_tooltip(cmd.description or cmd.tooltip)
+            
+        ImGui.end_child()
+                    
+        if not is_appearing and PyImGui.is_mouse_clicked(0) and not PyImGui.is_any_item_hovered() and not PyImGui.is_window_hovered():
+            assign_command_slot = None
+            PyImGui.close_current_popup()
+            
+        PyImGui.end_popup()
+
+def draw_configure_hotbar():
+    global configure_hotbar
+    
+    if configure_hotbar is None:
+        return        
+    
+    style = ImGui.get_style()
+    PyImGui.open_popup("Configure Hotbar")
+
+    if PyImGui.begin_popup("Configure Hotbar"):
+        is_appearing = PyImGui.is_window_appearing()
+        if is_appearing:
+            io = PyImGui.get_io()
+            mouse_x, mouse_y = io.mouse_pos_x, io.mouse_pos_y
+            PyImGui.set_window_pos(mouse_x, mouse_y - 80, PyImGui.ImGuiCond.Always)
+
+        ImGui.text(f"Configure '{configure_hotbar.identifier}'")
+        rows = len(configure_hotbar.commands)
+        cols = max(1, max(len(row) for _, row in configure_hotbar.commands.items()) if rows > 0 else 0)
+        
+        button_size = ImGui.input_int("Button Size", configure_hotbar.button_size)
+        if button_size != configure_hotbar.button_size and button_size >= 10 and button_size <= 256:
+            configure_hotbar.button_size = button_size
+            settings.save_settings()
+        ImGui.show_tooltip("Size of each command button in pixels (10-256)")
+            
+        desired_rows = ImGui.input_int("Rows", rows)
+        desired_cols = ImGui.input_int("Columns", cols)
+        
+        if desired_rows != rows or desired_cols != cols:
+            new_commands = {}
+            
+            for r in range(desired_rows):
+                new_commands[r] = {}
+                for c in range(desired_cols):
+                    if r in configure_hotbar.commands and c in configure_hotbar.commands[r]:
+                        new_commands[r][c] = configure_hotbar.commands[r][c]
+                    else:
+                        new_commands[r][c] = "Empty"
+                        
+            configure_hotbar.commands = new_commands
+            settings.save_settings()
+                
+        if not is_appearing and PyImGui.is_mouse_clicked(0) and not PyImGui.is_any_item_hovered() and not PyImGui.is_window_hovered():
+            configure_hotbar = None
+            PyImGui.close_current_popup()
+            
+        PyImGui.end_popup()
+
+def draw_hotbars(accounts: list[AccountData], cached_data: CacheData):
+    for _, hotbar in settings.CommandHotBars.items():
+        if hotbar.visible:
+            draw_hotbar(hotbar, accounts)
+            
+    
+    draw_configure_hotbar()
+    draw_command_select_popup()
+    draw_consumables_window(cached_data)
+
+def draw_configure_window():
+    from Widgets import HeroAI
+    
+    global module_info
+    
+    if not module_info:
+        module_info = widget_handler.get_widget_info(HeroAI.MODULE_NAME)
+        
+    HeroAI.configure_window.open = module_info.configuring if module_info else False
+    
+    if HeroAI.configure_window.begin():
+        if ImGui.begin_tab_bar("##HeroAIConfigTabs"):
+            if ImGui.begin_tab_item("General"):
+                if ImGui.begin_child("##GeneralSettingsChild", (0, 0)):
+                    show_party_panel_ui = ImGui.checkbox("Show Party Panel UI", settings.ShowPartyPanelUI)
+                    if show_party_panel_ui != settings.ShowPartyPanelUI:
+                        settings.ShowPartyPanelUI = show_party_panel_ui
+                        settings.save_settings()
+                    show_floating_targets = ImGui.checkbox("Show Floating Target Buttons", settings.ShowFloatingTargets)
+                    if show_floating_targets != settings.ShowFloatingTargets:
+                        settings.ShowFloatingTargets = show_floating_targets
+                        settings.save_settings()
+
+                    disable_automation = ImGui.checkbox("Disable Leader Automation", settings.DisableAutomationOnLeaderAccount)
+                    if disable_automation != settings.DisableAutomationOnLeaderAccount:
+                        settings.DisableAutomationOnLeaderAccount = disable_automation
+                        settings.save_settings()
+
+                    show_command_panel = ImGui.checkbox("Show Command Panel", settings.ShowCommandPanel)
+                    if show_command_panel != settings.ShowCommandPanel:
+                        settings.ShowCommandPanel = show_command_panel
+                        settings.save_settings()
+                        
+                ImGui.end_child()
+                ImGui.end_tab_item()
+                
+            if ImGui.begin_tab_item("Hero Panels"):      
+                if ImGui.begin_child("##HeroPanelSettingsChild", (0, 0)):              
+                    show_on_leader = ImGui.checkbox("Show only on Leader", settings.ShowPanelOnlyOnLeaderAccount)
+                    if show_on_leader != settings.ShowPanelOnlyOnLeaderAccount:
+                        settings.ShowPanelOnlyOnLeaderAccount = show_on_leader
+                        settings.save_settings()
+                    
+                    combine_panels = ImGui.checkbox("Combine Hero Panels", settings.CombinePanels)
+                    if combine_panels != settings.CombinePanels:
+                        settings.CombinePanels = combine_panels
+                        settings.save_settings()
+                        
+                    show_hero_panels = ImGui.checkbox("Show Hero Panels", settings.ShowHeroPanels)
+                    if show_hero_panels != settings.ShowHeroPanels:
+                        settings.ShowHeroPanels = show_hero_panels
+                        settings.save_settings()
+                            
+                    show_hero_buttons = ImGui.checkbox("Show Hero Buttons", settings.ShowHeroButtons)
+                    if show_hero_buttons != settings.ShowHeroButtons:
+                        settings.ShowHeroButtons = show_hero_buttons
+                        settings.save_settings()
+                        
+                    show_hero_bars = ImGui.checkbox("Show Health and Energy", settings.ShowHeroBars)
+                    if show_hero_bars != settings.ShowHeroBars:
+                        settings.ShowHeroBars = show_hero_bars
+                        settings.save_settings()
+                            
+                    show_hero_skills = ImGui.checkbox("Show Hero Skills", settings.ShowHeroSkills)
+                    if show_hero_skills != settings.ShowHeroSkills:
+                        settings.ShowHeroSkills = show_hero_skills
+                        settings.save_settings()
+                        
+                    show_hero_upkeeps = ImGui.checkbox("Show Hero Upkeeps", settings.ShowHeroUpkeeps)
+                    if show_hero_upkeeps != settings.ShowHeroUpkeeps:
+                        settings.ShowHeroUpkeeps = show_hero_upkeeps
+                        settings.save_settings()
+                        
+                    show_hero_effects = ImGui.checkbox("Show Hero Effects", settings.ShowHeroEffects)
+                    if show_hero_effects != settings.ShowHeroEffects:
+                        settings.ShowHeroEffects = show_hero_effects
+                        settings.save_settings()
+                        
+                    radio_value = 0 if not settings.ShowEffectDurations and not settings.ShowShortEffectDurations else (1 if settings.ShowShortEffectDurations else 2)
+
+                    radio_value = ImGui.radio_button("Show no durations", radio_value, 0)
+                    radio_value = ImGui.radio_button("Show short durations", radio_value, 1)
+                    radio_value = ImGui.radio_button("Show all durations", radio_value, 2)
+
+                    if radio_value == 0:
+                        if settings.ShowEffectDurations or settings.ShowShortEffectDurations:
+                            settings.ShowEffectDurations = False
+                            settings.ShowShortEffectDurations = False
+                            settings.save_settings()
+
+                    elif radio_value == 1:
+                        if settings.ShowEffectDurations or not settings.ShowShortEffectDurations:
+                            settings.ShowEffectDurations = False
+                            settings.ShowShortEffectDurations = True
+                            settings.save_settings()
+
+                    elif radio_value == 2:
+                        if not settings.ShowEffectDurations or settings.ShowShortEffectDurations:
+                            settings.ShowEffectDurations = True
+                            settings.ShowShortEffectDurations = False
+                            settings.save_settings()
+            
+                ImGui.end_child()
+                ImGui.end_tab_item()                
+                    
+            if ImGui.begin_tab_item("Hotbars"):
+                if ImGui.begin_child("##HotbarSettingsChild", (0, 0)):
+                    x_avail, y_avail = PyImGui.get_content_region_avail()
+                    
+                    if ImGui.button("Add Hotbar", x_avail - 4):
+                        identifier = f"Hotbar_{len(settings.CommandHotBars) + 1}"
+                        settings.CommandHotBars[identifier] = Settings.CommandHotBar(identifier)
+                        settings.save_settings()
+                    
+                    if ImGui.begin_child("##HotbarListChild", (0, 0), True):
+                        for key, hotbar in settings.CommandHotBars.items():
+                            ImGui.text_aligned(f"{key}", height=20, alignment=Alignment.MidLeft, font_size=14)
+                            PyImGui.same_line(x_avail - 36 - 36, 0)
+
+                            visible = ImGui.toggle_icon_button(f"{(IconsFontAwesome5.ICON_EYE if hotbar.visible else IconsFontAwesome5.ICON_EYE_SLASH)}##{key}", hotbar.visible, 32, 20)
+                            if visible != hotbar.visible:
+                                hotbar.visible = visible
+                                settings.save_settings()                    
+                            ImGui.show_tooltip(f"{'Hide' if hotbar.visible else 'Show'} Hotbar '{key}'")
+                            
+                            PyImGui.same_line(x_avail - 36, 0)
+                            
+                            if ImGui.icon_button(f"{IconsFontAwesome5.ICON_TRASH}##{key}", 32, 20):
+                                settings.delete_hotbar(key)
+                                break
+                            
+                            ImGui.show_tooltip(f"Delete Hotbar '{key}'")
+                    ImGui.end_child()
+                        
+                ImGui.end_child()
+                ImGui.end_tab_item()
+                
+            ImGui.end_tab_bar()
+            
+                
+                            
+    
+    HeroAI.configure_window.end()  
+    
+    if not HeroAI.configure_window.open:
+        WidgetHandler().set_widget_configuring(HeroAI.MODULE_NAME, False)
+          
+    pass

@@ -24,7 +24,6 @@ for module_name in list(sys.modules.keys()):
             Py4GW.Console.Log(MODULE_NAME, f"Error reloading module {module_name}: {e}", Py4GW.Console.MessageType.Error)
 
 from HeroAI.settings import Settings
-from HeroAI.ui import draw_combined_hero_panel, draw_hero_panel
 from HeroAI.cache_data import CacheData
 from HeroAI.constants import FOLLOW_DISTANCE_OUT_OF_COMBAT
 from HeroAI.constants import MAX_NUM_PLAYERS
@@ -51,6 +50,7 @@ from HeroAI.windows import DrawMultiboxTools
 from HeroAI.windows import DrawOptions
 from HeroAI.windows import DrawPanelButtons
 from HeroAI.windows import SubmitGameOptions
+from HeroAI.ui import draw_combined_hero_panel, draw_command_panel, draw_configure_window, draw_hero_panel, draw_hotbars
 from Py4GWCoreLib import GLOBAL_CACHE
 from Py4GWCoreLib import ActionQueueManager
 from Py4GWCoreLib import IconsFontAwesome5
@@ -71,7 +71,7 @@ from Py4GWCoreLib import Utils
 FOLLOW_COMBAT_DISTANCE = 25.0  # if body blocked, we get close enough.
 LEADER_FLAG_TOUCH_RANGE_THRESHOLD_VALUE = Range.Touch.value * 1.1
 LOOT_THROTTLE_CHECK = ThrottledTimer(250)
-MESSAGE_THROTTLE = ThrottledTimer(25)
+SETTINGS_THROTTLE = ThrottledTimer(50)
 ACCOUNT_THROTTLE = ThrottledTimer(500)
 
 cached_data = CacheData()
@@ -84,6 +84,14 @@ configure_window : WindowModule = WindowModule(
     window_size=(400, 300),
     window_pos=(200, 200),
     can_close=True,
+)
+command_panel_window : WindowModule = WindowModule(
+    module_name="HeroAI Command Panel",
+    window_name="HeroAI Command Panel",
+    window_size=(400, 300),
+    window_pos=(200, 200),
+    can_close=False,
+    window_flags=PyImGui.WindowFlags(PyImGui.WindowFlags.NoTitleBar | PyImGui.WindowFlags.AlwaysAutoResize),
 )
 widget_handler = WidgetHandler()
 module_info = None
@@ -309,7 +317,7 @@ class TabType(Enum):
 
 
 selected_tab: TabType = TabType.party
-settings = Settings()
+settings : Settings = Settings()
 
 
 def DrawFramedContent(cached_data: CacheData, content_frame_id):
@@ -432,38 +440,52 @@ def DrawEmbeddedWindow(cached_data: CacheData):
 def UpdateStatus(cached_data: CacheData):
     global hero_windows, messages
                 
+            
     RegisterPlayer(cached_data)
     RegisterHeroes(cached_data)
     UpdatePlayers(cached_data)
     UpdateGameOptions(cached_data)
 
     cached_data.UpdateGameOptions()
-                        
+    
     own_data = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(cached_data.account_email)
+    
+    if own_data and own_data.PlayerIsPartyLeader and settings.DisableAutomationOnLeaderAccount:        
+        hero_ai_data = GLOBAL_CACHE.ShMem.GetGerHeroAIOptionsByPartyNumber(own_data.PartyPosition)
+                
+        if hero_ai_data is not None:
+            hero_ai_data.Following = False
+            hero_ai_data.Avoidance = False
+            hero_ai_data.Looting = False
+            hero_ai_data.Targeting = False
+            hero_ai_data.Combat = False
+            GLOBAL_CACHE.ShMem.SetHeroAIOptions(own_data.AccountEmail, hero_ai_data)            
+            
+                  
     if not own_data:
-        return
+        return      
     
     identifier = "combined_hero_panel"
-    
+    accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
     if not settings.ShowPanelOnlyOnLeaderAccount or own_data.PlayerIsPartyLeader:
         if settings.ShowHeroPanels:
             messages = GLOBAL_CACHE.ShMem.GetAllMessages()
         
             if settings.CombinePanels:            
                 if not identifier in hero_windows:
-                    stored = settings.HeroPanelPositions.get(identifier, (200, 200, False))
+                    stored = settings.HeroPanelPositions.get(identifier, (200, 200, 200, 100, False))
                     hero_windows[identifier] = WindowModule(
                         module_name=f"HeroAI - {identifier}",
                         window_name=f"Heroes##HeroAI - {identifier}",
-                        window_size=(200, 100),
+                        window_size=(stored[2], stored[3]),
                         window_pos=(stored[0], stored[1]),
-                        collapse=stored[2],
+                        collapse=stored[4],
                         can_close=True,
                     )
                     
                 open = hero_windows[identifier].begin(True, PyImGui.WindowFlags.AlwaysAutoResize)
             
-            for account in GLOBAL_CACHE.ShMem.GetAllAccountData():
+            for account in accounts:
                 if not account.AccountEmail:
                     continue
             
@@ -472,13 +494,13 @@ def UpdateStatus(cached_data: CacheData):
                 
                 if not settings.CombinePanels:
                     if not account.AccountEmail in hero_windows:
-                        stored = settings.HeroPanelPositions.get(account.AccountEmail.lower(), (200, 200, False))
+                        stored = settings.HeroPanelPositions.get(account.AccountEmail.lower(), (200, 200, 200, 100, False))
                         hero_windows[account.AccountEmail] = WindowModule(
                             module_name=f"HeroAI - {account.AccountEmail}",
                             window_name=f"##HeroAI - {account.AccountEmail}",
-                            window_size=(200, 100),
+                            window_size=(stored[2], stored[3]),
                             window_pos=(stored[0], stored[1]),
-                            collapse=stored[2],
+                            collapse=stored[4],
                             can_close=False,
                         )
                         
@@ -488,6 +510,12 @@ def UpdateStatus(cached_data: CacheData):
                     
             if settings.CombinePanels:
                 hero_windows[identifier].end()
+
+    if settings.ShowCommandPanel and (own_data.PlayerIsPartyLeader or not settings.ShowCommandPanelOnlyOnLeaderAccount):
+        draw_command_panel(command_panel_window, accounts, cached_data)
+    
+    if settings.CommandHotBars:
+        draw_hotbars(accounts, cached_data)
                 
     DrawEmbeddedWindow(cached_data)
     if cached_data.ui_state_data.show_classic_controls:
@@ -568,120 +596,38 @@ def UpdateStatus(cached_data: CacheData):
 
 
 def configure():
-    global module_info
-    
-    if not module_info:
-        module_info = widget_handler.get_widget_info(MODULE_NAME)
-        
-    configure_window.open = module_info.configuring if module_info else False
-    
-    if configure_window.begin():
-        if ImGui.collapsing_header("General"):
-            show_party_panel_ui = ImGui.checkbox("Show Party Panel UI", settings.ShowPartyPanelUI)
-            
-            if show_party_panel_ui != settings.ShowPartyPanelUI:
-                settings.ShowPartyPanelUI = show_party_panel_ui
-                settings.save_settings()
-                    
-            show_floating_targets = ImGui.checkbox("Show Floating Target Buttons", settings.ShowFloatingTargets)
-            if show_floating_targets != settings.ShowFloatingTargets:
-                settings.ShowFloatingTargets = show_floating_targets
-                settings.save_settings()
-                    
-            
-            show_command_panel = ImGui.checkbox("Show Command Panel", settings.ShowCommandPanel)
-            if show_command_panel != settings.ShowCommandPanel:
-                settings.ShowCommandPanel = show_command_panel
-                settings.save_settings()
-                
-                
-        if ImGui.collapsing_header("Hero Panels"):       
-            show_on_leader = ImGui.checkbox("Show only on Leader", settings.ShowPanelOnlyOnLeaderAccount)
-            if show_on_leader != settings.ShowPanelOnlyOnLeaderAccount:
-                settings.ShowPanelOnlyOnLeaderAccount = show_on_leader
-                settings.save_settings()
-            
-            combine_panels = ImGui.checkbox("Combine Hero Panels", settings.CombinePanels)
-            if combine_panels != settings.CombinePanels:
-                settings.CombinePanels = combine_panels
-                settings.save_settings()
-                
-            show_hero_panels = ImGui.checkbox("Show Hero Panels", settings.ShowHeroPanels)
-            if show_hero_panels != settings.ShowHeroPanels:
-                settings.ShowHeroPanels = show_hero_panels
-                settings.save_settings()
-                
-        if ImGui.collapsing_header("Health & Energy"):
-            show_hero_bars = ImGui.checkbox("Show Health and Energy", settings.ShowHeroBars)
-            if show_hero_bars != settings.ShowHeroBars:
-                settings.ShowHeroBars = show_hero_bars
-                settings.save_settings()
-                
-        if ImGui.collapsing_header("Hero Skills"):
-            show_hero_skills = ImGui.checkbox("Show Hero Skills", settings.ShowHeroSkills)
-            if show_hero_skills != settings.ShowHeroSkills:
-                settings.ShowHeroSkills = show_hero_skills
-                settings.save_settings()
-        
-        if ImGui.collapsing_header("Hero Effects & Upkeeps"):
-            show_hero_upkeeps = ImGui.checkbox("Show Hero Upkeeps", settings.ShowHeroUpkeeps)
-            if show_hero_upkeeps != settings.ShowHeroUpkeeps:
-                settings.ShowHeroUpkeeps = show_hero_upkeeps
-                settings.save_settings()
-                
-            show_hero_effects = ImGui.checkbox("Show Hero Effects", settings.ShowHeroEffects)
-            if show_hero_effects != settings.ShowHeroEffects:
-                settings.ShowHeroEffects = show_hero_effects
-                settings.save_settings()
-
-            
-            radio_value = 0 if not settings.ShowEffectDurations and not settings.ShowShortEffectDurations else (1 if settings.ShowShortEffectDurations else 2)
-
-            radio_value = ImGui.radio_button("Show no durations", radio_value, 0)
-            radio_value = ImGui.radio_button("Show short durations", radio_value, 1)
-            radio_value = ImGui.radio_button("Show all durations", radio_value, 2)
-
-            if radio_value == 0:
-                if settings.ShowEffectDurations or settings.ShowShortEffectDurations:
-                    settings.ShowEffectDurations = False
-                    settings.ShowShortEffectDurations = False
-                    settings.save_settings()
-
-            elif radio_value == 1:
-                if settings.ShowEffectDurations or not settings.ShowShortEffectDurations:
-                    settings.ShowEffectDurations = False
-                    settings.ShowShortEffectDurations = True
-                    settings.save_settings()
-
-            elif radio_value == 2:
-                if not settings.ShowEffectDurations or settings.ShowShortEffectDurations:
-                    settings.ShowEffectDurations = True
-                    settings.ShowShortEffectDurations = False
-                    settings.save_settings()
-                
-                
-        if ImGui.collapsing_header("Hero Buttons"):
-            show_hero_buttons = ImGui.checkbox("Show Hero Buttons", settings.ShowHeroButtons)
-            if show_hero_buttons != settings.ShowHeroButtons:
-                settings.ShowHeroButtons = show_hero_buttons
-                settings.save_settings()
-                            
-    
-    configure_window.end()  
-    
-    if not configure_window.open:
-        WidgetHandler().set_widget_configuring(MODULE_NAME, False)
-          
-    pass
+    draw_configure_window()
 
 
 def main():
-    global cached_data
-    try:
+    global cached_data, settings
+    
+    try:        
         if not Routines.Checks.Map.MapValid():
             return
 
         cached_data.Update()
+                        
+        if SETTINGS_THROTTLE.IsExpired():
+            SETTINGS_THROTTLE.Reset()
+                            
+            if not settings.ensure_initialized(): 
+                SETTINGS_THROTTLE.SetThrottleTime(50)                              
+                hero_windows.clear()
+                window_settings = settings.HeroPanelPositions.get(command_panel_window.window_name.lower().replace(" ", "_"), (200, 200, 400, 300, False))
+                
+                command_panel_window.window_pos = (window_settings[0], window_settings[1])
+                command_panel_window.window_size = (window_settings[2], window_settings[3])
+                command_panel_window.first_run = True             
+                return
+            elif SETTINGS_THROTTLE.throttle_time != 1000:
+                SETTINGS_THROTTLE.SetThrottleTime(1000)
+            
+            settings.write_settings()
+        
+        if not settings._initialized:
+            return
+            
         if GLOBAL_CACHE.Map.IsMapReady() and GLOBAL_CACHE.Party.IsPartyLoaded():
             UpdateStatus(cached_data)
 
@@ -748,6 +694,7 @@ def minimal():
             PyImGui.end()
 
 def on_enable():
-    settings.load_settings()
+    settings.reset()
+    SETTINGS_THROTTLE.SetThrottleTime(50)
 
 __all__ = ['main', 'configure', 'on_enable']

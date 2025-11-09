@@ -231,11 +231,13 @@ def TravelToMap(index, message):
     if sender_data is None:
         GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
         return
-    map_id = sender_data.MapID
-    map_region = sender_data.MapRegion
-    map_district = sender_data.MapDistrict
 
-    yield from Routines.Yield.Map.TravelToRegion(map_id, map_region, map_district, language=0, log=True)
+    map_id = int(message.Params[0])
+    map_region = int(message.Params[1])
+    map_district = int(message.Params[2])
+    language = int(message.Params[3])
+
+    yield from Routines.Yield.Map.TravelToRegion(map_id, map_region, map_district, language=language, log=True)
     yield from Routines.Yield.wait(100)
     GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
     ConsoleLog(MODULE_NAME, "TravelToMap message processed and finished.", Console.MessageType.Info, False)

@@ -1,102 +1,195 @@
-from enum import IntEnum, Enum
+from dataclasses import dataclass
+from enum import IntEnum, Enum, IntFlag, auto
+from typing import Optional
 from .types import TEXTURE_FOLDER, MINIMALUS_FOLDER, StyleTheme
 from ..Overlay import Overlay
 import os
-
 
 class TextureState(IntEnum):
     Normal = 0
     Hovered = 1
     Active = 2
     Disabled = 3
+    
+class TextureSliceMode(IntEnum):
+    FULL = 1
+    THREE_HORIZONTAL = 3
+    THREE_VERTICAL = 4
+    NINE = 9
 
-class SplitTexture:
+class RegionFlags(IntFlag):
+    NONE   = 0
+    LEFT   = auto()
+    CENTER = auto()
+    RIGHT  = auto()
+    TOP    = auto()
+    MIDDLE = auto()
+    BOTTOM = auto()
+    FULL   = auto()
+
+class UVRegion:
+    __slots__ = ("x0", "y0", "x1", "y1")
+
+    def __init__(self, x0: float, y0: float, x1: float, y1: float):
+        self.x0, self.y0, self.x1, self.y1 = x0, y0, x1, y1
+
+    def uv0(self) -> tuple[float, float]:
+        return (self.x0, self.y0)
+
+    def uv1(self) -> tuple[float, float]:
+        return (self.x1, self.y1)
+
+    def as_tuple(self) -> tuple[float, float, float, float]:
+        return (self.x0, self.y0, self.x1, self.y1)
+
+class GameTexture:
     """
-    Represents a texture that is split into left, mid, and right parts.
-    Used for drawing scalable UI elements with sliced borders.
+    Unified class supporting:
+    - Atlas state maps (Normal, Hovered, Active, Disabled)
+    - 1/3/9-slice scalable rendering
+    - Precomputed UVs for all states
     """
 
     def __init__(
         self,
         texture: str,
         texture_size: tuple[float, float],
-        mid: tuple[float, float, float, float] | None = None,
-        left: tuple[float, float, float, float] | None = None,
-        right: tuple[float, float, float, float] | None = None,
+        mode: TextureSliceMode = TextureSliceMode.NINE,
+        element_size: Optional[tuple[float, float]] = None,
+        margin: Optional[tuple[float, float]] = None,
+        state_map: Optional[dict[TextureState, tuple[float, float]]] = None,
     ):
         self.texture = texture
-        self.width, self.height = texture_size
+        self.tex_width, self.tex_height = texture_size
+        self.mode = mode
+        self.element_width, self.element_height = element_size if element_size else (texture_size[0], texture_size[1])
 
-        self.left = left
-        self.left_width = (left[2] - left[0]) if left else 0
-        self.left_offset = self._calc_uv(left, texture_size) if left else (0, 0, 0, 0)
+        self.margin_x = margin[0] if margin else self._compute_margin(self.element_height)
+        self.margin_y = margin[1] if margin else self._compute_margin(self.element_height)
 
-        self.mid = mid
-        self.mid_width = (mid[2] - mid[0]) if mid else 0
-        self.mid_offset = self._calc_uv(mid, texture_size) if mid else (0, 0, 0, 0)
+        # atlas state → pixel offset
+        self.state_map = state_map or {
+            TextureState.Normal: (0, 0),
+        }
 
-        self.right = right
-        self.right_width = (right[2] - right[0]) if right else 0
-        self.right_offset = self._calc_uv(right, texture_size) if right else (0, 0, 0, 0)
+        # per-state, precomputed uv maps for all regions
+        self.state_uvs: dict[TextureState, dict[RegionFlags, Optional[UVRegion]]] = {}
 
-    @staticmethod
-    def _calc_uv(region: tuple[float, float, float, float], size: tuple[float, float]) -> tuple[float, float, float, float]:
-        x0, y0, x1, y1 = region
+        # build all precomputed UVs once
+        self._build_all_state_uvs()
+
+    # --- helpers ---------------------------------------------------------------
+
+    def _compute_margin(self, size: float) -> float:
+        if size <= 32:
+            return 10.0
+        elif size >= 64:
+            return 40.0
+        else:
+            return 10.0 + (size - 32.0) * (30.0 / 32.0)
+
+    def _uv(self, x0: float, y0: float, x1: float, y1: float) -> UVRegion:
+        """Convert absolute pixel coordinates to normalized UVs."""
+        return UVRegion(x0 / self.tex_width, y0 / self.tex_height, x1 / self.tex_width, y1 / self.tex_height)
+
+    def _build_state_uv(self, offset_x: float, offset_y: float) -> dict[RegionFlags, Optional[UVRegion]]:
+        """Build UV regions for one atlas state."""
+        sx, sy, w, h = self.margin_x, self.margin_y, self.element_width, self.element_height
+        ox, oy = offset_x, offset_y
+        uvs: dict[RegionFlags, Optional[UVRegion]] = {}
+        
+        if self.mode == TextureSliceMode.FULL:
+            uvs[RegionFlags.FULL] = self._uv(ox, oy, ox + w, oy + h)
+
+        elif self.mode == TextureSliceMode.THREE_HORIZONTAL:
+            uvs[RegionFlags.LEFT] = self._uv(ox, oy, ox + sx, oy + h)
+            uvs[RegionFlags.CENTER] = self._uv(ox + sx, oy, ox + w - sx, oy + h)
+            uvs[RegionFlags.RIGHT] = self._uv(ox + w - sx, oy, ox + w, oy + h)
+
+        elif self.mode == TextureSliceMode.THREE_VERTICAL:
+            uvs[RegionFlags.TOP] = self._uv(ox, oy, ox + w, oy + sy)
+            uvs[RegionFlags.MIDDLE] = self._uv(ox, oy + sy, ox + w, oy + h - sy)
+            uvs[RegionFlags.BOTTOM] = self._uv(ox, oy + h - sy, ox + w, oy + h)
+
+        elif self.mode == TextureSliceMode.NINE:
+            uvs[RegionFlags.TOP | RegionFlags.LEFT] = self._uv(ox, oy, ox + sx, oy + sy)
+            uvs[RegionFlags.TOP | RegionFlags.CENTER] = self._uv(ox + sx, oy, ox + w - sx, oy + sy)
+            uvs[RegionFlags.TOP | RegionFlags.RIGHT] = self._uv(ox + w - sx, oy, ox + w, oy + sy)
+            uvs[RegionFlags.MIDDLE | RegionFlags.LEFT] = self._uv(ox, oy + sy, ox + sx, oy + h - sy)
+            uvs[RegionFlags.MIDDLE | RegionFlags.CENTER] = self._uv(ox + sx, oy + sy, ox + w - sx, oy + h - sy)
+            uvs[RegionFlags.MIDDLE | RegionFlags.RIGHT] = self._uv(ox + w - sx, oy + sy, ox + w, oy + h - sy)
+            uvs[RegionFlags.BOTTOM | RegionFlags.LEFT] = self._uv(ox, oy + h - sy, ox + sx, oy + h)
+            uvs[RegionFlags.BOTTOM | RegionFlags.CENTER] = self._uv(ox + sx, oy + h - sy, ox + w - sx, oy + h)
+            uvs[RegionFlags.BOTTOM | RegionFlags.RIGHT] = self._uv(ox + w - sx, oy + h - sy, ox + w, oy + h)
+        return uvs
+
+    def _build_all_state_uvs(self):
+        """Precompute all per-state UV sets."""
+        for state, (ox, oy) in self.state_map.items():
+            self.state_uvs[state] = self._build_state_uv(ox, oy)
+
+    # --- drawing ---------------------------------------------------------------
+
+    def draw_in_drawlist(
+        self,
+        pos: tuple[float, float],
+        size: tuple[float, float],
+        state: TextureState = TextureState.Normal,
+        tint: tuple[int, int, int, int] = (255, 255, 255, 255),
+    ):
+        """Draw the precomputed state UVs with slicing."""
+        from .ImGuisrc import ImGui
+
+        x, y = pos
         w, h = size
-        return x0 / w, y0 / h, x1 / w, y1 / h
+        sx, sy = self.margin_x, self.margin_y
+        uvs = self.state_uvs.get(state) or self.state_uvs[TextureState.Normal]
+        
+        if not uvs:
+            return  # no UVs to draw
+        
+        def draw(region: RegionFlags, dx: float, dy: float, dw: float, dh: float):
+            uv_region = uvs.get(region, None)
+            if uv_region:
+                ImGui.DrawTextureInDrawList(
+                    pos=(x + dx, y + dy),
+                    size=(dw, dh),
+                    texture_path=self.texture,
+                    uv0=uv_region.uv0(),
+                    uv1=uv_region.uv1(),
+                    tint=tint
+                )
 
-    def draw_in_drawlist(self, x: float, y: float, size: tuple[float, float], tint=(255, 255, 255, 255), state: TextureState = TextureState.Normal):
-        from .ImGuisrc import ImGui
-        # Draw left part
-        ImGui.DrawTextureInDrawList(
-            pos=(x, y),
-            size=(self.left_width, size[1]),
-            texture_path=self.texture,
-            uv0=self.left_offset[:2],
-            uv1=self.left_offset[2:],
-            tint=tint
-        )
+        if self.mode == TextureSliceMode.FULL:
+            draw(RegionFlags.FULL, 0, 0, w, h)
 
-        # Draw mid part
-        mid_x = x + self.left_width
-        mid_width = size[0] - self.left_width - self.right_width
-        ImGui.DrawTextureInDrawList(
-            pos=(mid_x, y),
-            size=(mid_width, size[1]),
-            texture_path=self.texture,
-            uv0=self.mid_offset[:2],
-            uv1=self.mid_offset[2:],
-            tint=tint
-        )
+        elif self.mode == TextureSliceMode.THREE_HORIZONTAL:
+            lw, rw = sx, sx
+            mw = max(0, w - lw - rw)
+            draw(RegionFlags.LEFT, 0, 0, lw, h)
+            draw(RegionFlags.CENTER, lw, 0, mw, h)
+            draw(RegionFlags.RIGHT, lw + mw, 0, rw, h)
 
-        # Draw right part
-        right_x = x + size[0] - self.right_width
-        ImGui.DrawTextureInDrawList(
-            pos=(right_x, y),
-            size=(self.right_width, size[1]),
-            texture_path=self.texture,
-            uv0=self.right_offset[:2],
-            uv1=self.right_offset[2:],
-            tint=tint
-        )
+        elif self.mode == TextureSliceMode.THREE_VERTICAL:
+            th, bh = sy, sy
+            mh = max(0, h - th - bh)
+            draw(RegionFlags.TOP, 0, 0, w, th)
+            draw(RegionFlags.MIDDLE, 0, th, w, mh)
+            draw(RegionFlags.BOTTOM, 0, th + mh, w, bh)
 
-    def draw_in_background_drawlist(self, x: float, y: float, size: tuple[float, float], tint=(255, 255, 255, 255), overlay_name : str = ""):        
-        from .ImGuisrc import ImGui
-        ImGui.overlay_instance.BeginDraw(overlay_name)
+        elif self.mode == TextureSliceMode.NINE:
+            cw, ch = sx, sy
+            mw, mh = max(0, w - 2 * cw), max(0, h - 2 * ch)
 
-        # Draw left part
-        ImGui.overlay_instance.DrawTexturedRectExtended((x, y), (self.left_width, size[1]), self.texture, self.left_offset[:2], self.left_offset[2:], tint)
-
-        # Draw mid part
-        mid_x = x + self.left_width
-        mid_width = size[0] - self.left_width - self.right_width
-        ImGui.overlay_instance.DrawTexturedRectExtended((mid_x, y), (mid_width, size[1]), self.texture, self.mid_offset[:2], self.mid_offset[2:], tint)
-
-        # Draw right part
-        right_x = x + size[0] - self.right_width
-        ImGui.overlay_instance.DrawTexturedRectExtended((right_x, y), (self.right_width, size[1]), self.texture, self.right_offset[:2], self.right_offset[2:], tint)
-
-        ImGui.overlay_instance.EndDraw()
+            draw(RegionFlags.TOP | RegionFlags.LEFT, 0, 0, cw, ch)
+            draw(RegionFlags.TOP | RegionFlags.CENTER, cw, 0, mw, ch)
+            draw(RegionFlags.TOP | RegionFlags.RIGHT, cw + mw, 0, cw, ch)
+            draw(RegionFlags.MIDDLE | RegionFlags.LEFT, 0, ch, cw, mh)
+            draw(RegionFlags.MIDDLE | RegionFlags.CENTER, cw, ch, mw, mh)
+            draw(RegionFlags.MIDDLE | RegionFlags.RIGHT, cw + mw, ch, cw, mh)
+            draw(RegionFlags.BOTTOM | RegionFlags.LEFT, 0, ch + mh, cw, ch)
+            draw(RegionFlags.BOTTOM | RegionFlags.CENTER, cw, ch + mh, mw, ch)
+            draw(RegionFlags.BOTTOM | RegionFlags.RIGHT, cw + mw, ch + mh, cw, ch)
 
 class MapTexture:
     """
@@ -140,8 +233,7 @@ class MapTexture:
 
     def draw_in_drawlist(
         self,
-        x: float,
-        y: float,
+        pos: tuple[float, float],
         size: tuple[float, float],
         state: TextureState = TextureState.Normal,
         tint=(255, 255, 255, 255)
@@ -149,31 +241,13 @@ class MapTexture:
         from .ImGuisrc import ImGui
         uv = self.get_uv(state)
         ImGui.DrawTextureInDrawList(
-            pos=(x, y),
+            pos=pos,
             size=size,
             texture_path=self.texture,
             uv0=uv[:2],
             uv1=uv[2:],
             tint=tint,
         )
-
-    def draw_in_background_drawlist(
-        self,
-        x: float,
-        y: float,
-        size: tuple[float, float],
-        state: TextureState = TextureState.Normal,
-        tint=(255, 255, 255, 255),
-        overlay_name: str = ""
-    ):
-        from .ImGuisrc import ImGui
-        
-        uv = self.get_uv(state)
-        ImGui.overlay_instance.BeginDraw(overlay_name)
-
-        ImGui.overlay_instance.DrawTexturedRectExtended((x, y), size, self.texture, uv[:2], uv[2:], tint)
-
-        ImGui.overlay_instance.EndDraw()
 
 class ThemeTexture:
     PlaceHolderTexture = MapTexture(
@@ -185,14 +259,14 @@ class ThemeTexture:
 
     def __init__(
         self,
-        *args: tuple[StyleTheme, SplitTexture | MapTexture],
+        *args: tuple[StyleTheme, GameTexture | MapTexture],
     ):
-        self.textures: dict[StyleTheme, SplitTexture | MapTexture] = {}
+        self.textures: dict[StyleTheme, GameTexture | MapTexture] = {}
 
         for theme, texture in args:
             self.textures[theme] = texture
 
-    def get_texture(self, theme: StyleTheme | None = None) -> SplitTexture | MapTexture:
+    def get_texture(self, theme: StyleTheme | None = None) -> GameTexture | MapTexture:
         from .ImGuisrc import ImGui
         theme = theme or ImGui.get_style().Theme
         return self.textures.get(theme, ThemeTexture.PlaceHolderTexture)
@@ -212,12 +286,9 @@ class ThemeTextures(Enum):
         normal=(0, 0)
     )
 
-    ScrollGrab_Top = SplitTexture(
+    ScrollGrab_Top = GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_scrollgrab.png"),
         texture_size=(16, 16),
-        left=(0, 0, 5, 7),
-        mid=(5, 0, 10, 7),
-        right=(10, 0, 16, 7),   
     )
 
     ScrollGrab_Middle = MapTexture(
@@ -234,12 +305,9 @@ class ThemeTextures(Enum):
         normal=(0, 0)
     )
 
-    ScrollGrab_Bottom = SplitTexture(
+    ScrollGrab_Bottom = GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_scrollgrab.png"),
-        texture_size=(16, 16),
-        left=(0, 9, 5, 16),
-        mid=(5, 9, 10, 16),
-        right=(10, 9, 16, 16),    
+        texture_size=(16, 16), 
     )            
 
     RightButton = MapTexture(
@@ -309,57 +377,45 @@ class ThemeTextures(Enum):
     )
 
     Combo_Arrow = ThemeTexture(
-        (StyleTheme.Minimalus, SplitTexture(
+        (StyleTheme.Minimalus, GameTexture(
             texture=os.path.join(MINIMALUS_FOLDER, "ui_combo_arrow.png"),
             texture_size=(128, 32),
-            left=(4, 4, 14, 27),
-            mid=(15, 4, 92, 27),
-            right=(93, 4, 123, 27)
+            mode=TextureSliceMode.FULL,
         )),
 
-        (StyleTheme.Guild_Wars, SplitTexture(
+        (StyleTheme.Guild_Wars, GameTexture(
             texture=os.path.join(TEXTURE_FOLDER, "ui_combo_arrow.png"),
             texture_size=(128, 32),
-            left=(1, 4, 14, 27),
-            mid=(15, 4, 92, 27),
-            right=(93, 4, 126, 27),
+            mode=TextureSliceMode.FULL,
         ))
     )
 
     Combo_Background = ThemeTexture(
-        (StyleTheme.Minimalus, SplitTexture(
+        (StyleTheme.Minimalus, GameTexture(
             texture=os.path.join(MINIMALUS_FOLDER, "ui_combo_background.png"),
             texture_size=(128, 32),
-            left=(4, 4, 14, 27),
-            mid=(15, 4, 92, 27),
-            right=(93, 4, 124, 27)
+            margin=(36, 8),
         )),
 
-        (StyleTheme.Guild_Wars, SplitTexture(
+        (StyleTheme.Guild_Wars, GameTexture(
             texture=os.path.join(
                 TEXTURE_FOLDER, "ui_combo_background.png"),
             texture_size=(128, 32),
-            left=(1, 4, 14, 27),
-            mid=(15, 4, 92, 27),
-            right=(93, 4, 126, 27),
+            margin=(36, 8),
         ))
     )
 
     Combo_Frame = ThemeTexture(
-        (StyleTheme.Minimalus, SplitTexture(
+        (StyleTheme.Minimalus, GameTexture(
             texture=os.path.join(MINIMALUS_FOLDER, "ui_combo_frame.png"),
             texture_size=(128, 32),
-            left=(4, 4, 14, 27),
-            mid=(15, 4, 92, 27),
-            right=(93, 4, 124, 27),
+            margin=(36, 8),
         )),
 
-        (StyleTheme.Guild_Wars, SplitTexture(
+        (StyleTheme.Guild_Wars, GameTexture(
             texture=os.path.join(TEXTURE_FOLDER, "ui_combo_frame.png"),
             texture_size=(128, 32),
-            left=(1, 4, 14, 27),
-            mid=(15, 4, 92, 27),
-            right=(93, 4, 126, 27),
+            margin=(36, 8),
         ))
     )
     ArrowCollapsed = ThemeTexture(
@@ -393,75 +449,51 @@ class ThemeTextures(Enum):
     )    
     
     CollapsingHeader_Background = ThemeTexture(
-        (StyleTheme.Minimalus, SplitTexture(
+        (StyleTheme.Minimalus, GameTexture(
             texture=os.path.join(MINIMALUS_FOLDER, "ui_collapsing_header_background.png"),
             texture_size=(128, 32),
-            left=(4, 5, 14, 26),
-            mid=(15, 5, 92, 26),
-            right=(93, 5, 124, 26),
         )),
 
-        (StyleTheme.Guild_Wars, SplitTexture(
+        (StyleTheme.Guild_Wars, GameTexture(
             texture=os.path.join(
                 TEXTURE_FOLDER, "ui_collapsing_header_background.png"),
             texture_size=(128, 32),
-            left=(3, 5, 14, 26),
-            mid=(15, 5, 92, 26),
-            right=(93, 5, 125, 26),
         ))
     )
 
     CollapsingHeader_Frame = ThemeTexture(
-        (StyleTheme.Minimalus, SplitTexture(
+        (StyleTheme.Minimalus, GameTexture(
             texture=os.path.join(MINIMALUS_FOLDER, "ui_collapsing_header_frame.png"),
             texture_size=(128, 32),
-            left=(4, 5, 14, 26),
-            mid=(15, 5, 92, 26),
-            right=(93, 5, 124, 26),
         )),
 
-        (StyleTheme.Guild_Wars, SplitTexture(
+        (StyleTheme.Guild_Wars, GameTexture(
             texture=os.path.join(TEXTURE_FOLDER, "ui_collapsing_header_frame.png"),
             texture_size=(128, 32),
-            left=(3, 5, 14, 26),
-            mid=(15, 5, 92, 26),
-            right=(93, 5, 125, 26),
         ))
     )
 
     Button_Frame = ThemeTexture(
-        (StyleTheme.Minimalus, SplitTexture(
+        (StyleTheme.Minimalus, GameTexture(
             texture=os.path.join(MINIMALUS_FOLDER, "ui_button_frame.png"),
             texture_size=(32, 32),
-            left=(6, 4, 7, 25),
-            mid=(8, 4, 24, 25),
-            right=(25, 4, 26, 25), 
         )),
 
-        (StyleTheme.Guild_Wars, SplitTexture(
+        (StyleTheme.Guild_Wars, GameTexture(
             texture=os.path.join(TEXTURE_FOLDER, "ui_button_frame.png"),
             texture_size=(32, 32),
-            left=(2, 4, 7, 25),
-            mid=(8, 4, 24, 25),
-            right=(24, 4, 30, 25), 
         ))
     )
 
     Button_Background = ThemeTexture(
-        (StyleTheme.Minimalus, SplitTexture(
+        (StyleTheme.Minimalus, GameTexture(
             texture=os.path.join(MINIMALUS_FOLDER, "ui_button_background.png"),
             texture_size=(32, 32),
-            left=(6, 4, 7, 25),
-            mid=(8, 4, 24, 25),
-            right=(25, 4, 26, 25), 
         )),
 
-        (StyleTheme.Guild_Wars, SplitTexture(
+        (StyleTheme.Guild_Wars, GameTexture(
             texture=os.path.join(TEXTURE_FOLDER, "ui_button_background.png"),
             texture_size=(32, 32),
-            left=(2, 4, 7, 25),
-            mid=(8, 4, 24, 25),
-            right=(24, 4, 30, 25), 
         ))
     )
 
@@ -504,19 +536,13 @@ class ThemeTextures(Enum):
     )
 
     SliderBar = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(MINIMALUS_FOLDER, "ui_slider_bar.png"),
         texture_size=(32, 16),
-        left=(0, 0, 7, 16),
-        mid=(8, 0, 24, 16),
-        right=(25, 0, 32, 16),   
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_slider_bar.png"),
         texture_size=(32, 16),
-        left=(0, 0, 7, 16),
-        mid=(8, 0, 24, 16),
-        right=(25, 0, 32, 16),   
     )),
     )
 
@@ -536,36 +562,24 @@ class ThemeTextures(Enum):
     )
 
     Input_Inactive = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(MINIMALUS_FOLDER, "ui_input_inactive.png"),
         texture_size=(32, 16),
-        left= (1, 0, 6, 16),
-        mid= (7, 0, 26, 16),
-        right= (27, 0, 31, 16),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_input_inactive.png"),
         texture_size=(32, 16),
-        left= (1, 0, 6, 16),
-        mid= (7, 0, 26, 16),
-        right= (27, 0, 31, 16),
     )),
     )
 
     Input_Active = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(MINIMALUS_FOLDER, "ui_input_active.png"),
         texture_size=(32, 16),
-        left= (1, 1, 6, 15),
-        mid= (7, 1, 26, 15),
-        right= (27, 1, 31, 15),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_input_active.png"),
         texture_size=(32, 16),
-        left= (1, 1, 6, 15),
-        mid= (7, 1, 26, 15),
-        right= (27, 1, 31, 15),
     )),
     )
 
@@ -603,71 +617,40 @@ class ThemeTextures(Enum):
     )),
     )        
 
-    Tab_Frame_Top = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    Tab_Frame = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(MINIMALUS_FOLDER, "ui_tab_bar_frame.png"),
         texture_size=(32, 32),
-        left=(1, 1, 4, 5),
-        mid=(5, 1, 26, 5),
-        right=(27, 1, 31, 5),   
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_tab_bar_frame.png"),
         texture_size=(32, 32),
-        left=(1, 1, 4, 5),
-        mid=(5, 1, 26, 5),
-        right=(27, 1, 31, 5),   
     )),
     )
-
-    Tab_Frame_Body = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
-        texture = os.path.join(MINIMALUS_FOLDER, "ui_tab_bar_frame.png"),
-        texture_size=(32, 32),
-        left=(1, 5, 4, 26),
-        mid=(5, 5, 26, 26),
-        right=(27, 5, 31, 26), 
-    )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
-        texture = os.path.join(TEXTURE_FOLDER, "ui_tab_bar_frame.png"),
-        texture_size=(32, 32),
-        left=(1, 5, 4, 26),
-        mid=(5, 5, 26, 26),
-        right=(27, 5, 31, 26),  
-    )),
-    )
-
+    
     Tab_Active = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(MINIMALUS_FOLDER, "ui_tab_active.png"),
         texture_size=(32, 32),
-        left=(2, 1, 8, 32),
-        mid=(9, 1, 23, 32),
-        right=(24, 1, 30, 32),   
+        margin=(8, 0),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_tab_active.png"),
         texture_size=(32, 32),
-        left=(2, 1, 8, 32),
-        mid=(9, 1, 23, 32),
-        right=(24, 1, 30, 32),   
+        margin=(8, 0),
     )),
     )
 
     Tab_Inactive = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(MINIMALUS_FOLDER, "ui_tab_inactive.png"),
         texture_size=(32, 32),
-        left=(2, 6, 8, 32),
-        mid=(9, 6, 23, 32),
-        right=(24, 6, 30, 32),   
+        margin=(8, 0),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_tab_inactive.png"),
         texture_size=(32, 32),
-        left=(2, 6, 8, 32),
-        mid=(9, 6, 23, 32),
-        right=(24, 6, 30, 32),    
+        margin=(8, 0),
     )),
     )
 
@@ -738,106 +721,145 @@ class ThemeTextures(Enum):
     )
 
     Title_Bar = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
-        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_title_frame_atlas.png"),
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_titlebar.png"),
         texture_size=(128, 32),
-        left=(0, 6, 18, 32),
-        mid=(19, 6, 109, 32),
-        right=(110, 6, 128, 32)
+        margin=(18, 0),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
-        texture = os.path.join(TEXTURE_FOLDER, "ui_window_title_frame_atlas.png"),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_titlebar.png"),
         texture_size=(128, 32),
-        left=(0, 6, 18, 32),
-        mid=(19, 6, 109, 32),
-        right=(110, 6, 128, 32)
+        margin=(18, 0),
+    )),
+    )
+    
+    Title_Bar_Collapsed = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_titlebar_collapsed.png"),
+        texture_size=(128, 32),
+        margin=(18, 0),
+    )),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_titlebar_collapsed.png"),
+        texture_size=(128, 32),
+        margin=(18, 0),
     )),
     )
 
-    Window_Frame_Top = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
-        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_frame_atlas.png"),
+    Window = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window.png"),
         texture_size=(128, 128),
-        left=(0, 0, 18, 40),
-        right=(110, 0, 128, 40),
-        mid=(19, 0, 109, 40)
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
-        texture = os.path.join(TEXTURE_FOLDER, "ui_window_frame_atlas.png"),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window.png"),
         texture_size=(128, 128),
-        left=(0, 0, 18, 40),
-        right=(110, 0, 128, 40),
-        mid=(19, 0, 109, 40)
+    )),
+    )
+    
+    Window_NoResize_NoTitleBar = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_notitlebar_noresize.png"),
+        texture_size=(128, 128),
+    )),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window_notitlebar_noresize.png"),
+        texture_size=(128, 128),
+    )),
+    )
+
+    Window_NoResize = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_noresize.png"),
+        texture_size=(128, 128),
+    )),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window_noresize.png"),
+        texture_size=(128, 128),
+    )),
+    )
+
+    Window_NoTitleBar = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_notitlebar.png"),
+        texture_size=(128, 128),
+    )),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window_notitlebar.png"),
+        texture_size=(128, 128),
+    )),
+    )
+
+    Window_NoResize_NoTitlebar = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window.png"),
+        texture_size=(128, 128),
+    )),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window.png"),
+        texture_size=(128, 128),
+    )),
+    )
+
+
+
+
+
+    Window_Frame_Top = ThemeTexture(
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window.png"),
+        texture_size=(128, 128),
+    )),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window.png"),
+        texture_size=(128, 128),
     )),
     )
 
     Window_Frame_Center = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
-        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_frame_atlas.png"),
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window.png"),
         texture_size=(128, 128),
-        left=(0, 40, 18, 68),
-        mid=(19, 40, 109, 68),
-        right=(110, 40, 128, 68),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
-        texture = os.path.join(TEXTURE_FOLDER, "ui_window_frame_atlas.png"),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window.png"),
         texture_size=(128, 128),
-        left=(0, 40, 18, 68),
-        mid=(19, 40, 109, 68),
-        right=(110, 40, 128, 68),
     )),
     )
 
     Window_Frame_Bottom = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
-        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_frame_atlas.png"),
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window.png"),
         texture_size=(128, 128),
-        left=(0, 68, 18, 128),
-        mid=(19, 68, 77, 128),
-        right=(78, 68, 128, 128),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
-        texture = os.path.join(TEXTURE_FOLDER, "ui_window_frame_atlas.png"),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window.png"),
         texture_size=(128, 128),
-        left=(0, 68, 18, 128),
-        mid=(19, 68, 77, 128),
-        right=(78, 68, 128, 128),
     )),
     )
 
     Window_Frame_Top_NoTitleBar = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
-        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_frame_atlas_no_titlebar.png"),
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_no_titlebar.png"),
         texture_size=(128, 128),
-        left=(0, 0, 18, 51),
-        right=(110, 0, 128, 51),
-        mid=(19, 0, 109, 51)
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
-        texture = os.path.join(TEXTURE_FOLDER, "ui_window_frame_atlas_no_titlebar.png"),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window_no_titlebar.png"),
         texture_size=(128, 128),
-        left=(0, 0, 18, 51),
-        right=(110, 0, 128, 51),
-        mid=(19, 0, 109, 51)
     )),
     )
 
     Window_Frame_Bottom_No_Resize = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
-        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_frame_atlas_no_resize.png"),
+    (StyleTheme.Minimalus,  GameTexture(
+        texture = os.path.join(MINIMALUS_FOLDER, "ui_window_noresize.png"),
         texture_size=(128, 128),
-        left=(0, 68, 18, 128),
-        mid=(19, 68, 77, 128),
-        right=(78, 68, 128, 128),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
-        texture = os.path.join(TEXTURE_FOLDER, "ui_window_frame_atlas_no_resize.png"),
+    (StyleTheme.Guild_Wars,  GameTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_window_noresize.png"),
         texture_size=(128, 128),
-        left=(0, 68, 18, 128),
-        mid=(19, 68, 77, 128),
-        right=(78, 68, 128, 128),
     )),
     )
+
 
     Separator = ThemeTexture(
     (StyleTheme.Minimalus,  MapTexture(
@@ -855,19 +877,13 @@ class ThemeTextures(Enum):
     )
 
     ProgressBarFrame = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_progressbar_frame.png"),
         texture_size=(16, 16),
-        left= (1, 1, 2, 14),
-        mid= (3, 1, 12, 14),
-        right= (13, 1, 14, 14),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_progressbar_frame.png"),
         texture_size=(16, 16),
-        left= (1, 1, 2, 14),
-        mid= (3, 1, 12, 14),
-        right= (13, 1, 14, 14),
     )),
     )
     
@@ -961,7 +977,6 @@ class ThemeTextures(Enum):
     )),
     )
     
-
     ProgressBarProgressCursor = ThemeTexture(
     (StyleTheme.Minimalus,  MapTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_progress_highlight.png"),
@@ -1297,33 +1312,27 @@ class ThemeTextures(Enum):
     (StyleTheme.Minimalus,  MapTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_aggression.png"),
         texture_size = (128, 64),
-        size = (29, 29),
-        normal= (66, 34),
-        active= (98, 34),
+        size = (27, 29),
+        normal= (67, 34),
+        active= (99, 34),
     )),
     (StyleTheme.Guild_Wars,  MapTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_aggression.png"),
         texture_size = (128, 64),
-        size = (29, 29),
-        normal= (66, 34),
-        active= (98, 34),
+        size = (27, 29),
+        normal= (67, 34),
+        active= (99, 34),
     )),
     )
 
     HeaderLabelBackground = ThemeTexture(
-    (StyleTheme.Minimalus,  SplitTexture(
+    (StyleTheme.Minimalus,  GameTexture(
         texture = os.path.join(MINIMALUS_FOLDER, "header_label.png"),
         texture_size = (128, 32),
-        left= (0, 11, 21, 32),
-        mid= (21, 11, 107, 32),
-        right= (107, 11, 128, 32),
     )),
-    (StyleTheme.Guild_Wars,  SplitTexture(
+    (StyleTheme.Guild_Wars,  GameTexture(
         texture = os.path.join(TEXTURE_FOLDER, "header_label.png"),
         texture_size = (128, 32),
-        left= (0, 11, 21, 32),
-        mid= (21, 11, 107, 32),
-        right= (107, 11, 128, 32),
     )),
     )
     
@@ -1335,6 +1344,79 @@ class ThemeTextures(Enum):
     )),
     (StyleTheme.Guild_Wars,  MapTexture(
         texture = os.path.join(TEXTURE_FOLDER, "ui_adrenaline_effect.png"),
+        texture_size = (64, 64),
+        size = (64, 64),
+    )),
+    )
+    
+    Inventory_Slots = ThemeTexture(
+    (StyleTheme.Minimalus,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_iventory_slots.png"),
+        texture_size = (128, 128),
+        size = (52, 64),
+        normal= (0, 0),
+        active = (0, 64),      
+    )),
+    (StyleTheme.Guild_Wars,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_iventory_slots.png"),
+        texture_size = (128, 128),
+        size = (52, 64),
+        normal= (0, 0),
+        active = (0, 64),      
+    )),
+    )
+    
+    Inventory_Slot_Blue = ThemeTexture(
+    (StyleTheme.Minimalus,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_iventory_slots.png"),
+        texture_size = (128, 128),
+        size = (52, 64),  
+        normal= (52, 0),
+    )),
+    (StyleTheme.Guild_Wars,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_iventory_slots.png"),
+        texture_size = (128, 128),
+        size = (52, 64),     
+        normal= (52, 0),
+    )),
+    )
+    
+    Inventory_Slot_Red = ThemeTexture(
+    (StyleTheme.Minimalus,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_iventory_slots.png"),
+        texture_size = (128, 128),
+        size = (52, 64),
+        normal= (52, 64),
+    )),
+    (StyleTheme.Guild_Wars,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "ui_iventory_slots.png"),
+        texture_size = (128, 128),
+        size = (52, 64),        
+        normal= (52, 64),
+    )),
+    )
+    
+    MoraleBoost = ThemeTexture(
+    (StyleTheme.Minimalus,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "morale_boost_effect.png"),
+        texture_size = (64, 64),
+        size = (64, 64),
+    )),
+    (StyleTheme.Guild_Wars,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "morale_boost_effect.png"),
+        texture_size = (64, 64),
+        size = (64, 64),
+    )),
+    )
+    
+    DeathPenalty = ThemeTexture(
+    (StyleTheme.Minimalus,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "death_penalty_effect.png"),
+        texture_size = (64, 64),
+        size = (64, 64),
+    )),
+    (StyleTheme.Guild_Wars,  MapTexture(
+        texture = os.path.join(TEXTURE_FOLDER, "death_penalty_effect.png"),
         texture_size = (64, 64),
         size = (64, 64),
     )),
