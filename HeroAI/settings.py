@@ -96,6 +96,8 @@ class Settings:
         self.ShowEffectDurations = False
         self.ShowShortEffectDurations = True
         self.ShowHeroUpkeeps = True
+        self.MaxEffectRows = 2
+        
         self.ShowHeroButtons = True
         self.ShowHeroBars = True
         self.ShowHeroSkills = True
@@ -103,6 +105,7 @@ class Settings:
         self.ShowPartyPanelUI = True
         self.HeroPanelPositions : dict[str, tuple[int, int, int, int, bool]] = {}
         self.CommandHotBars : dict[str, Settings.CommandHotBar] = {}
+        
         
         base_path = Console.get_projects_path()
         self.ini_path = os.path.join(base_path, "Widgets", "Config", "HeroAI.ini")
@@ -157,6 +160,8 @@ class Settings:
         if not self.save_requested:
             return
         
+        ConsoleLog("HeroAI", "Saving HeroAI settings...")
+        
         self.ini_handler.write_key("General", "ShowCommandPanel", str(self.ShowCommandPanel))
         self.ini_handler.write_key("General", "ShowCommandPanelOnlyOnLeaderAccount", str(self.ShowCommandPanelOnlyOnLeaderAccount))
         
@@ -171,6 +176,7 @@ class Settings:
         self.ini_handler.write_key("General", "ShowEffectDurations", str(self.ShowEffectDurations))
         self.ini_handler.write_key("General", "ShowShortEffectDurations", str(self.ShowShortEffectDurations))
         self.ini_handler.write_key("General", "ShowHeroUpkeeps", str(self.ShowHeroUpkeeps))
+        self.ini_handler.write_key("General", "MaxEffectRows", str(self.MaxEffectRows))
         
         self.ini_handler.write_key("General", "ShowHeroButtons", str(self.ShowHeroButtons))
         self.ini_handler.write_key("General", "ShowHeroBars", str(self.ShowHeroBars))
@@ -201,6 +207,7 @@ class Settings:
         self.ShowEffectDurations = self.ini_handler.read_bool("General", "ShowEffectDurations", True)
         self.ShowShortEffectDurations = self.ini_handler.read_bool("General", "ShowShortEffectDurations", True)
         self.ShowHeroUpkeeps = self.ini_handler.read_bool("General", "ShowHeroUpkeeps", True)
+        self.MaxEffectRows = self.ini_handler.read_int("General", "MaxEffectRows", 2)
         
         self.ShowHeroButtons = self.ini_handler.read_bool("General", "ShowHeroButtons", True)
         self.ShowHeroBars = self.ini_handler.read_bool("General", "ShowHeroBars", True)

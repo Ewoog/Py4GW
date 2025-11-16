@@ -46,6 +46,7 @@ class AccountData(Structure):
         ("MapID", c_uint),
         ("MapRegion", c_int),
         ("MapDistrict", c_uint),
+        ("MapLanguage", c_int),
         ("PlayerID", c_uint),
         ("PlayerLevel", c_uint),
         ("PlayerProfession", c_uint),
@@ -102,6 +103,7 @@ class AccountData(Structure):
     MapID: int
     MapRegion: int
     MapDistrict: int
+    MapLanguage : int
     PlayerID: int
     PlayerLevel: int
     PlayerProfession: int
@@ -305,6 +307,7 @@ class Py4GWSharedMemoryManager:
             player.MapID = 0
             player.MapRegion = 0
             player.MapDistrict = 0
+            player.MapLanguage = 0
             player.PlayerID = 0
             player.PlayerLevel = 0
             player.PlayerProfession = 0
@@ -527,6 +530,7 @@ class Py4GWSharedMemoryManager:
             player.MapID = self.map_instance.map_id.ToInt()
             player.MapRegion = self.map_instance.server_region.ToInt()
             player.MapDistrict = self.map_instance.district
+            player.MapLanguage = self.map_instance.language.ToInt()
             player.PlayerID = agent_id
             player.PlayerLevel = self.player_instance.agent.living_agent.level
             player.PlayerProfession = self.player_instance.agent.living_agent.profession.Get()
@@ -636,6 +640,7 @@ class Py4GWSharedMemoryManager:
             hero.MapID = self.map_instance.map_id.ToInt()
             hero.MapRegion = map_region
             hero.MapDistrict = self.map_instance.district
+            hero.MapLanguage = self.map_instance.language.ToInt()
             hero.PlayerID = agent_id
             hero.PlayerLevel = hero_agent_instance.living_agent.level
             hero.PlayerProfession = hero_agent_instance.living_agent.profession.Get()
@@ -747,6 +752,7 @@ class Py4GWSharedMemoryManager:
             pet.MapID = self.map_instance.map_id.ToInt()
             pet.MapRegion = map_region
             pet.MapDistrict = self.map_instance.district
+            pet.MapLanguage = self.map_instance.language.ToInt()
             pet.PlayerID = agent_id
             pet.PartyID = self.party_instance.party_id
             pet.PartyPosition = 0
@@ -840,6 +846,7 @@ class Py4GWSharedMemoryManager:
             p.MapID,
             p.MapRegion,
             p.MapDistrict,
+            p.MapLanguage,
             p.PartyID,
             p.PartyPosition,
             p.PlayerLoginNumber,
@@ -940,10 +947,10 @@ class Py4GWSharedMemoryManager:
         for i in range(self.max_num_players):
             player = self.GetStruct().AccountData[i]
             if player.IsSlotActive and player.IsAccount:
-                maps.add((player.MapID, player.MapRegion, player.MapDistrict))
+                maps.add((player.MapID, player.MapRegion, player.MapDistrict, player.MapLanguage))
         return list(maps)
     
-    def GetPartiesFromMaps(self, map_id: int, map_region: int, map_district: int):
+    def GetPartiesFromMaps(self, map_id: int, map_region: int, map_district: int, map_language: int):
         """
         Get a list of unique PartyIDs for players in the specified map/region/district.
         """
@@ -953,12 +960,13 @@ class Py4GWSharedMemoryManager:
             if (player.IsSlotActive and player.IsAccount and
                 player.MapID == map_id and
                 player.MapRegion == map_region and
-                player.MapDistrict == map_district):
+                player.MapDistrict == map_district and
+                player.MapLanguage == map_language):
                 parties.add(player.PartyID)
         return list(parties)
 
     
-    def GetPlayersFromParty(self, party_id: int, map_id: int, map_region: int, map_district: int):
+    def GetPlayersFromParty(self, party_id: int, map_id: int, map_region: int, map_district: int, map_language: int):
         """Get a list of players in a specific party on a specific map."""
         players = []
         for i in range(self.max_num_players):
@@ -967,6 +975,7 @@ class Py4GWSharedMemoryManager:
                 player.MapID == map_id and
                 player.MapRegion == map_region and
                 player.MapDistrict == map_district and
+                player.MapLanguage == map_language and
                 player.PartyID == party_id):
                 players.append(player)
         return players

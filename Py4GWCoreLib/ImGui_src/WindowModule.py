@@ -313,7 +313,7 @@ class WindowModule:
                 
             window_texture.value.get_texture().draw_in_drawlist(
                 pos=self.__window_decorator_rect[:2],
-                size=self.__window_decorator_rect[2:]
+                size=self.__window_decorator_rect[2:],
             )
                 
 
@@ -417,4 +417,4 @@ class WindowModule:
             else:
                 self.__dragging = False
                 self.__drag_started = False
-    
+     

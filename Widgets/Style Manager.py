@@ -1,31 +1,32 @@
 # Reload imports
 from datetime import datetime
 from enum import Enum
-import importlib
 import os
 from typing import Optional
 
 import Py4GW
 import PyImGui
-from PyOverlay import Overlay
 
-from Py4GWCoreLib import IconsFontAwesome5, ImGui, Routines
+from Py4GWCoreLib import IconsFontAwesome5, ImGui
+from Py4GWCoreLib.ImGui_src.WindowModule import WindowModule
 from Py4GWCoreLib.ImGui_src.Style import Style 
-from Py4GWCoreLib.ImGui_src.Textures import MapTexture, GameTexture, TextureState, ThemeTexture, ThemeTextures
-from Py4GWCoreLib.ImGui_src.types import MINIMALUS_FOLDER, TEXTURE_FOLDER, ControlAppearance, StyleColorType, StyleTheme
-from Py4GWCoreLib.py4gwcorelib_src.Color import Color
-from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
+from Py4GWCoreLib.ImGui_src.types import ControlAppearance, StyleColorType, StyleTheme
 from Py4GWCoreLib.py4gwcorelib_src.IniHandler import IniHandler
 from Py4GWCoreLib import Timer
 from Py4GWCoreLib.py4gwcorelib_src.Timer import ThrottledTimer
 
-import sys
 
-from Py4GWCoreLib.py4gwcorelib_src.Utils import Utils
 from Py4GW_widget_manager import WidgetHandler
   
 
 MODULE_NAME = "Style Manager"
+
+class ThemeTexturesDev(Enum):
+ pass
+    
+class ImGuiDev:
+    pass
+   
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 root_directory = os.path.normpath(os.path.join(script_directory, ".."))
@@ -61,7 +62,7 @@ window_pos = (screen_width / 2 - window_size[0] / 2, screen_height / 2 - window_
 window_pos = window.pos if window else window_pos
 collapse = window.collapsed if window else False
          
-window_module = ImGui.WindowModule(
+window_module = WindowModule(
     MODULE_NAME,
     window_name="Style Manager",
     window_size=window_size,
@@ -71,10 +72,10 @@ window_module = ImGui.WindowModule(
     can_close=True,
 )
        
-theme_compare_window = ImGui.WindowModule(
+theme_compare_window = WindowModule(
     MODULE_NAME + " Theme Compare",
     window_name="Theme Compare",
-    window_size=(800.0, 600.0),
+    window_size=(1400.0, 800.0),
     window_pos=(100.0, 100.0),
     collapse=collapse,
     window_flags=PyImGui.WindowFlags.NoFlag,
@@ -145,13 +146,6 @@ class preview_states:
         self.theme_2 = StyleTheme.Minimalus
         self.theme_3 = StyleTheme.Guild_Wars
 
-class ThemeTexturesDev(Enum):
-    pass
-    
-class ImGuiDev:
-            
-    pass
-    
 
 preview = preview_states()
 

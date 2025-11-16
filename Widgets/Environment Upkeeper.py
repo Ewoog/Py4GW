@@ -42,6 +42,7 @@ def reset_on_load():
     widget_config.throttle_salvage_queue.Reset()
     widget_config.throttle_identify_queue.Reset()
     widget_config.throttle_fast_queue.Reset()
+    
     #Resetting all queues
     widget_config.action_queue_manager.ResetAllQueues()
     widget_config.raw_agent_array.reset()

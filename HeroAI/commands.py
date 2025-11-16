@@ -1,8 +1,14 @@
+import math
 from typing import Callable
+
+from PyParty import PyParty
 from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
 from Py4GWCoreLib.GlobalCache.SharedMemory import AccountData
 from Py4GWCoreLib.ImGui_src.IconsFontAwesome5 import IconsFontAwesome5
+from Py4GWCoreLib.Party import Party
+from Py4GWCoreLib.Player import Player
 from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
+from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
 
 class Command:
     def __init__(self, name: str, icon: str, command_function : Callable[[list[AccountData]], None] | None, tooltip : str = "", description: str = "", map_types: list[str] = ["Explorable", "Outpost"]) -> None:
@@ -41,7 +47,7 @@ class HeroAICommands:
         self.Empty = Command("Empty", "", None)
         self.PixelStack = Command("Pixel Stack", IconsFontAwesome5.ICON_COMPRESS_ARROWS_ALT, self.pixel_stack_command, "Pixel Stack Team")
         self.InteractWithTarget = Command("Interact With Target", IconsFontAwesome5.ICON_HAND_POINT_RIGHT, self.interact_with_target_command, "Interact with current target")
-        self.DialogWithTarget = Command("Dialog With Target", IconsFontAwesome5.ICON_COMMENT_DOTS, self.dialog_with_target_command, "Take dialog with current target")
+        self.TakeDialogWithTarget = Command("Dialog With Target", IconsFontAwesome5.ICON_COMMENT_DOTS, self.talk_and_dialog_with_target_command, "Take dialog with current target")
         self.OpenConsumables = Command("Open Consumables", IconsFontAwesome5.ICON_CANDY_CANE, self.open_consumables_commands, "Open/Close Consumables Configuration Window")
         self.FlagHeroes = Command("Flag Heroes", IconsFontAwesome5.ICON_FLAG, self.flag_heroes_command, "Flag all heroes", map_types=["Explorable"])
         self.UnflagHeroes = Command("Unflag Heroes", IconsFontAwesome5.ICON_CIRCLE_XMARK, self.unflag_heroes_command, "Unflag all heroes", map_types=["Explorable"])
@@ -57,7 +63,7 @@ class HeroAICommands:
             self.Empty,
             self.PixelStack,
             self.InteractWithTarget,
-            self.DialogWithTarget,
+            self.TakeDialogWithTarget,
             self.OpenConsumables,
             self.FlagHeroes,
             self.UnflagHeroes,
@@ -122,11 +128,27 @@ class HeroAICommands:
         sender_email = GLOBAL_CACHE.Player.GetAccountEmail()
         sender_id = GLOBAL_CACHE.Player.GetAgentID()
         
+        def SetWaitingActions(delay_ms: int):
+            delays = math.ceil(delay_ms // 50)
+            for _ in range(delays):
+                GLOBAL_CACHE._ActionQueueManager.AddAction("ACTION", lambda: None)  # Adding a no-op to ensure spacing between invites
+        
+        party_members = GLOBAL_CACHE.Party.GetPlayers()
+        
         for account in accounts:
+            if account.AccountEmail == sender_email:
+                continue
+            
             same_map = GLOBAL_CACHE.Map.GetMapID() == account.MapID and GLOBAL_CACHE.Map.GetRegion()[0] == account.MapRegion and GLOBAL_CACHE.Map.GetDistrict() == account.MapDistrict
             
-            if same_map:
-                GLOBAL_CACHE.Party.Players.InvitePlayer(account.CharacterName)
+            if same_map and not GLOBAL_CACHE.Party.IsPartyMember(account.PlayerID):        
+                char_name = account.CharacterName
+                def send_invite(name = char_name):
+                    ConsoleLog("HeroAI", f"Inviting {name} to party.")
+                    Player.SendChatCommand("invite " + name)
+                    
+                GLOBAL_CACHE._ActionQueueManager.AddAction("ACTION", send_invite)
+                SetWaitingActions(250)              
                 
             GLOBAL_CACHE.ShMem.SendMessage(
                 sender_email,
@@ -138,7 +160,7 @@ class HeroAICommands:
                     GLOBAL_CACHE.Map.GetDistrict(),
                     GLOBAL_CACHE.Map.GetLanguage()[0],
                 )
-            )
+            ) 
         
     
     def resign_command(self, accounts: list[AccountData]):
@@ -152,6 +174,9 @@ class HeroAICommands:
         sender_email = GLOBAL_CACHE.Player.GetAccountEmail()
         
         for account in accounts:
+            if account.AccountEmail == sender_email:
+                continue
+            
             GLOBAL_CACHE.ShMem.SendMessage(sender_email, account.AccountEmail, SharedCommandType.PixelStack, (player_x, player_y, 0, 0))
             
     def interact_with_target_command(self, accounts: list[AccountData]):
@@ -161,12 +186,26 @@ class HeroAICommands:
         for account in accounts:
             GLOBAL_CACHE.ShMem.SendMessage(sender_email, account.AccountEmail, SharedCommandType.InteractWithTarget, (target_id, 0, 0, 0))
     
-    def dialog_with_target_command(self, accounts: list[AccountData]):
+    def talk_and_dialog_with_target_command(self, accounts: list[AccountData]):
         sender_email = GLOBAL_CACHE.Player.GetAccountEmail()        
         target_id = GLOBAL_CACHE.Player.GetTargetID()
         
         for account in accounts:
             GLOBAL_CACHE.ShMem.SendMessage(sender_email, account.AccountEmail, SharedCommandType.TakeDialogWithTarget, (target_id, 1, 0, 0))
+
+    def send_dialog(self, accounts: list[AccountData], dialog_option: int):
+        sender_email = GLOBAL_CACHE.Player.GetAccountEmail()        
+        target_id = GLOBAL_CACHE.Player.GetTargetID()
+        own_map_id = GLOBAL_CACHE.Map.GetMapID()
+        own_region = GLOBAL_CACHE.Map.GetRegion()[0]
+        own_district = GLOBAL_CACHE.Map.GetDistrict()
+        own_language = GLOBAL_CACHE.Map.GetLanguage()[0]
+        
+        for account in accounts:
+            same_map = own_map_id == account.MapID and own_region == account.MapRegion and own_district == account.MapDistrict and own_language == account.MapLanguage
+            
+            if same_map:
+                GLOBAL_CACHE.ShMem.SendMessage(sender_email, account.AccountEmail, SharedCommandType.SendDialog, (dialog_option, 0, 0, 0))
 
     def open_consumables_commands(self, accounts: list[AccountData]):
         from HeroAI import ui, windows

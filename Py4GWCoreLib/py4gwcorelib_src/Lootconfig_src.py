@@ -409,6 +409,7 @@ LootGroups: Dict[str, Dict[str, List[ModelID]]] = {
             ModelID.Ruby_Djinn_Essence,
         ],
         "S": [
+            ModelID.Sandblasted_Lodestone,
             ModelID.Shadowy_Husk,
             ModelID.Shadowy_Remnants,
             ModelID.Shiverpeak_Mane,
@@ -508,6 +509,20 @@ LootGroups: Dict[str, Dict[str, List[ModelID]]] = {
             ModelID.Map_Piece_Top_Left,
             ModelID.Map_Piece_Top_Right,
         ],
+        "Keys": [
+            ModelID.Dungeon_Key,
+            ModelID.Boss_Key,
+            ModelID.Prison_Key,
+        ],
+        "Keys": [
+            ModelID.Dungeon_Key,
+            ModelID.Boss_Key,
+            ModelID.Cell_Key,
+            ModelID.Prison_Key,
+            ModelID.Diamond_Key,
+            ModelID.Ruby_Key,
+            ModelID.Sapphire_Key,
+        ],
         "Dungeon quest items": [
             ModelID.Spectral_Crystal,
             ModelID.Shimmering_Essence,
@@ -526,7 +541,6 @@ class LootConfig:
 
     def __new__(cls):        
         if cls._instance is None:
-            ConsoleLog("LootConfig", "Initializing LootConfig singleton instance.")
             cls._instance = super().__new__(cls)
         return cls._instance
 
@@ -758,7 +772,7 @@ class LootConfig:
         loot_array = AgentArray.GetItemArray()
         loot_array = AgentArray.Filter.ByDistance(loot_array, Player.GetXY(), distance)
 
-        party_leader_id = Party.GetPartyLeaderID()
+        """party_leader_id = Party.GetPartyLeaderID()
         player_agent_id = Player.GetAgentID()
 
         if party_leader_id == player_agent_id:  # Leader or solo
@@ -768,11 +782,15 @@ class LootConfig:
         else:  # Follower
             loot_array = AgentArray.Filter.ByCondition(
                 loot_array, lambda item_id: IsValidFollowerItem(item_id)
-            )
+            )"""
 
-
-        pick_up_array = [] # Final list of items to pick up
+        loot_array = AgentArray.Filter.ByCondition(
+            loot_array,
+            lambda item_id: IsValidItem(item_id)
+        )
         
+        pick_up_array = []
+
         for agent_id in loot_array[:]:  # Iterate over a copy to avoid modifying while iterating
             item_data = Agent.GetItemAgent(agent_id)
             item_id = item_data.item_id

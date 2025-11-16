@@ -1,15 +1,7 @@
 import math
 import sys
 import traceback
-from enum import Enum
 import Py4GW
-from PyMap import PyMap
-from Py4GWCoreLib.GlobalCache.SharedMemory import AccountData, SharedMessage
-from Py4GWCoreLib.ImGui_src.WindowModule import WindowModule
-from Py4GWCoreLib.Skillbar import SkillBar
-from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
-from Py4GW_widget_manager import WidgetHandler
-
 
 MODULE_NAME = "HeroAI"
 for module_name in list(sys.modules.keys()):
@@ -22,6 +14,15 @@ for module_name in list(sys.modules.keys()):
                 pass
         except Exception as e:
             Py4GW.Console.Log(MODULE_NAME, f"Error reloading module {module_name}: {e}", Py4GW.Console.MessageType.Error)
+
+
+from enum import Enum
+from PyMap import PyMap
+from Py4GWCoreLib.GlobalCache.SharedMemory import AccountData, SharedMessage
+from Py4GWCoreLib.ImGui_src.WindowModule import WindowModule
+from Py4GWCoreLib.Skillbar import SkillBar
+from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
+from Py4GW_widget_manager import WidgetHandler
 
 from HeroAI.settings import Settings
 from HeroAI.cache_data import CacheData
@@ -50,7 +51,7 @@ from HeroAI.windows import DrawMultiboxTools
 from HeroAI.windows import DrawOptions
 from HeroAI.windows import DrawPanelButtons
 from HeroAI.windows import SubmitGameOptions
-from HeroAI.ui import draw_combined_hero_panel, draw_command_panel, draw_configure_window, draw_hero_panel, draw_hotbars
+from HeroAI.ui import draw_combined_hero_panel, draw_command_panel, draw_configure_window, draw_dialog_overlay, draw_hero_panel, draw_hotbars
 from Py4GWCoreLib import GLOBAL_CACHE
 from Py4GWCoreLib import ActionQueueManager
 from Py4GWCoreLib import IconsFontAwesome5
@@ -516,6 +517,8 @@ def UpdateStatus(cached_data: CacheData):
     
     if settings.CommandHotBars:
         draw_hotbars(accounts, cached_data)
+        
+    draw_dialog_overlay(accounts, cached_data, messages)
                 
     DrawEmbeddedWindow(cached_data)
     if cached_data.ui_state_data.show_classic_controls:

@@ -635,6 +635,32 @@ class Yield:
             
             yield from Yield.wait(aftercast_delay)
             return True
+        
+        @staticmethod
+        def CastSkillSlotAtTarget(slot:int, target_id:int=0, extra_condition=True, aftercast_delay=0, log=False):
+            from .Checks import Checks
+            if not Checks.Map.IsExplorable():
+                return False
+            
+            if slot <= 0 or slot > 8:
+                yield
+                return False
+            
+            skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(slot)
+            player_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+            enough_energy = Checks.Skills.HasEnoughEnergy(player_agent_id,skill_id)
+            skill_ready = Checks.Skills.IsSkillSlotReady(slot)
+            
+            if not(enough_energy and skill_ready and extra_condition):
+                yield
+                return False
+
+            GLOBAL_CACHE.SkillBar.UseSkill(slot, aftercast_delay=aftercast_delay, target_agent_id=target_id)
+            if log:
+                ConsoleLog("CastSkillSlot", f"Cast {GLOBAL_CACHE.Skill.GetName(skill_id)}, slot: {GLOBAL_CACHE.SkillBar.GetSlotBySkillID(skill_id)}", Console.MessageType.Info)
+            
+            yield from Yield.wait(aftercast_delay)
+            return True
       
 #region Map      
     class Map:  
