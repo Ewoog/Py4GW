@@ -1930,16 +1930,6 @@ def draw_configure_window():
                     if show_command_panel != settings.ShowCommandPanel:
                         settings.ShowCommandPanel = show_command_panel
                         settings.save_settings()
-                    
-                    PyImGui.separator()
-                    PyImGui.text_colored("Skill Behavior:", Utils.RGBToNormal(200, 200, 200, 255))
-                    
-                    unyielding_auto_drop = ImGui.checkbox("Unyielding Aura: Auto-drop on ally death", settings.UnyieldingAuraAutoDropOnDeath)
-                    if PyImGui.is_item_hovered():
-                        ImGui.show_tooltip("Automatically drop Unyielding Aura when a party member dies to trigger resurrection")
-                    if unyielding_auto_drop != settings.UnyieldingAuraAutoDropOnDeath:
-                        settings.UnyieldingAuraAutoDropOnDeath = unyielding_auto_drop
-                        settings.save_settings()
                         
                 ImGui.end_child()
                 ImGui.end_tab_item()
