@@ -373,7 +373,7 @@ class Checks:
                 # Filter out allies - only keep non-ally players
                 hostile_players = AgentArray.Filter.ByCondition(hostile_players, lambda agent_id: GLOBAL_CACHE.Agent.GetAllegiance(agent_id)[0] != 1)  # 1 = Ally allegiance
                 # Add hostile players to enemy array
-                enemy_array = list(set(enemy_array + hostile_players))
+                enemy_array = enemy_array + hostile_players
             
             if len(enemy_array) == 0:
                 return False

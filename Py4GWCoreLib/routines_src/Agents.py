@@ -180,7 +180,7 @@ class Agents:
             # Filter out allies - only keep non-ally players
             hostile_players = AgentArray.Filter.ByCondition(hostile_players, lambda agent_id: GLOBAL_CACHE.Agent.GetAllegiance(agent_id)[0] != 1)  # 1 = Ally allegiance
             # Add hostile players to enemy array
-            enemy_array = list(set(enemy_array + hostile_players))
+            enemy_array = enemy_array + hostile_players
         
         enemy_array = AgentArray.Filter.ByCondition(enemy_array, lambda agent_id: Utils.Distance((x,y), GLOBAL_CACHE.Agent.GetXY(agent_id)) <= max_distance)
         enemy_array = AgentArray.Filter.ByCondition(enemy_array, lambda agent_id: GLOBAL_CACHE.Agent.IsAlive(agent_id))
