@@ -1197,16 +1197,19 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     settings.ArcaneMimicryTargetAgentID = ally_agent_ids[new_selection]
                     settings.save_settings()
                 
-                # Display currently configured target
+                # Display currently configured target with agent ID for debugging
                 if settings.ArcaneMimicryTargetAgentID > 0:
                     try:
                         selected_name = ally_options[ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)]
                         PyImGui.text_colored(
-                            f"Currently configured to target: {selected_name}",
+                            f"Currently configured to target: {selected_name} (Agent ID: {settings.ArcaneMimicryTargetAgentID})",
                             Utils.RGBToNormal(0, 255, 0, 255)
                         )
                     except (ValueError, IndexError):
-                        pass
+                        PyImGui.text_colored(
+                            f"Configured target not found in current party (Agent ID: {settings.ArcaneMimicryTargetAgentID})",
+                            Utils.RGBToNormal(255, 165, 0, 255)
+                        )
             else:
                 PyImGui.text_colored("No allies found in party", Utils.RGBToNormal(255, 165, 0, 255))
         else:

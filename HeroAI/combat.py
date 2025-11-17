@@ -356,9 +356,13 @@ class CombatClass:
             settings = Settings()
             # Use the configured target agent ID if available
             if settings.ArcaneMimicryTargetAgentID > 0:
-                # Verify the target is still valid (alive and in range)
-                if GLOBAL_CACHE.Agent.IsLiving(settings.ArcaneMimicryTargetAgentID):
-                    return settings.ArcaneMimicryTargetAgentID
+                # Verify the target is still valid (alive, ally, and in party)
+                target_id = settings.ArcaneMimicryTargetAgentID
+                if GLOBAL_CACHE.Agent.IsLiving(target_id):
+                    # Additional validation: ensure target is actually an ally in our party
+                    target_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
+                    if target_allegiance == Allegiance.Ally or target_allegiance == Allegiance.AllyNonAttackable:
+                        return target_id
             # If no valid target configured, fall through to default OtherAlly targeting
 
         if target_allegiance == Skilltarget.Enemy:
