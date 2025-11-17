@@ -106,6 +106,11 @@ class Settings:
         self.HeroPanelPositions : dict[str, tuple[int, int, int, int, bool]] = {}
         self.CommandHotBars : dict[str, Settings.CommandHotBar] = {}
         
+        # Mesmer skill configurations (skill slot index, 0-based)
+        self.ArcaneEchoSkillSlot = 0  # Which skill to copy with Arcane Echo
+        self.AuspiciousIncantationSkillSlot = 0  # Which skill to use after Auspicious Incantation
+        self.ArcaneMimicrySkillSlot = 0  # Which skill to steal with Arcane Mimicry
+        
         
         base_path = Console.get_projects_path()
         self.ini_path = os.path.join(base_path, "Widgets", "Config", "HeroAI.ini")
@@ -183,6 +188,11 @@ class Settings:
         self.ini_handler.write_key("General", "ShowFloatingTargets", str(self.ShowFloatingTargets))
         self.ini_handler.write_key("General", "ShowHeroSkills", str(self.ShowHeroSkills))
         self.ini_handler.write_key("General", "ShowPartyPanelUI", str(self.ShowPartyPanelUI))
+        
+        # Mesmer skill settings
+        self.account_ini_handler.write_key("MesmerSkills", "ArcaneEchoSkillSlot", str(self.ArcaneEchoSkillSlot))
+        self.account_ini_handler.write_key("MesmerSkills", "AuspiciousIncantationSkillSlot", str(self.AuspiciousIncantationSkillSlot))
+        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicrySkillSlot", str(self.ArcaneMimicrySkillSlot))
 
         for hero_email, (x, y, w, h, collapsed) in self.HeroPanelPositions.items():
             self.account_ini_handler.write_key("HeroPanelPositions", hero_email, f"{x},{y},{w},{h},{collapsed}")
@@ -214,6 +224,11 @@ class Settings:
         self.ShowFloatingTargets = self.ini_handler.read_bool("General", "ShowFloatingTargets", True)
         self.ShowHeroSkills = self.ini_handler.read_bool("General", "ShowHeroSkills", True)
         self.ShowPartyPanelUI = self.ini_handler.read_bool("General", "ShowPartyPanelUI", True)
+        
+        # Mesmer skill settings
+        self.ArcaneEchoSkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneEchoSkillSlot", 0)
+        self.AuspiciousIncantationSkillSlot = self.account_ini_handler.read_int("MesmerSkills", "AuspiciousIncantationSkillSlot", 0)
+        self.ArcaneMimicrySkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicrySkillSlot", 0)
 
         self.HeroPanelPositions.clear()        
         self.import_hero_panel_positions(self.account_ini_handler)

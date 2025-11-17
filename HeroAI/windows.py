@@ -1033,5 +1033,106 @@ def DrawControlPanelWindow(cached_data:CacheData):
 
         cached_data.HeroAI_windows.control_window.process_window()
     cached_data.HeroAI_windows.control_window.end()
+
+def DrawMesmerSkillsWindow(cached_data: CacheData):
+    """Draw the Mesmer Skills configuration window for Arcane Echo, Auspicious Incantation, and Arcane Mimicry"""
+    from HeroAI.settings import Settings
+    settings = Settings()
+    
+    PyImGui.text("Configure Mesmer Skills")
+    PyImGui.separator()
+    
+    # Get current skillbar
+    skill_names = []
+    skill_ids = []
+    for slot in range(8):
+        skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(slot + 1)  # Slots are 1-based
+        if skill_id > 0:
+            skill_name = GLOBAL_CACHE.Skill.GetName(skill_id)
+            skill_names.append(f"Slot {slot + 1}: {skill_name}")
+            skill_ids.append(skill_id)
+        else:
+            skill_names.append(f"Slot {slot + 1}: Empty")
+            skill_ids.append(0)
+    
+    # Arcane Echo configuration
+    if PyImGui.collapsing_header("Arcane Echo", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text("Select which skill to copy with Arcane Echo:")
+        arcane_echo_id = GLOBAL_CACHE.Skill.GetID("Arcane_Echo")
+        has_arcane_echo = arcane_echo_id in skill_ids
+        
+        if has_arcane_echo:
+            current_selection = settings.ArcaneEchoSkillSlot
+            if current_selection >= len(skill_names):
+                current_selection = 0
+                
+            new_selection = ImGui.combo("##ArcaneEchoSkill", current_selection, skill_names)
+            if new_selection != current_selection:
+                settings.ArcaneEchoSkillSlot = new_selection
+                settings.save_settings()
+                
+            selected_skill_id = skill_ids[settings.ArcaneEchoSkillSlot]
+            if selected_skill_id > 0:
+                PyImGui.text_colored(
+                    f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                    Utils.RGBToNormal(0, 255, 0, 255)
+                )
+        else:
+            PyImGui.text_colored("Arcane Echo not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    
+    # Auspicious Incantation configuration
+    if PyImGui.collapsing_header("Auspicious Incantation", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text("Select which skill to use after Auspicious Incantation:")
+        auspicious_id = GLOBAL_CACHE.Skill.GetID("Auspicious_Incantation")
+        has_auspicious = auspicious_id in skill_ids
+        
+        if has_auspicious:
+            current_selection = settings.AuspiciousIncantationSkillSlot
+            if current_selection >= len(skill_names):
+                current_selection = 0
+                
+            new_selection = ImGui.combo("##AuspiciousSkill", current_selection, skill_names)
+            if new_selection != current_selection:
+                settings.AuspiciousIncantationSkillSlot = new_selection
+                settings.save_settings()
+                
+            selected_skill_id = skill_ids[settings.AuspiciousIncantationSkillSlot]
+            if selected_skill_id > 0:
+                PyImGui.text_colored(
+                    f"Currently configured to cast: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                    Utils.RGBToNormal(0, 255, 0, 255)
+                )
+        else:
+            PyImGui.text_colored("Auspicious Incantation not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    
+    # Arcane Mimicry configuration
+    if PyImGui.collapsing_header("Arcane Mimicry", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text("Select which skill to steal with Arcane Mimicry:")
+        mimicry_id = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
+        has_mimicry = mimicry_id in skill_ids
+        
+        if has_mimicry:
+            current_selection = settings.ArcaneMimicrySkillSlot
+            if current_selection >= len(skill_names):
+                current_selection = 0
+                
+            new_selection = ImGui.combo("##MimicrySkill", current_selection, skill_names)
+            if new_selection != current_selection:
+                settings.ArcaneMimicrySkillSlot = new_selection
+                settings.save_settings()
+                
+            selected_skill_id = skill_ids[settings.ArcaneMimicrySkillSlot]
+            if selected_skill_id > 0:
+                PyImGui.text_colored(
+                    f"Currently configured to steal: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                    Utils.RGBToNormal(0, 255, 0, 255)
+                )
+        else:
+            PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
    
+
 

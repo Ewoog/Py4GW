@@ -46,6 +46,7 @@ from HeroAI.windows import DrawControlPanelWindow
 from HeroAI.windows import DrawFlaggingWindow
 from HeroAI.windows import DrawFlags
 from HeroAI.windows import DrawMainWindow
+from HeroAI.windows import DrawMesmerSkillsWindow
 from HeroAI.windows import DrawMessagingOptions
 from HeroAI.windows import DrawMultiboxTools
 from HeroAI.windows import DrawOptions
@@ -315,6 +316,7 @@ class TabType(Enum):
     config = 5
     debug = 6
     messaging = 7
+    mesmer_skills = 8
 
 
 selected_tab: TabType = TabType.party
@@ -376,6 +378,8 @@ def DrawFramedContent(cached_data: CacheData, content_frame_id):
             case TabType.messaging:
                 # Placeholder for messaging tab
                 DrawMessagingOptions(cached_data)
+            case TabType.mesmer_skills:
+                DrawMesmerSkillsWindow(cached_data)
 
     PyImGui.end()
     PyImGui.pop_style_var(1)
@@ -417,6 +421,10 @@ def DrawEmbeddedWindow(cached_data: CacheData):
                 selected_tab = TabType.messaging
                 PyImGui.end_tab_item()
             ImGui.show_tooltip("Messaging")
+            if PyImGui.begin_tab_item(IconsFontAwesome5.ICON_HAT_WIZARD + "##mesmerSkillsTab"):
+                selected_tab = TabType.mesmer_skills
+                PyImGui.end_tab_item()
+            ImGui.show_tooltip("Mesmer Skills")
             if GLOBAL_CACHE.Map.IsOutpost():
                 if PyImGui.begin_tab_item(IconsFontAwesome5.ICON_USER_PLUS + "##candidatesTab"):
                     selected_tab = TabType.candidates
