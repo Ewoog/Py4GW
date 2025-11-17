@@ -40,9 +40,35 @@ def main():
             widget_config.buff_exists = GLOBAL_CACHE.Effects.EffectExists(player_id, unyielding_aura) or GLOBAL_CACHE.Effects.BuffExists(player_id, unyielding_aura)
         widget_config.game_throttle_timer.Start()
         
-    if widget_config.map_valid and  widget_config.buff_exists:
-        buff_id = GLOBAL_CACHE.Effects.GetBuffID(unyielding_aura)
-        GLOBAL_CACHE.Effects.DropBuff(buff_id)
+    if widget_config.map_valid and widget_config.buff_exists:
+        # Check if any party member is dead
+        party_member_dead = False
+        
+        # Check heroes
+        heroes = GLOBAL_CACHE.Party.GetHeroes()
+        for hero in heroes:
+            if hero.agent_id > 0 and GLOBAL_CACHE.Agent.IsDead(hero.agent_id):
+                party_member_dead = True
+                break
+        
+        # Check other players if no dead hero found yet
+        if not party_member_dead:
+            players = GLOBAL_CACHE.Party.GetPlayers()
+            player_id = GLOBAL_CACHE.Player.GetAgentID()
+            for player in players:
+                player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                # Skip self
+                if player_agent_id == player_id or player_agent_id == 0:
+                    continue
+                if GLOBAL_CACHE.Agent.IsDead(player_agent_id):
+                    party_member_dead = True
+                    break
+        
+        # Drop the buff if someone is dead
+        if party_member_dead:
+            buff_id = GLOBAL_CACHE.Effects.GetBuffID(unyielding_aura)
+            if buff_id > 0:
+                GLOBAL_CACHE.Effects.DropBuff(buff_id)
 
         
 

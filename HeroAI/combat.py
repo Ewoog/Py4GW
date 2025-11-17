@@ -113,7 +113,6 @@ class CombatClass:
         self.arcane_mimicry = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
         self.arcane_echo = GLOBAL_CACHE.Skill.GetID("Arcane_Echo")
         self.auspicious_incantation = GLOBAL_CACHE.Skill.GetID("Auspicious_Incantation")
-        self.unyielding_aura = GLOBAL_CACHE.Skill.GetID("Unyielding_Aura")
         #junundu
         self.junundu_wail = GLOBAL_CACHE.Skill.GetID("Junundu_Wail")
         self.unknown_junundu_ability = GLOBAL_CACHE.Skill.GetID("Unknown_Junundu_Ability")
@@ -1147,56 +1146,10 @@ class CombatClass:
                     
         return int((attack_speed / attack_speed_modifier) * 1000)
 
-    def CheckUnyieldingAura(self):
-        """
-        Check if Unyielding Aura should be dropped when a party member dies.
-        This triggers the resurrection effect of Unyielding Aura.
-        """
-        from HeroAI.settings import Settings
-        settings = Settings()
-        
-        # Only proceed if the auto-drop setting is enabled
-        if not settings.UnyieldingAuraAutoDropOnDeath:
-            return
-        
-        # Check if player has Unyielding Aura active
-        player_id = GLOBAL_CACHE.Player.GetAgentID()
-        if not self.HasEffect(player_id, self.unyielding_aura):
-            return
-        
-        # Check if any party member is dead
-        party_size = GLOBAL_CACHE.Party.GetPartySize()
-        for i in range(party_size):
-            # Get party member agent ID (party positions are 1-based)
-            if i == 0:
-                # Party leader
-                party_member_id = GLOBAL_CACHE.Party.GetPartyLeaderID()
-            else:
-                # Other party members (heroes or players)
-                heroes = GLOBAL_CACHE.Party.GetHeroes()
-                if i - 1 < len(heroes):
-                    party_member_id = heroes[i - 1].agent_id
-                else:
-                    continue
-            
-            # Skip self
-            if party_member_id == player_id or party_member_id == 0:
-                continue
-            
-            # Check if this party member is dead
-            if GLOBAL_CACHE.Agent.IsDead(party_member_id):
-                # Drop Unyielding Aura to trigger resurrection
-                from Py4GWCoreLib.Effect import Effects
-                Effects.DropBuff(self.unyielding_aura)
-                return
-
     def HandleCombat(self,ooc=False):
         """
         tries to Execute the next skill in the skill order.
         """
-        
-        # Check Unyielding Aura for auto-drop on party member death
-        self.CheckUnyieldingAura()
         
         # Check if we have a pending follow-up skill that should be cast immediately
         if self.pending_followup_skill_slot >= 0:

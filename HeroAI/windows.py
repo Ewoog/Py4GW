@@ -1035,7 +1035,7 @@ def DrawControlPanelWindow(cached_data:CacheData):
     cached_data.HeroAI_windows.control_window.end()
 
 def DrawCustomSkillsWindow(cached_data: CacheData):
-    """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, Arcane Mimicry, and Unyielding Aura"""
+    """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, and Arcane Mimicry"""
     from HeroAI.settings import Settings
     settings = Settings()
     
@@ -1254,26 +1254,6 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 PyImGui.text_colored("No allies with elite skills found in party", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
-    
-    PyImGui.spacing()
-    PyImGui.separator()
-    PyImGui.spacing()
-    
-    # Unyielding Aura configuration
-    if PyImGui.collapsing_header("Unyielding Aura", PyImGui.TreeNodeFlags.DefaultOpen):
-        PyImGui.text("Configure Unyielding Aura behavior:")
-        
-        unyielding_auto_drop = ImGui.checkbox("Auto-drop on ally death", settings.UnyieldingAuraAutoDropOnDeath)
-        if PyImGui.is_item_hovered():
-            ImGui.show_tooltip("Automatically drop Unyielding Aura when a party member dies to trigger resurrection")
-        if unyielding_auto_drop != settings.UnyieldingAuraAutoDropOnDeath:
-            settings.UnyieldingAuraAutoDropOnDeath = unyielding_auto_drop
-            settings.save_settings()
-        
-        PyImGui.text_colored(
-            "When enabled, HeroAI will drop Unyielding Aura immediately when any party member dies,\ntriggering the resurrection effect.",
-            Utils.RGBToNormal(180, 180, 180, 255)
-        )
    
 
 
