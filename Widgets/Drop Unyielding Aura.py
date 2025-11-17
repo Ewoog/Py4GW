@@ -1,5 +1,6 @@
 from Py4GWCoreLib import GLOBAL_CACHE
 from Py4GWCoreLib import Timer
+from Py4GWCoreLib import Utils
 module_name = "Drop Unyielding Aura"
 
 class config:
@@ -47,18 +48,17 @@ def main():
         party_member_dead_in_earshot = False
         
         player_id = GLOBAL_CACHE.Player.GetAgentID()
-        player_pos = GLOBAL_CACHE.Agent.GetPos(player_id)
+        player_x, player_y = GLOBAL_CACHE.Agent.GetXY(player_id)
         
         # Check heroes
         heroes = GLOBAL_CACHE.Party.GetHeroes()
         for hero in heroes:
             if hero.agent_id > 0 and GLOBAL_CACHE.Agent.IsDead(hero.agent_id):
-                hero_pos = GLOBAL_CACHE.Agent.GetPos(hero.agent_id)
-                if hero_pos:
-                    distance = GLOBAL_CACHE.Agent.GetDistance(player_pos, hero_pos)
-                    if distance <= EARSHOT_RANGE:
-                        party_member_dead_in_earshot = True
-                        break
+                hero_x, hero_y = GLOBAL_CACHE.Agent.GetXY(hero.agent_id)
+                distance = Utils.Distance((player_x, player_y), (hero_x, hero_y))
+                if distance <= EARSHOT_RANGE:
+                    party_member_dead_in_earshot = True
+                    break
         
         # Check other players if no dead hero found yet
         if not party_member_dead_in_earshot:
@@ -69,12 +69,11 @@ def main():
                 if player_agent_id == player_id or player_agent_id == 0:
                     continue
                 if GLOBAL_CACHE.Agent.IsDead(player_agent_id):
-                    other_player_pos = GLOBAL_CACHE.Agent.GetPos(player_agent_id)
-                    if other_player_pos:
-                        distance = GLOBAL_CACHE.Agent.GetDistance(player_pos, other_player_pos)
-                        if distance <= EARSHOT_RANGE:
-                            party_member_dead_in_earshot = True
-                            break
+                    other_player_x, other_player_y = GLOBAL_CACHE.Agent.GetXY(player_agent_id)
+                    distance = Utils.Distance((player_x, player_y), (other_player_x, other_player_y))
+                    if distance <= EARSHOT_RANGE:
+                        party_member_dead_in_earshot = True
+                        break
         
         # Drop the buff if someone is dead within earshot
         if party_member_dead_in_earshot:
