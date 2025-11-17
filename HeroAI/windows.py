@@ -1180,16 +1180,53 @@ def DrawMesmerSkillsWindow(cached_data: CacheData):
                     ally_agent_ids.append(hero_agent_id)
                     ally_elite_skill_ids.append(hero_elite_skill_id)
             
-            # Get other players in party
-            others = GLOBAL_CACHE.Party.GetOthers()
-            for other in others:
-                other_agent_id = other.agent_id if hasattr(other, 'agent_id') else 0
-                if other_agent_id == 0 or other_agent_id == GLOBAL_CACHE.Player.GetAgentID():
-                    continue
+            # Get other players in party via shared memory (like teambuild tab)
+            try:
+                from Widgets.CustomBehaviors.primitives.parties.party_teambuild_manager import PartyTeamBuildManager
+                from Py4GWCoreLib.Skillbar import SkillBar
                 
-                # Try to get other player's skillbar - this might not be available
-                # For now, we'll skip other players as we can't reliably get their skillbar
-                # In actual gameplay, only heroes are controllable anyway
+                party_manager = PartyTeamBuildManager()
+                all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+                my_account_email = GLOBAL_CACHE.Player.GetAccountEmail()
+                
+                for account in all_accounts:
+                    account_email = account.AccountEmail
+                    # Skip self
+                    if account_email == my_account_email:
+                        continue
+                    
+                    # Skip if no agent ID
+                    player_agent_id = account.PlayerID
+                    if player_agent_id == 0:
+                        continue
+                    
+                    # Get skillbar template from shared memory
+                    template = party_manager.get_template_for_account(account_email)
+                    if not template:
+                        continue
+                    
+                    # Parse the template to get skills
+                    try:
+                        prof_primary, prof_secondary, attributes, skills = SkillBar.ParseSkillbarTemplate(template)
+                        
+                        # Find elite skill
+                        player_elite_skill_id = 0
+                        for skill_id in skills:
+                            if skill_id > 0 and GLOBAL_CACHE.Skill.Data.IsElite(skill_id):
+                                player_elite_skill_id = skill_id
+                                break
+                        
+                        if player_elite_skill_id > 0:
+                            player_name = account.CharacterName if account.CharacterName else account_email
+                            elite_skill_name = GLOBAL_CACHE.Skill.GetName(player_elite_skill_id)
+                            ally_options.append(f"{player_name} - {elite_skill_name}")
+                            ally_agent_ids.append(player_agent_id)
+                            ally_elite_skill_ids.append(player_elite_skill_id)
+                    except Exception as e:
+                        # Skip if template parsing fails
+                        pass
+            except ImportError:
+                # CustomBehaviors might not be available
                 pass
             
             if ally_options:
