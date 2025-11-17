@@ -1141,17 +1141,20 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
     
     # Arcane Mimicry configuration
     if PyImGui.collapsing_header("Arcane Mimicry", PyImGui.TreeNodeFlags.DefaultOpen):
-        PyImGui.text("Select which ally's elite skill to copy with Arcane Mimicry:")
+        PyImGui.text("Select which ally to target with Arcane Mimicry:")
+        PyImGui.text_colored(
+            "Arcane Mimicry will copy the elite skill from the selected party member.",
+            Utils.RGBToNormal(180, 180, 180, 255)
+        )
         mimicry_id = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
         
         # Check if player has Arcane Mimicry in skillbar
         has_mimicry = mimicry_id in skill_ids
         
         if has_mimicry:
-            # Get all allies (heroes and other players) and their elite skills
+            # Get all allies (heroes and other players)
             ally_options = []
             ally_agent_ids = []
-            ally_elite_skill_ids = []
             
             # Get heroes
             heroes = GLOBAL_CACHE.Party.GetHeroes()
@@ -1159,26 +1162,10 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 hero_agent_id = hero.agent_id
                 if hero_agent_id == 0:
                     continue
-                    
-                # Get hero's skillbar
-                hero_skillbar = GLOBAL_CACHE.SkillBar.GetHeroSkillbar(index)
-                if not hero_skillbar:
-                    continue
                 
-                # Find elite skill in hero's skillbar
-                hero_elite_skill_id = 0
-                for skill_data in hero_skillbar:
-                    skill_id = skill_data.id.id if hasattr(skill_data, 'id') else 0
-                    if skill_id > 0 and GLOBAL_CACHE.Skill.Flags.IsElite(skill_id):
-                        hero_elite_skill_id = skill_id
-                        break
-                
-                if hero_elite_skill_id > 0:
-                    hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero {index + 1}"
-                    elite_skill_name = GLOBAL_CACHE.Skill.GetName(hero_elite_skill_id)
-                    ally_options.append(f"{hero_name} - {elite_skill_name}")
-                    ally_agent_ids.append(hero_agent_id)
-                    ally_elite_skill_ids.append(hero_elite_skill_id)
+                hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero {index + 1}"
+                ally_options.append(hero_name)
+                ally_agent_ids.append(hero_agent_id)
             
             # Get other players in party
             players = GLOBAL_CACHE.Party.GetPlayers()
@@ -1192,42 +1179,9 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     if player_agent_id == my_agent_id or player_agent_id == 0:
                         continue
                     
-                    # Try to get player's elite skill from their skillbar
-                    # We can only get this if they're using shared memory (multibox scenario)
-                    player_elite_skill_id = 0
-                    try:
-                        from Widgets.CustomBehaviors.primitives.parties.party_teambuild_manager import PartyTeamBuildManager
-                        party_manager = PartyTeamBuildManager()
-                        
-                        # Get player's account email to lookup their template
-                        player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
-                        
-                        # Try to get from skillbar data if available
-                        if hasattr(party_manager, 'skillbar_datas') and party_manager.skillbar_datas:
-                            # Look through skillbar_datas to find this player
-                            for email, skillbar_data in party_manager.skillbar_datas.items():
-                                if skillbar_data and hasattr(skillbar_data, 'skillbar_parsed'):
-                                    # Check if this matches our player by trying their skills
-                                    skills = skillbar_data.skillbar_parsed.skills
-                                    for skill_id in skills:
-                                        if skill_id > 0 and GLOBAL_CACHE.Skill.Flags.IsElite(skill_id):
-                                            # We found an elite skill in this skillbar
-                                            # Assume this is the right player for now
-                                            player_elite_skill_id = skill_id
-                                            break
-                                    if player_elite_skill_id > 0:
-                                        break
-                    except:
-                        # If shared memory approach fails, skip this player
-                        pass
-                    
-                    # If we found an elite skill, add this player to the list
-                    if player_elite_skill_id > 0:
-                        player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
-                        elite_skill_name = GLOBAL_CACHE.Skill.GetName(player_elite_skill_id)
-                        ally_options.append(f"{player_name} - {elite_skill_name}")
-                        ally_agent_ids.append(player_agent_id)
-                        ally_elite_skill_ids.append(player_elite_skill_id)
+                    player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                    ally_options.append(player_name)
+                    ally_agent_ids.append(player_agent_id)
             
             if ally_options:
                 # Find current selection index
@@ -1241,17 +1195,20 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 new_selection = ImGui.combo("##MimicryAlly", current_selection, ally_options)
                 if new_selection != current_selection:
                     settings.ArcaneMimicryTargetAgentID = ally_agent_ids[new_selection]
-                    settings.ArcaneMimicryEliteSkillID = ally_elite_skill_ids[new_selection]
                     settings.save_settings()
                 
                 # Display currently configured target
-                if settings.ArcaneMimicryEliteSkillID > 0:
-                    PyImGui.text_colored(
-                        f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(settings.ArcaneMimicryEliteSkillID)}",
-                        Utils.RGBToNormal(0, 255, 0, 255)
-                    )
+                if settings.ArcaneMimicryTargetAgentID > 0:
+                    try:
+                        selected_name = ally_options[ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)]
+                        PyImGui.text_colored(
+                            f"Currently configured to target: {selected_name}",
+                            Utils.RGBToNormal(0, 255, 0, 255)
+                        )
+                    except (ValueError, IndexError):
+                        pass
             else:
-                PyImGui.text_colored("No allies with elite skills found in party", Utils.RGBToNormal(255, 165, 0, 255))
+                PyImGui.text_colored("No allies found in party", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
    
