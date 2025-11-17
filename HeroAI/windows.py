@@ -1062,21 +1062,36 @@ def DrawMesmerSkillsWindow(cached_data: CacheData):
         has_arcane_echo = arcane_echo_id in skill_ids
         
         if has_arcane_echo:
-            current_selection = settings.ArcaneEchoSkillSlot
-            if current_selection >= len(skill_names):
+            # Filter out Arcane Echo itself from the list
+            filtered_skill_names = []
+            filtered_skill_slots = []
+            for i, skill_id in enumerate(skill_ids):
+                if skill_id != arcane_echo_id:
+                    filtered_skill_names.append(skill_names[i])
+                    filtered_skill_slots.append(i)
+            
+            if filtered_skill_names:
+                # Find current selection in filtered list
                 current_selection = 0
+                if settings.ArcaneEchoSkillSlot < len(skill_ids) and skill_ids[settings.ArcaneEchoSkillSlot] != arcane_echo_id:
+                    try:
+                        current_selection = filtered_skill_slots.index(settings.ArcaneEchoSkillSlot)
+                    except ValueError:
+                        current_selection = 0
                 
-            new_selection = ImGui.combo("##ArcaneEchoSkill", current_selection, skill_names)
-            if new_selection != current_selection:
-                settings.ArcaneEchoSkillSlot = new_selection
-                settings.save_settings()
+                new_selection = ImGui.combo("##ArcaneEchoSkill", current_selection, filtered_skill_names)
+                if new_selection != current_selection:
+                    settings.ArcaneEchoSkillSlot = filtered_skill_slots[new_selection]
+                    settings.save_settings()
                 
-            selected_skill_id = skill_ids[settings.ArcaneEchoSkillSlot]
-            if selected_skill_id > 0:
-                PyImGui.text_colored(
-                    f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
-                    Utils.RGBToNormal(0, 255, 0, 255)
-                )
+                selected_skill_id = skill_ids[settings.ArcaneEchoSkillSlot]
+                if selected_skill_id > 0:
+                    PyImGui.text_colored(
+                        f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                        Utils.RGBToNormal(0, 255, 0, 255)
+                    )
+            else:
+                PyImGui.text_colored("No other skills available to copy", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Echo not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
     
@@ -1089,21 +1104,36 @@ def DrawMesmerSkillsWindow(cached_data: CacheData):
         has_auspicious = auspicious_id in skill_ids
         
         if has_auspicious:
-            current_selection = settings.AuspiciousIncantationSkillSlot
-            if current_selection >= len(skill_names):
+            # Filter out Auspicious Incantation itself from the list
+            filtered_skill_names = []
+            filtered_skill_slots = []
+            for i, skill_id in enumerate(skill_ids):
+                if skill_id != auspicious_id:
+                    filtered_skill_names.append(skill_names[i])
+                    filtered_skill_slots.append(i)
+            
+            if filtered_skill_names:
+                # Find current selection in filtered list
                 current_selection = 0
+                if settings.AuspiciousIncantationSkillSlot < len(skill_ids) and skill_ids[settings.AuspiciousIncantationSkillSlot] != auspicious_id:
+                    try:
+                        current_selection = filtered_skill_slots.index(settings.AuspiciousIncantationSkillSlot)
+                    except ValueError:
+                        current_selection = 0
                 
-            new_selection = ImGui.combo("##AuspiciousSkill", current_selection, skill_names)
-            if new_selection != current_selection:
-                settings.AuspiciousIncantationSkillSlot = new_selection
-                settings.save_settings()
+                new_selection = ImGui.combo("##AuspiciousSkill", current_selection, filtered_skill_names)
+                if new_selection != current_selection:
+                    settings.AuspiciousIncantationSkillSlot = filtered_skill_slots[new_selection]
+                    settings.save_settings()
                 
-            selected_skill_id = skill_ids[settings.AuspiciousIncantationSkillSlot]
-            if selected_skill_id > 0:
-                PyImGui.text_colored(
-                    f"Currently configured to cast: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
-                    Utils.RGBToNormal(0, 255, 0, 255)
-                )
+                selected_skill_id = skill_ids[settings.AuspiciousIncantationSkillSlot]
+                if selected_skill_id > 0:
+                    PyImGui.text_colored(
+                        f"Currently configured to cast: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                        Utils.RGBToNormal(0, 255, 0, 255)
+                    )
+            else:
+                PyImGui.text_colored("No other skills available to cast", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Auspicious Incantation not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
     

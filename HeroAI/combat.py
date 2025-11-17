@@ -41,6 +41,10 @@ class CombatClass:
         self.oldCalledTarget = 0
         self.shared_memory_handler = shared_memory_manager.SharedMemoryManager()
         
+        # Track follow-up skills for Arcane Echo and Auspicious Incantation
+        self.pending_followup_skill_slot = -1  # -1 means no follow-up pending
+        self.followup_skill_timer = Timer()
+        
         self.in_aggro = False
         self.is_targeting_enabled = False
         self.is_combat_enabled = False
@@ -107,6 +111,8 @@ class CombatClass:
         self.natures_blessing = GLOBAL_CACHE.Skill.GetID("Natures_Blessing")
         self.relentless_assault = GLOBAL_CACHE.Skill.GetID("Relentless_Assault")
         self.arcane_mimicry = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
+        self.arcane_echo = GLOBAL_CACHE.Skill.GetID("Arcane_Echo")
+        self.auspicious_incantation = GLOBAL_CACHE.Skill.GetID("Auspicious_Incantation")
         #junundu
         self.junundu_wail = GLOBAL_CACHE.Skill.GetID("Junundu_Wail")
         self.unknown_junundu_ability = GLOBAL_CACHE.Skill.GetID("Unknown_Junundu_Ability")
@@ -1144,6 +1150,47 @@ class CombatClass:
         """
         tries to Execute the next skill in the skill order.
         """
+        
+        # Check if we have a pending follow-up skill that should be cast immediately
+        if self.pending_followup_skill_slot >= 0:
+            # Check if enough time has passed since the previous skill
+            if self.followup_skill_timer.GetElapsedTime() > 100:  # Small delay to ensure previous skill finished
+                slot = self.pending_followup_skill_slot
+                skill_id = self.skills[slot].skill_id
+                
+                # Try to cast the follow-up skill
+                is_skill_ready = self.IsSkillReady(slot)
+                if is_skill_ready:
+                    is_ready_to_cast, target_agent_id = self.IsReadyToCast(slot)
+                    if is_ready_to_cast and target_agent_id > 0 and GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
+                        # Cast the follow-up skill
+                        self.in_casting_routine = True
+                        
+                        if self.fast_casting_exists:
+                            activation, recharge = Routines.Checks.Skills.apply_fast_casting(skill_id, self.fast_casting_level)
+                        else:
+                            activation = GLOBAL_CACHE.Skill.Data.GetActivation(skill_id)
+                        
+                        self.aftercast = activation * 1000
+                        self.aftercast += GLOBAL_CACHE.Skill.Data.GetAftercast(skill_id) * 1000
+                        
+                        skill_type, _ = GLOBAL_CACHE.Skill.GetType(skill_id)
+                        if skill_type == SkillType.Attack.value:
+                            self.aftercast += self.GetWeaponAttackAftercast()
+                        
+                        self.aftercast += self.ping_handler.GetCurrentPing()
+                        self.aftercast_timer.Reset()
+                        
+                        GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[slot]+1, target_agent_id)
+                        
+                        # Clear the pending follow-up
+                        self.pending_followup_skill_slot = -1
+                        self.ResetSkillPointer()
+                        return True
+                
+                # If we couldn't cast it, clear the pending state after a timeout
+                if self.followup_skill_timer.GetElapsedTime() > 3000:  # 3 second timeout
+                    self.pending_followup_skill_slot = -1
        
         slot = self.skill_pointer
         skill_id = self.skills[slot].skill_id
@@ -1195,5 +1242,25 @@ class CombatClass:
 
         self.aftercast_timer.Reset()
         GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[self.skill_pointer]+1, target_agent_id)
+        
+        # Check if we just cast Arcane Echo or Auspicious Incantation
+        # If so, schedule the configured follow-up skill to be cast next
+        if skill_id == self.arcane_echo or skill_id == self.auspicious_incantation:
+            from HeroAI.settings import Settings
+            settings = Settings()
+            
+            if skill_id == self.arcane_echo:
+                followup_slot = settings.ArcaneEchoSkillSlot
+            else:  # auspicious_incantation
+                followup_slot = settings.AuspiciousIncantationSkillSlot
+            
+            # Verify the slot is valid and not the same skill
+            if 0 <= followup_slot < len(self.skills):
+                followup_skill_id = self.skills[followup_slot].skill_id
+                if followup_skill_id > 0 and followup_skill_id != skill_id:
+                    self.pending_followup_skill_slot = followup_slot
+                    self.followup_skill_timer.Reset()
+                    self.followup_skill_timer.Start()
+        
         self.ResetSkillPointer()
         return True
