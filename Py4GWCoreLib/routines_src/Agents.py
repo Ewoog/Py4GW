@@ -162,9 +162,12 @@ class Agents:
         from ..AgentArray import AgentArray
         from ..Py4GWcorelib import Utils
         """
-        Purpose: filters enemies within the specified range.
+        Purpose: filters enemies within the specified range. In PvP maps, also includes hostile players.
         Args:
-            range (int): The maximum distance to search for enemies.
+            x (float): The x coordinate to search from.
+            y (float): The y coordinate to search from.
+            max_distance (float): The maximum distance to search for enemies.
+            aggressive_only (bool): If True, only return aggressive enemies.
         Returns: List of enemy agent IDs
         """
         from ..GlobalCache import GLOBAL_CACHE
