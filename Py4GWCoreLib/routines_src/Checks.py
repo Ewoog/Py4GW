@@ -362,6 +362,19 @@ class Checks:
                 return False
             
             enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+            
+            # In PvP maps, also check for hostile players (not in our party/alliance)
+            if GLOBAL_CACHE.Map.IsPVP():
+                all_agents = GLOBAL_CACHE.AgentArray.GetAgentArray()
+                # Filter for living players that are not allies
+                hostile_players = AgentArray.Filter.ByCondition(all_agents, lambda agent_id: GLOBAL_CACHE.Agent.IsPlayer(agent_id))
+                hostile_players = AgentArray.Filter.ByCondition(hostile_players, lambda agent_id: GLOBAL_CACHE.Agent.IsAlive(agent_id))
+                hostile_players = AgentArray.Filter.ByCondition(hostile_players, lambda agent_id: GLOBAL_CACHE.Player.GetAgentID() != agent_id)
+                # Filter out allies - only keep non-ally players
+                hostile_players = AgentArray.Filter.ByCondition(hostile_players, lambda agent_id: GLOBAL_CACHE.Agent.GetAllegiance(agent_id)[0] != 1)  # 1 = Ally allegiance
+                # Add hostile players to enemy array
+                enemy_array = list(set(enemy_array + hostile_players))
+            
             if len(enemy_array) == 0:
                 return False
             enemy_array = AgentArray.Filter.ByCondition(enemy_array, lambda agent_id: Utils.Distance(GLOBAL_CACHE.Player.GetXY(), GLOBAL_CACHE.Agent.GetXY(agent_id)) <= aggro_area)
