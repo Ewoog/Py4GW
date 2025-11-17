@@ -361,7 +361,7 @@ class CombatClass:
                 if GLOBAL_CACHE.Agent.IsLiving(target_id):
                     # Additional validation: ensure target is actually an ally in our party
                     target_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
-                    if target_allegiance == Allegiance.Ally or target_allegiance == Allegiance.AllyNonAttackable:
+                    if target_allegiance == Allegiance.Ally:
                         return target_id
             # If no valid target configured, fall through to default OtherAlly targeting
 
