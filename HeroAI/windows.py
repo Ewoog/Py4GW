@@ -1169,7 +1169,7 @@ def DrawMesmerSkillsWindow(cached_data: CacheData):
                 hero_elite_skill_id = 0
                 for skill_data in hero_skillbar:
                     skill_id = skill_data.id.id if hasattr(skill_data, 'id') else 0
-                    if skill_id > 0 and GLOBAL_CACHE.Skill.Data.IsElite(skill_id):
+                    if skill_id > 0 and GLOBAL_CACHE.Skill.Flags.IsElite(skill_id):
                         hero_elite_skill_id = skill_id
                         break
                 
@@ -1212,7 +1212,7 @@ def DrawMesmerSkillsWindow(cached_data: CacheData):
                         # Find elite skill
                         player_elite_skill_id = 0
                         for skill_id in skills:
-                            if skill_id > 0 and GLOBAL_CACHE.Skill.Data.IsElite(skill_id):
+                            if skill_id > 0 and GLOBAL_CACHE.Skill.Flags.IsElite(skill_id):
                                 player_elite_skill_id = skill_id
                                 break
                         
