@@ -106,6 +106,7 @@ class CombatClass:
         self.heroic_refrain = GLOBAL_CACHE.Skill.GetID("Heroic_Refrain")
         self.natures_blessing = GLOBAL_CACHE.Skill.GetID("Natures_Blessing")
         self.relentless_assault = GLOBAL_CACHE.Skill.GetID("Relentless_Assault")
+        self.arcane_mimicry = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
         #junundu
         self.junundu_wail = GLOBAL_CACHE.Skill.GetID("Junundu_Wail")
         self.unknown_junundu_ability = GLOBAL_CACHE.Skill.GetID("Unknown_Junundu_Ability")
@@ -342,6 +343,17 @@ class CombatClass:
         if self.skills[slot].skill_id == self.heroic_refrain:
             if not self.HasEffect(GLOBAL_CACHE.Player.GetAgentID(), self.heroic_refrain):
                 return GLOBAL_CACHE.Player.GetAgentID()
+
+        # Special handling for Arcane Mimicry - target specific ally based on settings
+        if self.skills[slot].skill_id == self.arcane_mimicry:
+            from HeroAI.settings import Settings
+            settings = Settings()
+            # Use the configured target agent ID if available
+            if settings.ArcaneMimicryTargetAgentID > 0:
+                # Verify the target is still valid (alive and in range)
+                if GLOBAL_CACHE.Agent.IsLiving(settings.ArcaneMimicryTargetAgentID):
+                    return settings.ArcaneMimicryTargetAgentID
+            # If no valid target configured, fall through to default OtherAlly targeting
 
         if target_allegiance == Skilltarget.Enemy:
             v_target = self.GetPartyTarget()

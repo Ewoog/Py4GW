@@ -1111,26 +1111,80 @@ def DrawMesmerSkillsWindow(cached_data: CacheData):
     
     # Arcane Mimicry configuration
     if PyImGui.collapsing_header("Arcane Mimicry", PyImGui.TreeNodeFlags.DefaultOpen):
-        PyImGui.text("Select which skill to steal with Arcane Mimicry:")
+        PyImGui.text("Select which ally's elite skill to copy with Arcane Mimicry:")
         mimicry_id = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
+        
+        # Check if player has Arcane Mimicry in skillbar
         has_mimicry = mimicry_id in skill_ids
         
         if has_mimicry:
-            current_selection = settings.ArcaneMimicrySkillSlot
-            if current_selection >= len(skill_names):
+            # Get all allies (heroes and other players) and their elite skills
+            ally_options = []
+            ally_agent_ids = []
+            ally_elite_skill_ids = []
+            
+            # Get heroes
+            heroes = GLOBAL_CACHE.Party.GetHeroes()
+            for index, hero in enumerate(heroes):
+                hero_agent_id = hero.agent_id
+                if hero_agent_id == 0:
+                    continue
+                    
+                # Get hero's skillbar
+                hero_skillbar = GLOBAL_CACHE.SkillBar.GetHeroSkillbar(index)
+                if not hero_skillbar:
+                    continue
+                
+                # Find elite skill in hero's skillbar
+                hero_elite_skill_id = 0
+                for skill_data in hero_skillbar:
+                    skill_id = skill_data.id.id if hasattr(skill_data, 'id') else 0
+                    if skill_id > 0 and GLOBAL_CACHE.Skill.Data.IsElite(skill_id):
+                        hero_elite_skill_id = skill_id
+                        break
+                
+                if hero_elite_skill_id > 0:
+                    hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero {index + 1}"
+                    elite_skill_name = GLOBAL_CACHE.Skill.GetName(hero_elite_skill_id)
+                    ally_options.append(f"{hero_name} - {elite_skill_name}")
+                    ally_agent_ids.append(hero_agent_id)
+                    ally_elite_skill_ids.append(hero_elite_skill_id)
+            
+            # Get other players in party
+            others = GLOBAL_CACHE.Party.GetOthers()
+            for other in others:
+                other_agent_id = other.agent_id if hasattr(other, 'agent_id') else 0
+                if other_agent_id == 0 or other_agent_id == GLOBAL_CACHE.Player.GetAgentID():
+                    continue
+                
+                # Try to get other player's skillbar - this might not be available
+                # For now, we'll skip other players as we can't reliably get their skillbar
+                # In actual gameplay, only heroes are controllable anyway
+                pass
+            
+            if ally_options:
+                # Find current selection index
                 current_selection = 0
+                if settings.ArcaneMimicryTargetAgentID > 0:
+                    try:
+                        current_selection = ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)
+                    except ValueError:
+                        current_selection = 0
                 
-            new_selection = ImGui.combo("##MimicrySkill", current_selection, skill_names)
-            if new_selection != current_selection:
-                settings.ArcaneMimicrySkillSlot = new_selection
-                settings.save_settings()
+                new_selection = ImGui.combo("##MimicryAlly", current_selection, ally_options)
+                if new_selection != current_selection:
+                    settings.ArcaneMimicryTargetAgentID = ally_agent_ids[new_selection]
+                    settings.ArcaneMimicryEliteSkillID = ally_elite_skill_ids[new_selection]
+                    settings.save_settings()
                 
-            selected_skill_id = skill_ids[settings.ArcaneMimicrySkillSlot]
-            if selected_skill_id > 0:
-                PyImGui.text_colored(
-                    f"Currently configured to steal: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
-                    Utils.RGBToNormal(0, 255, 0, 255)
-                )
+                # Display currently configured target
+                if settings.ArcaneMimicryEliteSkillID > 0:
+                    PyImGui.text_colored(
+                        f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(settings.ArcaneMimicryEliteSkillID)}",
+                        Utils.RGBToNormal(0, 255, 0, 255)
+                    )
+            else:
+                PyImGui.text_colored("No allies with elite skills found in party", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
    

@@ -109,7 +109,9 @@ class Settings:
         # Mesmer skill configurations (skill slot index, 0-based)
         self.ArcaneEchoSkillSlot = 0  # Which skill to copy with Arcane Echo
         self.AuspiciousIncantationSkillSlot = 0  # Which skill to use after Auspicious Incantation
-        self.ArcaneMimicrySkillSlot = 0  # Which skill to steal with Arcane Mimicry
+        self.ArcaneMimicrySkillSlot = 0  # Which skill to steal with Arcane Mimicry (deprecated, keeping for compatibility)
+        self.ArcaneMimicryTargetAgentID = 0  # Which ally to target with Arcane Mimicry
+        self.ArcaneMimicryEliteSkillID = 0  # Which elite skill to copy with Arcane Mimicry
         
         
         base_path = Console.get_projects_path()
@@ -193,6 +195,8 @@ class Settings:
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneEchoSkillSlot", str(self.ArcaneEchoSkillSlot))
         self.account_ini_handler.write_key("MesmerSkills", "AuspiciousIncantationSkillSlot", str(self.AuspiciousIncantationSkillSlot))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicrySkillSlot", str(self.ArcaneMimicrySkillSlot))
+        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetAgentID", str(self.ArcaneMimicryTargetAgentID))
+        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryEliteSkillID", str(self.ArcaneMimicryEliteSkillID))
 
         for hero_email, (x, y, w, h, collapsed) in self.HeroPanelPositions.items():
             self.account_ini_handler.write_key("HeroPanelPositions", hero_email, f"{x},{y},{w},{h},{collapsed}")
@@ -229,6 +233,8 @@ class Settings:
         self.ArcaneEchoSkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneEchoSkillSlot", 0)
         self.AuspiciousIncantationSkillSlot = self.account_ini_handler.read_int("MesmerSkills", "AuspiciousIncantationSkillSlot", 0)
         self.ArcaneMimicrySkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicrySkillSlot", 0)
+        self.ArcaneMimicryTargetAgentID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetAgentID", 0)
+        self.ArcaneMimicryEliteSkillID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryEliteSkillID", 0)
 
         self.HeroPanelPositions.clear()        
         self.import_hero_panel_positions(self.account_ini_handler)
