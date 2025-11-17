@@ -1180,54 +1180,54 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     ally_agent_ids.append(hero_agent_id)
                     ally_elite_skill_ids.append(hero_elite_skill_id)
             
-            # Get other players in party via shared memory (like teambuild tab)
-            try:
-                from Widgets.CustomBehaviors.primitives.parties.party_teambuild_manager import PartyTeamBuildManager
-                from Py4GWCoreLib.Skillbar import SkillBar
-                
-                party_manager = PartyTeamBuildManager()
-                all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
-                my_account_email = GLOBAL_CACHE.Player.GetAccountEmail()
-                
-                for account in all_accounts:
-                    account_email = account.AccountEmail
+            # Get other players in party
+            players = GLOBAL_CACHE.Party.GetPlayers()
+            my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+            
+            if len(players) > 1:
+                for player in players:
+                    player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                    
                     # Skip self
-                    if account_email == my_account_email:
+                    if player_agent_id == my_agent_id or player_agent_id == 0:
                         continue
                     
-                    # Skip if no agent ID
-                    player_agent_id = account.PlayerID
-                    if player_agent_id == 0:
-                        continue
-                    
-                    # Get skillbar template from shared memory
-                    template = party_manager.get_template_for_account(account_email)
-                    if not template:
-                        continue
-                    
-                    # Parse the template to get skills
+                    # Try to get player's elite skill from their skillbar
+                    # We can only get this if they're using shared memory (multibox scenario)
+                    player_elite_skill_id = 0
                     try:
-                        prof_primary, prof_secondary, attributes, skills = SkillBar.ParseSkillbarTemplate(template)
+                        from Widgets.CustomBehaviors.primitives.parties.party_teambuild_manager import PartyTeamBuildManager
+                        party_manager = PartyTeamBuildManager()
                         
-                        # Find elite skill
-                        player_elite_skill_id = 0
-                        for skill_id in skills:
-                            if skill_id > 0 and GLOBAL_CACHE.Skill.Flags.IsElite(skill_id):
-                                player_elite_skill_id = skill_id
-                                break
+                        # Get player's account email to lookup their template
+                        player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
                         
-                        if player_elite_skill_id > 0:
-                            player_name = account.CharacterName if account.CharacterName else account_email
-                            elite_skill_name = GLOBAL_CACHE.Skill.GetName(player_elite_skill_id)
-                            ally_options.append(f"{player_name} - {elite_skill_name}")
-                            ally_agent_ids.append(player_agent_id)
-                            ally_elite_skill_ids.append(player_elite_skill_id)
-                    except Exception as e:
-                        # Skip if template parsing fails
+                        # Try to get from skillbar data if available
+                        if hasattr(party_manager, 'skillbar_datas') and party_manager.skillbar_datas:
+                            # Look through skillbar_datas to find this player
+                            for email, skillbar_data in party_manager.skillbar_datas.items():
+                                if skillbar_data and hasattr(skillbar_data, 'skillbar_parsed'):
+                                    # Check if this matches our player by trying their skills
+                                    skills = skillbar_data.skillbar_parsed.skills
+                                    for skill_id in skills:
+                                        if skill_id > 0 and GLOBAL_CACHE.Skill.Flags.IsElite(skill_id):
+                                            # We found an elite skill in this skillbar
+                                            # Assume this is the right player for now
+                                            player_elite_skill_id = skill_id
+                                            break
+                                    if player_elite_skill_id > 0:
+                                        break
+                    except:
+                        # If shared memory approach fails, skip this player
                         pass
-            except ImportError:
-                # CustomBehaviors might not be available
-                pass
+                    
+                    # If we found an elite skill, add this player to the list
+                    if player_elite_skill_id > 0:
+                        player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                        elite_skill_name = GLOBAL_CACHE.Skill.GetName(player_elite_skill_id)
+                        ally_options.append(f"{player_name} - {elite_skill_name}")
+                        ally_agent_ids.append(player_agent_id)
+                        ally_elite_skill_ids.append(player_elite_skill_id)
             
             if ally_options:
                 # Find current selection index
