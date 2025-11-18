@@ -1235,6 +1235,43 @@ class CombatClass:
 
         if not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
             return False
+        
+        # Special check for Auspicious Incantation: ensure we have enough energy for both
+        # Auspicious Incantation AND the target spell (at reduced cost)
+        if skill_id == self.auspicious_incantation:
+            from HeroAI.settings import Settings
+            settings = Settings()
+            followup_slot = settings.AuspiciousIncantationSkillSlot
+            
+            # Verify the followup slot is valid
+            if 0 <= followup_slot < len(self.skills):
+                followup_skill_id = self.skills[followup_slot].skill_id
+                
+                # Check if the followup skill is ready (not on cooldown)
+                if not Routines.Checks.Skills.IsSkillIDReady(followup_skill_id):
+                    self.AdvanceSkillPointer()
+                    return False
+                
+                # Check if we have enough energy for both spells
+                # Auspicious Incantation reduces energy cost by 50%
+                current_energy = self.GetEnergyValues(GLOBAL_CACHE.Player.GetAgentID()) * GLOBAL_CACHE.Agent.GetMaxEnergy(GLOBAL_CACHE.Player.GetAgentID())
+                
+                # Energy cost for Auspicious Incantation itself
+                auspicious_cost = Routines.Checks.Skills.GetEnergyCostWithEffects(skill_id, GLOBAL_CACHE.Player.GetAgentID())
+                if self.expertise_exists:
+                    auspicious_cost = Routines.Checks.Skills.apply_expertise_reduction(auspicious_cost, self.expertise_level, skill_id)
+                
+                # Energy cost for the followup spell (reduced by 50% due to Auspicious)
+                followup_cost = Routines.Checks.Skills.GetEnergyCostWithEffects(followup_skill_id, GLOBAL_CACHE.Player.GetAgentID())
+                if self.expertise_exists:
+                    followup_cost = Routines.Checks.Skills.apply_expertise_reduction(followup_cost, self.expertise_level, followup_skill_id)
+                followup_cost = followup_cost * 0.5  # Auspicious reduces cost by 50%
+                
+                total_energy_needed = auspicious_cost + followup_cost
+                
+                if current_energy < total_energy_needed:
+                    self.AdvanceSkillPointer()
+                    return False
             
         self.in_casting_routine = True
 
