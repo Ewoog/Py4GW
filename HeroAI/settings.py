@@ -113,6 +113,9 @@ class Settings:
         self.ArcaneMimicryTargetAgentID = 0  # Which ally to target with Arcane Mimicry
         self.ArcaneMimicryEliteSkillID = 0  # Which elite skill to copy with Arcane Mimicry
         
+        # Combat behavior settings
+        self.AggressiveInterrupts = False  # When enabled, immediately interrupt any casting enemy
+        
         
         base_path = Console.get_projects_path()
         self.ini_path = os.path.join(base_path, "Widgets", "Config", "HeroAI.ini")
@@ -197,6 +200,9 @@ class Settings:
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicrySkillSlot", str(self.ArcaneMimicrySkillSlot))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetAgentID", str(self.ArcaneMimicryTargetAgentID))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryEliteSkillID", str(self.ArcaneMimicryEliteSkillID))
+        
+        # Combat behavior settings
+        self.account_ini_handler.write_key("Combat", "AggressiveInterrupts", str(self.AggressiveInterrupts))
 
         for hero_email, (x, y, w, h, collapsed) in self.HeroPanelPositions.items():
             self.account_ini_handler.write_key("HeroPanelPositions", hero_email, f"{x},{y},{w},{h},{collapsed}")
@@ -235,6 +241,9 @@ class Settings:
         self.ArcaneMimicrySkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicrySkillSlot", 0)
         self.ArcaneMimicryTargetAgentID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetAgentID", 0)
         self.ArcaneMimicryEliteSkillID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryEliteSkillID", 0)
+        
+        # Combat behavior settings
+        self.AggressiveInterrupts = self.account_ini_handler.read_bool("Combat", "AggressiveInterrupts", False)
 
         self.HeroPanelPositions.clear()        
         self.import_hero_panel_positions(self.account_ini_handler)
