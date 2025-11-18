@@ -1357,12 +1357,16 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     for member_type, member_id, member_name in party_members:
                         is_enabled = member_id in config['players']
                         
-                        if ImGui.toggle_button(f"{member_name}##{skill_name}_{member_id}", is_enabled, 150, 24):
-                            # Toggle the state - add if not present, remove if present
-                            if member_id in config['players']:
-                                config['players'].discard(member_id)
-                            else:
+                        # toggle_button returns the new state, not a click indicator
+                        new_state = ImGui.toggle_button(f"{member_name}##{skill_name}_{member_id}", is_enabled, 150, 24)
+                        
+                        # Check if the state changed
+                        if new_state != is_enabled:
+                            # Update the set based on the new state
+                            if new_state:
                                 config['players'].add(member_id)
+                            else:
+                                config['players'].discard(member_id)
                             settings.save_requested = True
                             settings.write_settings()  # Immediately write to persist the change
                         
