@@ -439,7 +439,7 @@ class CombatClass:
                     heroes = GLOBAL_CACHE.Party.GetHeroes()
                     for hero in heroes:
                         if hero.agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(hero.agent_id):
-                            prof_id = GLOBAL_CACHE.Agent.GetProfession(hero.agent_id)
+                            prof_id, _ = GLOBAL_CACHE.Agent.GetProfessionIDs(hero.agent_id)  # Returns (primary, secondary)
                             if professions_dict.get(prof_id, False) and not self.HasEffect(hero.agent_id, self.skills[slot].skill_id):
                                 party_members.append(hero.agent_id)
                     
@@ -449,7 +449,7 @@ class CombatClass:
                     for player in players:
                         player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
                         if player_agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
-                            prof_id = GLOBAL_CACHE.Agent.GetProfession(player_agent_id)
+                            prof_id, _ = GLOBAL_CACHE.Agent.GetProfessionIDs(player_agent_id)  # Returns (primary, secondary)
                             if professions_dict.get(prof_id, False) and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
                                 party_members.append(player_agent_id)
                     
