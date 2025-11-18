@@ -1038,6 +1038,7 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
     """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, Arcane Mimicry, and Buff Targeting"""
     from HeroAI.settings import Settings
     settings = Settings()
+    settings.ensure_initialized()  # Ensure settings are loaded for current account
     
     PyImGui.text("Configure Custom Skills")
     PyImGui.separator()
@@ -1242,7 +1243,8 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
             
             if new_mode_index != current_mode_index:
                 config['mode'] = 'profession' if new_mode_index == 0 else 'player'
-                settings.save_settings()
+                settings.save_requested = True
+                settings.write_settings()  # Immediately write to persist the change
             
             PyImGui.spacing()
             
@@ -1274,7 +1276,8 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     if not os.path.exists(texture_path):
                         if ImGui.toggle_button(f"{profession.name}##{skill_name}_{profession.name}", is_enabled, 80, 26):
                             config['professions'][profession_id] = not is_enabled
-                            settings.save_settings()
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
                     else:
                         if is_enabled:
                             PyImGui.push_style_var(ImGui.ImGuiStyleVar.FrameBorderSize, 3)
@@ -1288,7 +1291,8 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                         
                         if clicked:
                             config['professions'][profession_id] = not is_enabled
-                            settings.save_settings()
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
                         
                         tooltip_text = f"{'Deactivate' if is_enabled else 'Activate'} buff for {profession.name}"
                         ImGui.show_tooltip(tooltip_text)
@@ -1358,7 +1362,8 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                                 config['players'].discard(member_id)
                             else:
                                 config['players'].add(member_id)
-                            settings.save_settings()
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
                         
                         PyImGui.same_line(0, 5)
                         PyImGui.text(f"({member_type})")
