@@ -1211,26 +1211,38 @@ class CombatClass:
             self.AdvanceSkillPointer()
             return False
          
+        # Store original target for skills that need to temporarily change targets
+        original_target = 0
          
         # For Arcane Mimicry, change target to the ally BEFORE calling IsReadyToCast
         # This ensures the player's current target is correctly set for the skill
         if skill_id == self.arcane_mimicry:
+            original_target = GLOBAL_CACHE.Player.GetTargetID()
             arcane_target = self.GetAppropiateTarget(slot)
             if arcane_target > 0 and GLOBAL_CACHE.Agent.IsLiving(arcane_target):
                 GLOBAL_CACHE.Player.ChangeTarget(arcane_target)
          
         is_read_to_cast, target_agent_id = self.IsReadyToCast(slot)
  
+        # Helper function to restore target for Arcane Mimicry
+        def restore_arcane_target():
+            if skill_id == self.arcane_mimicry and original_target > 0:
+                if GLOBAL_CACHE.Agent.IsLiving(original_target):
+                    GLOBAL_CACHE.Player.ChangeTarget(original_target)
+ 
         if not is_read_to_cast:
+            restore_arcane_target()
             self.AdvanceSkillPointer()
             return False
         
 
         if target_agent_id == 0:
+            restore_arcane_target()
             self.AdvanceSkillPointer()
             return False
 
         if not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
+            restore_arcane_target()
             return False
             
         self.in_casting_routine = True
@@ -1254,6 +1266,9 @@ class CombatClass:
         self.aftercast_timer.Reset()
         
         GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[self.skill_pointer]+1, target_agent_id)
+        
+        # For Arcane Mimicry, restore the original target after casting
+        restore_arcane_target()
         
         # Check if we just cast Arcane Echo or Auspicious Incantation
         # If so, schedule the configured follow-up skill to be cast next
