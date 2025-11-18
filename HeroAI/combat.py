@@ -53,6 +53,7 @@ class CombatClass:
         self.fast_casting_level = 0
         self.expertise_exists = False
         self.expertise_level = 0
+        self.aggressive_interrupts = False  # Aggressive interrupt mode
         
         self.nearest_enemy = Routines.Agents.GetNearestEnemy(self.get_combat_distance())
         self.lowest_ally = TargetLowestAlly()
@@ -128,6 +129,10 @@ class CombatClass:
         self.fast_casting_level = cached_data.fast_casting_level
         self.expertise_exists = cached_data.expertise_exists
         self.expertise_level = cached_data.expertise_level
+        
+        from HeroAI.settings import Settings
+        settings = Settings()
+        self.aggressive_interrupts = settings.AggressiveInterrupts
         
 
     def PrioritizeSkills(self):
@@ -975,6 +980,57 @@ class CombatClass:
 
         return False
 
+    def FindReadyInterruptForCastingEnemy(self):
+        """
+        When aggressive interrupts are enabled, find a ready interrupt skill and a casting enemy.
+        Returns (slot, target_id) if found, otherwise (None, None)
+        """
+        if not self.aggressive_interrupts:
+            return None, None
+        
+        # First, find any enemy that is casting with a significant activation time
+        casting_enemy = None
+        enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+        distance = self.get_combat_distance()
+        enemy_array = AgentArray.Filter.ByDistance(enemy_array, GLOBAL_CACHE.Player.GetXY(), distance)
+        enemy_array = AgentArray.Filter.ByCondition(enemy_array, lambda agent_id: GLOBAL_CACHE.Agent.IsAlive(agent_id))
+        
+        for enemy_id in enemy_array:
+            if GLOBAL_CACHE.Agent.IsCasting(enemy_id):
+                casting_skill_id = GLOBAL_CACHE.Agent.GetCastingSkill(enemy_id)
+                # Only interrupt skills with activation time >= 0.25 seconds
+                if casting_skill_id > 0 and GLOBAL_CACHE.Skill.Data.GetActivation(casting_skill_id) >= 0.25:
+                    casting_enemy = enemy_id
+                    break
+        
+        if not casting_enemy:
+            return None, None
+        
+        # Now find an interrupt skill that's ready to cast
+        for slot in range(MAX_SKILLS):
+            skill = self.skills[slot]
+            
+            # Check if this is an interrupt skill
+            if skill.custom_skill_data.Nature != SkillNature.Interrupt.value:
+                continue
+            
+            # Check if the skill is ready (recharge, energy, adrenaline, etc.)
+            if not self.IsSkillReady(slot):
+                continue
+            
+            # Verify this interrupt skill can target enemies
+            target_allegiance = skill.custom_skill_data.TargetAllegiance
+            if target_allegiance not in [Skilltarget.Enemy.value, Skilltarget.EnemyCasting.value, Skilltarget.EnemyCastingSpell.value]:
+                continue
+            
+            # Check if we can cast it on the casting enemy (validates conditions, range, etc.)
+            if GLOBAL_CACHE.Agent.IsLiving(casting_enemy):
+                is_ready, _ = self.IsReadyToCast(slot)
+                if is_ready:
+                    return slot, casting_enemy
+        
+        return None, None
+
 
 
     def IsReadyToCast(self, slot):
@@ -1195,6 +1251,36 @@ class CombatClass:
                 # If we couldn't cast it, clear the pending state after a timeout
                 if self.followup_skill_timer.GetElapsedTime() > 3000:  # 3 second timeout
                     self.pending_followup_skill_slot = -1
+        
+        # Aggressive interrupt mode: immediately interrupt any casting enemy
+        if self.aggressive_interrupts and not ooc and self.is_combat_enabled:
+            interrupt_slot, casting_enemy = self.FindReadyInterruptForCastingEnemy()
+            if interrupt_slot is not None and casting_enemy is not None:
+                # Found an interrupt skill and a casting enemy - use it immediately
+                self.in_casting_routine = True
+                skill_id = self.skills[interrupt_slot].skill_id
+                
+                if self.fast_casting_exists:
+                    activation, recharge = Routines.Checks.Skills.apply_fast_casting(skill_id, self.fast_casting_level)
+                else:
+                    activation = GLOBAL_CACHE.Skill.Data.GetActivation(skill_id)
+                
+                self.aftercast = activation * 1000
+                self.aftercast += GLOBAL_CACHE.Skill.Data.GetAftercast(skill_id) * 1000
+                
+                skill_type, _ = GLOBAL_CACHE.Skill.GetType(skill_id)
+                if skill_type == SkillType.Attack.value:
+                    self.aftercast += self.GetWeaponAttackAftercast()
+                
+                self.aftercast += self.ping_handler.GetCurrentPing()
+                self.aftercast_timer.Reset()
+                
+                # Use the interrupt skill on the casting enemy
+                GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[interrupt_slot]+1, casting_enemy)
+                
+                # Reset skill pointer to continue normal rotation
+                self.ResetSkillPointer()
+                return True
        
         slot = self.skill_pointer
         skill_id = self.skills[slot].skill_id

@@ -1214,6 +1214,42 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 PyImGui.text_colored("No allies found in party", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    PyImGui.separator()
+    PyImGui.spacing()
+    
+    # Aggressive Interrupts configuration
+    if PyImGui.collapsing_header("Aggressive Interrupts", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text_colored(
+            "When enabled, HeroAI will become very aggressive with interrupts.",
+            Utils.RGBToNormal(180, 180, 180, 255)
+        )
+        PyImGui.text_colored(
+            "The bot will find any enemy in range that is casting and immediately",
+            Utils.RGBToNormal(180, 180, 180, 255)
+        )
+        PyImGui.text_colored(
+            "interrupt it, canceling other actions if necessary.",
+            Utils.RGBToNormal(180, 180, 180, 255)
+        )
+        PyImGui.spacing()
+        
+        aggressive_interrupts = ImGui.checkbox("Enable Aggressive Interrupts", settings.AggressiveInterrupts)
+        if aggressive_interrupts != settings.AggressiveInterrupts:
+            settings.AggressiveInterrupts = aggressive_interrupts
+            settings.save_settings()
+        
+        if settings.AggressiveInterrupts:
+            PyImGui.text_colored(
+                "Aggressive Interrupts: ENABLED - Bot will immediately interrupt casting enemies",
+                Utils.RGBToNormal(0, 255, 0, 255)
+            )
+        else:
+            PyImGui.text_colored(
+                "Aggressive Interrupts: DISABLED - Bot will use normal interrupt priority",
+                Utils.RGBToNormal(180, 180, 180, 255)
+            )
    
 
 
