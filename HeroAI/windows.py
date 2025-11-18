@@ -1358,7 +1358,8 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                         is_enabled = member_id in config['players']
                         
                         if ImGui.toggle_button(f"{member_name}##{skill_name}_{member_id}", is_enabled, 150, 24):
-                            if is_enabled:
+                            # Toggle the state - add if not present, remove if present
+                            if member_id in config['players']:
                                 config['players'].discard(member_id)
                             else:
                                 config['players'].add(member_id)

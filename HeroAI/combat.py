@@ -364,6 +364,106 @@ class CombatClass:
                     if target_allegiance == Allegiance.Ally:
                         return target_id
             # If no valid target configured, fall through to default OtherAlly targeting
+        
+        # Special handling for buff skills - use buff targeting configuration
+        buff_skill_names = {
+            GLOBAL_CACHE.Skill.GetID("Dark_Aura"): 'Dark_Aura',
+            GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon"): 'Great_Dwarf_Weapon',
+            GLOBAL_CACHE.Skill.GetID("Strength_of_Honor"): 'Strength_of_Honor',
+            GLOBAL_CACHE.Skill.GetID("Spell_Breaker"): 'Spell_Breaker'
+        }
+        
+        if self.skills[slot].skill_id in buff_skill_names:
+            from HeroAI.settings import Settings
+            from Py4GWCoreLib.enums_src.GameData_enums import Profession
+            settings = Settings()
+            settings.ensure_initialized()
+            
+            skill_name = buff_skill_names[self.skills[slot].skill_id]
+            config = settings.BuffTargetingConfig.get(skill_name, {})
+            
+            if config:
+                mode = config.get('mode', 'profession')
+                
+                if mode == 'player':
+                    # Player-based targeting - find lowest health ally that's in the player list
+                    players_set = config.get('players', set())
+                    if not players_set:
+                        # No players selected - don't cast the buff
+                        return 0
+                    
+                    # Get all party members
+                    party_members = []
+                    
+                    # Add heroes
+                    heroes = GLOBAL_CACHE.Party.GetHeroes()
+                    for hero in heroes:
+                        if hero.agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(hero.agent_id):
+                            hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else "Hero"
+                            if hero_name in players_set and not self.HasEffect(hero.agent_id, self.skills[slot].skill_id):
+                                party_members.append(hero.agent_id)
+                    
+                    # Add other players
+                    players = GLOBAL_CACHE.Party.GetPlayers()
+                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                    for player in players:
+                        player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                        if player_agent_id != 0 and player_agent_id != my_agent_id and GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
+                            player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                            if player_name in players_set and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
+                                party_members.append(player_agent_id)
+                    
+                    # Return lowest health ally from the selected players
+                    if party_members:
+                        lowest_health = 1.0
+                        lowest_agent = 0
+                        for agent_id in party_members:
+                            health = GLOBAL_CACHE.Agent.GetHealth(agent_id)
+                            if health < lowest_health:
+                                lowest_health = health
+                                lowest_agent = agent_id
+                        return lowest_agent
+                    return 0
+                    
+                else:  # profession mode
+                    # Profession-based targeting - find lowest health ally of enabled profession
+                    professions_dict = config.get('professions', {})
+                    if not any(professions_dict.values()):
+                        # No professions selected - don't cast the buff
+                        return 0
+                    
+                    # Get all party members of enabled professions
+                    party_members = []
+                    
+                    # Add heroes
+                    heroes = GLOBAL_CACHE.Party.GetHeroes()
+                    for hero in heroes:
+                        if hero.agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(hero.agent_id):
+                            prof_id = GLOBAL_CACHE.Agent.GetProfession(hero.agent_id)
+                            if professions_dict.get(prof_id, False) and not self.HasEffect(hero.agent_id, self.skills[slot].skill_id):
+                                party_members.append(hero.agent_id)
+                    
+                    # Add other players
+                    players = GLOBAL_CACHE.Party.GetPlayers()
+                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                    for player in players:
+                        player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                        if player_agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
+                            prof_id = GLOBAL_CACHE.Agent.GetProfession(player_agent_id)
+                            if professions_dict.get(prof_id, False) and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
+                                party_members.append(player_agent_id)
+                    
+                    # Return lowest health ally from enabled professions
+                    if party_members:
+                        lowest_health = 1.0
+                        lowest_agent = 0
+                        for agent_id in party_members:
+                            health = GLOBAL_CACHE.Agent.GetHealth(agent_id)
+                            if health < lowest_health:
+                                lowest_health = health
+                                lowest_agent = agent_id
+                        return lowest_agent
+                    return 0
 
         if target_allegiance == Skilltarget.Enemy:
             v_target = self.GetPartyTarget()
