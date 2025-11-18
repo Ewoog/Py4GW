@@ -1212,6 +1212,13 @@ class CombatClass:
             return False
          
          
+        # For Arcane Mimicry, change target to the ally BEFORE calling IsReadyToCast
+        # This ensures the player's current target is correctly set for the skill
+        if skill_id == self.arcane_mimicry:
+            arcane_target = self.GetAppropiateTarget(slot)
+            if arcane_target > 0 and GLOBAL_CACHE.Agent.IsLiving(arcane_target):
+                GLOBAL_CACHE.Player.ChangeTarget(arcane_target)
+         
         is_read_to_cast, target_agent_id = self.IsReadyToCast(slot)
  
         if not is_read_to_cast:
@@ -1245,10 +1252,6 @@ class CombatClass:
         self.aftercast += self.ping_handler.GetCurrentPing()
 
         self.aftercast_timer.Reset()
-        
-        # For Arcane Mimicry, explicitly change target before casting to ensure correct targeting
-        if skill_id == self.arcane_mimicry:
-            GLOBAL_CACHE.Player.ChangeTarget(target_agent_id)
         
         GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[self.skill_pointer]+1, target_agent_id)
         
