@@ -1035,7 +1035,7 @@ def DrawControlPanelWindow(cached_data:CacheData):
     cached_data.HeroAI_windows.control_window.end()
 
 def DrawCustomSkillsWindow(cached_data: CacheData):
-    """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, and Arcane Mimicry"""
+    """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, Arcane Mimicry, and Dark Aura"""
     from HeroAI.settings import Settings
     settings = Settings()
     
@@ -1214,6 +1214,97 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 PyImGui.text_colored("No allies found in party", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    
+    # Dark Aura buff targeting configuration
+    if PyImGui.collapsing_header("Dark Aura - Buff Targeting", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text("Select which party members to target with Dark Aura:")
+        PyImGui.text_colored(
+            "Configure which professions receive the Dark Aura buff.",
+            Utils.RGBToNormal(180, 180, 180, 255)
+        )
+        
+        dark_aura_id = GLOBAL_CACHE.Skill.GetID("Dark_Aura")
+        has_dark_aura = dark_aura_id in skill_ids
+        
+        if has_dark_aura:
+            try:
+                # Import CustomBehaviors modules to access the buff configuration
+                from Widgets.CustomBehaviors.primitives.custom_behavior_loader import CustomBehaviorLoader
+                from Widgets.CustomBehaviors.primitives.skills.bonds.custom_buff_multiple_target import CustomBuffMultipleTarget
+                import os
+                
+                # Get the current behavior instance
+                custom_behavior = CustomBehaviorLoader().custom_combat_behavior
+                
+                if custom_behavior is not None:
+                    # Try to find the Dark Aura utility in the behavior
+                    dark_aura_utility = None
+                    
+                    # Check if the behavior has a dark_aura attribute (for NecromancerDarkAuraSupport)
+                    if hasattr(custom_behavior, 'dark_aura'):
+                        dark_aura_utility = custom_behavior.dark_aura
+                    else:
+                        # Otherwise, search through all skills
+                        try:
+                            skills = custom_behavior.get_skills_final_list() if hasattr(custom_behavior, 'get_skills_final_list') else []
+                            for skill in skills:
+                                if skill.custom_skill.skill_name == "Dark_Aura":
+                                    dark_aura_utility = skill
+                                    break
+                        except Exception:
+                            pass
+                    
+                    if dark_aura_utility is not None:
+                        # Get the buff configuration from the Dark Aura utility
+                        buff_configuration = dark_aura_utility.get_buff_configuration()
+                        
+                        if buff_configuration is not None:
+                            # Get the py4gw root directory for texture paths
+                            script_directory = os.path.dirname(os.path.abspath(__file__))
+                            py4gw_root_directory = os.path.abspath(os.path.join(script_directory, os.pardir)) + "\\\\"
+                            
+                            # Render the buff configuration UI
+                            buff_configuration.render_buff_configuration(py4gw_root_directory)
+                            
+                            PyImGui.spacing()
+                            PyImGui.text_colored(
+                                "Buff configuration is active and working!",
+                                Utils.RGBToNormal(0, 255, 0, 255)
+                            )
+                        else:
+                            PyImGui.text_colored(
+                                "Dark Aura utility found but no buff configuration available.",
+                                Utils.RGBToNormal(255, 165, 0, 255)
+                            )
+                    else:
+                        PyImGui.text_colored(
+                            "Dark Aura utility not found in current behavior.",
+                            Utils.RGBToNormal(255, 165, 0, 255)
+                        )
+                        PyImGui.text_colored(
+                            "Make sure you have a necromancer build with Dark Aura loaded in CustomBehaviors.",
+                            Utils.RGBToNormal(180, 180, 180, 255)
+                        )
+                else:
+                    PyImGui.text_colored(
+                        "No CustomBehavior loaded. Load a necromancer build with Dark Aura first.",
+                        Utils.RGBToNormal(255, 165, 0, 255)
+                    )
+                    
+            except ImportError as e:
+                PyImGui.text_colored(
+                    f"CustomBehaviors module not available: {str(e)}",
+                    Utils.RGBToNormal(255, 0, 0, 255)
+                )
+            except Exception as e:
+                PyImGui.text_colored(
+                    f"Error loading Dark Aura configuration: {str(e)}",
+                    Utils.RGBToNormal(255, 0, 0, 255)
+                )
+        else:
+            PyImGui.text_colored("Dark Aura not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
    
 
 
