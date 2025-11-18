@@ -1398,6 +1398,28 @@ class CombatClass:
                     self.AdvanceSkillPointer()
                     return False
         
+        # Special check for Arcane Mimicry: ensure target elite spell is ready
+        if skill_id == self.arcane_mimicry:
+            from HeroAI.settings import Settings
+            settings = Settings()
+            target_elite_id = settings.ArcaneMimicryEliteSkillID
+            
+            # Only check if a target elite skill has been configured
+            if target_elite_id > 0:
+                # Check if we can find this elite on the target ally's skillbar
+                # Since we can't check other players' skill recharge, we check if the skill exists
+                # and if we already have it copied (meaning we should wait before copying again)
+                
+                # Check if the elite is already on our skillbar (from previous Arcane Mimicry)
+                # If so, only cast Arcane Mimicry again if that elite is ready to use
+                our_slot = GLOBAL_CACHE.SkillBar.GetSlotBySkillID(target_elite_id)
+                if our_slot > 0:
+                    # We have the elite skill, check if it's ready
+                    if not Routines.Checks.Skills.IsSkillIDReady(target_elite_id):
+                        # The copied elite is still on cooldown, don't cast Arcane Mimicry yet
+                        self.AdvanceSkillPointer()
+                        return False
+        
         # Check if this is a target spell for Arcane Echo or Auspicious Incantation
         # If so, and the Echo/Auspicious spell is available, skip this spell
         # Priority: Auspicious (highest) -> Arcane -> target spell
