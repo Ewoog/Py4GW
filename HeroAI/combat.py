@@ -360,8 +360,8 @@ class CombatClass:
                 target_id = settings.ArcaneMimicryTargetAgentID
                 if GLOBAL_CACHE.Agent.IsLiving(target_id):
                     # Additional validation: ensure target is actually an ally in our party
-                    target_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
-                    if target_allegiance == Allegiance.Ally:
+                    agent_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
+                    if agent_allegiance == Allegiance.Ally:
                         return target_id
             # If no valid target configured, fall through to default OtherAlly targeting
 
@@ -1213,6 +1213,7 @@ class CombatClass:
          
         # Store original target for skills that need to temporarily change targets
         original_target = 0
+        target_was_changed = False
          
         # For Arcane Mimicry, change target to the ally BEFORE calling IsReadyToCast
         # This ensures the player's current target is correctly set for the skill
@@ -1221,14 +1222,19 @@ class CombatClass:
             arcane_target = self.GetAppropiateTarget(slot)
             if arcane_target > 0 and GLOBAL_CACHE.Agent.IsLiving(arcane_target):
                 GLOBAL_CACHE.Player.ChangeTarget(arcane_target)
+                target_was_changed = True
          
         is_read_to_cast, target_agent_id = self.IsReadyToCast(slot)
  
         # Helper function to restore target for Arcane Mimicry
         def restore_arcane_target():
-            if skill_id == self.arcane_mimicry and original_target > 0:
-                if GLOBAL_CACHE.Agent.IsLiving(original_target):
+            if skill_id == self.arcane_mimicry and target_was_changed:
+                # Always try to restore, even if original target is no longer valid
+                if original_target > 0 and GLOBAL_CACHE.Agent.IsLiving(original_target):
                     GLOBAL_CACHE.Player.ChangeTarget(original_target)
+                else:
+                    # If original target is gone, clear the target to avoid staying stuck on the ally
+                    GLOBAL_CACHE.Player.ChangeTarget(0)
  
         if not is_read_to_cast:
             restore_arcane_target()
