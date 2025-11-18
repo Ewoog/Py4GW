@@ -1211,10 +1211,13 @@ class CombatClass:
             self.AdvanceSkillPointer()
             return False
          
+        # Store original target for skills that need to temporarily change targets
+        original_target = 0
          
         # For Arcane Mimicry, change target to the ally BEFORE calling IsReadyToCast
         # This ensures the player's current target is correctly set for the skill
         if skill_id == self.arcane_mimicry:
+            original_target = GLOBAL_CACHE.Player.GetTargetID()
             arcane_target = self.GetAppropiateTarget(slot)
             if arcane_target > 0 and GLOBAL_CACHE.Agent.IsLiving(arcane_target):
                 GLOBAL_CACHE.Player.ChangeTarget(arcane_target)
@@ -1254,6 +1257,11 @@ class CombatClass:
         self.aftercast_timer.Reset()
         
         GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[self.skill_pointer]+1, target_agent_id)
+        
+        # For Arcane Mimicry, restore the original target after casting
+        if skill_id == self.arcane_mimicry and original_target > 0:
+            if GLOBAL_CACHE.Agent.IsLiving(original_target):
+                GLOBAL_CACHE.Player.ChangeTarget(original_target)
         
         # Check if we just cast Arcane Echo or Auspicious Incantation
         # If so, schedule the configured follow-up skill to be cast next
