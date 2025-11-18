@@ -1245,6 +1245,11 @@ class CombatClass:
         self.aftercast += self.ping_handler.GetCurrentPing()
 
         self.aftercast_timer.Reset()
+        
+        # For Arcane Mimicry, explicitly change target before casting to ensure correct targeting
+        if skill_id == self.arcane_mimicry:
+            GLOBAL_CACHE.Player.ChangeTarget(target_agent_id)
+        
         GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[self.skill_pointer]+1, target_agent_id)
         
         # Check if we just cast Arcane Echo or Auspicious Incantation
