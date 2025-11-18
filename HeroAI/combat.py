@@ -1446,6 +1446,16 @@ class CombatClass:
         
         GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[self.skill_pointer]+1, target_agent_id)
         
+        # Log when interrupting a spell
+        if self.skills[slot].custom_skill_data.Nature == SkillNature.Interrupt.value:
+            skill_name = GLOBAL_CACHE.Skill.GetName(skill_id)
+            target_skill_id = GLOBAL_CACHE.Agent.GetCastingSkill(target_agent_id)
+            if target_skill_id != 0:
+                target_skill_name = GLOBAL_CACHE.Skill.GetName(target_skill_id)
+                Py4GW.Console.Log("HeroAI", f"Interrupting [{target_skill_name}] with [{skill_name}]", Py4GW.Console.MessageType.Notice)
+            else:
+                Py4GW.Console.Log("HeroAI", f"Using interrupt skill [{skill_name}]", Py4GW.Console.MessageType.Notice)
+        
         # For Arcane Mimicry, restore the original target after casting
         restore_arcane_target()
         
