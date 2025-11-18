@@ -63,6 +63,20 @@ class _Party:
         GLOBAL_CACHE.Party.Players.KickPlayer(player_name)
         yield from Routines.Yield.wait(250)
 
+    @_yield_step(label="FlagHero", counter_key="FLAG_HERO")
+    def flag_hero(self, hero_id, x, y):
+        from ...GlobalCache import GLOBAL_CACHE
+        from ...Routines import Routines
+        GLOBAL_CACHE.Party.Heroes.FlagHero(hero_id, x, y)
+        yield from Routines.Yield.wait(500)
+
+    @_yield_step(label="UnflagHero", counter_key="UNFLAG_HERO")
+    def unflag_hero(self, hero_id):
+        from ...GlobalCache import GLOBAL_CACHE
+        from ...Routines import Routines
+        GLOBAL_CACHE.Party.Heroes.UnflagHero(hero_id)
+        yield from Routines.Yield.wait(500)
+
     @_yield_step(label="FlagAllHeroes", counter_key="FLAG_ALL_HEROES")
     def flag_all_heroes(self, x, y):
         from ...GlobalCache import GLOBAL_CACHE

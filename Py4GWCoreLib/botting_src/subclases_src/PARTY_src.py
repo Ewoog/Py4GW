@@ -14,6 +14,12 @@ class _PARTY:
     def LeaveParty(self):
         self._helpers.Party.leave_party()
 
+    def FlagHero(self, hero_id: int, x: float, y: float):
+        self._helpers.Party.flag_hero(hero_id, x, y)
+
+    def UnflagHero(self, hero_id: int):
+        self._helpers.Party.unflag_hero(hero_id)
+
     def FlagAllHeroes(self, x: float, y: float):
         self._helpers.Party.flag_all_heroes(x, y)
 
