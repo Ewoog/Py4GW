@@ -1236,8 +1236,23 @@ class CombatClass:
         if not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
             return False
         
+        # Special check for Arcane Echo: ensure target spell is ready
+        if skill_id == self.arcane_echo:
+            from HeroAI.settings import Settings
+            settings = Settings()
+            followup_slot = settings.ArcaneEchoSkillSlot
+            
+            # Verify the followup slot is valid
+            if 0 <= followup_slot < len(self.skills):
+                followup_skill_id = self.skills[followup_slot].skill_id
+                
+                # Check if the followup skill is ready (not on cooldown)
+                if not Routines.Checks.Skills.IsSkillIDReady(followup_skill_id):
+                    self.AdvanceSkillPointer()
+                    return False
+        
         # Special check for Auspicious Incantation: ensure we have enough energy for both
-        # Auspicious Incantation AND the target spell (at reduced cost)
+        # Auspicious Incantation AND the target spell
         if skill_id == self.auspicious_incantation:
             from HeroAI.settings import Settings
             settings = Settings()
@@ -1253,7 +1268,6 @@ class CombatClass:
                     return False
                 
                 # Check if we have enough energy for both spells
-                # Auspicious Incantation reduces energy cost by 50%
                 current_energy = self.GetEnergyValues(GLOBAL_CACHE.Player.GetAgentID()) * GLOBAL_CACHE.Agent.GetMaxEnergy(GLOBAL_CACHE.Player.GetAgentID())
                 
                 # Energy cost for Auspicious Incantation itself
@@ -1261,17 +1275,42 @@ class CombatClass:
                 if self.expertise_exists:
                     auspicious_cost = Routines.Checks.Skills.apply_expertise_reduction(auspicious_cost, self.expertise_level, skill_id)
                 
-                # Energy cost for the followup spell (reduced by 50% due to Auspicious)
+                # Energy cost for the followup spell
                 followup_cost = Routines.Checks.Skills.GetEnergyCostWithEffects(followup_skill_id, GLOBAL_CACHE.Player.GetAgentID())
                 if self.expertise_exists:
                     followup_cost = Routines.Checks.Skills.apply_expertise_reduction(followup_cost, self.expertise_level, followup_skill_id)
-                followup_cost = followup_cost * 0.5  # Auspicious reduces cost by 50%
                 
                 total_energy_needed = auspicious_cost + followup_cost
                 
                 if current_energy < total_energy_needed:
                     self.AdvanceSkillPointer()
                     return False
+        
+        # Check if this is a target spell for Arcane Echo or Auspicious Incantation
+        # If so, and the Echo/Auspicious spell is available, skip this spell
+        # Priority: Auspicious (highest) -> Arcane -> target spell
+        from HeroAI.settings import Settings
+        settings = Settings()
+        
+        # Check if current skill is the Auspicious target and Auspicious is ready
+        if (settings.AuspiciousIncantationSkillSlot < len(self.skills) and 
+            skill_id == self.skills[settings.AuspiciousIncantationSkillSlot].skill_id and
+            skill_id != self.auspicious_incantation):
+            # Check if Auspicious Incantation is ready
+            if Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation):
+                # Skip this spell, let Auspicious cast first
+                self.AdvanceSkillPointer()
+                return False
+        
+        # Check if current skill is the Arcane Echo target and Arcane Echo is ready
+        if (settings.ArcaneEchoSkillSlot < len(self.skills) and 
+            skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
+            skill_id != self.arcane_echo):
+            # Check if Arcane Echo is ready
+            if Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo):
+                # Skip this spell, let Arcane Echo cast first
+                self.AdvanceSkillPointer()
+                return False
             
         self.in_casting_routine = True
 
