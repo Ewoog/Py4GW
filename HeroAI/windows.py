@@ -1333,6 +1333,11 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 # Get current party members
                 party_members = []
                 
+                # Add current player (self)
+                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                my_name = GLOBAL_CACHE.Player.GetName()
+                party_members.append(('self', my_name, my_name))
+                
                 # Add heroes
                 heroes = GLOBAL_CACHE.Party.GetHeroes()
                 for hero in heroes:
@@ -1342,10 +1347,10 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 
                 # Add other players
                 players = GLOBAL_CACHE.Party.GetPlayers()
-                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
                 
                 for player in players:
                     player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                    # Skip self (already added above) and invalid agents
                     if player_agent_id == my_agent_id or player_agent_id == 0:
                         continue
                     

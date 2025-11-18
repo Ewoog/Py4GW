@@ -395,6 +395,13 @@ class CombatClass:
                     # Get all party members
                     party_members = []
                     
+                    # Add current player (self)
+                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                    my_name = GLOBAL_CACHE.Player.GetName()
+                    if my_name in players_set and GLOBAL_CACHE.Agent.IsLiving(my_agent_id):
+                        if not self.HasEffect(my_agent_id, self.skills[slot].skill_id):
+                            party_members.append(my_agent_id)
+                    
                     # Add heroes
                     heroes = GLOBAL_CACHE.Party.GetHeroes()
                     for hero in heroes:
@@ -405,10 +412,12 @@ class CombatClass:
                     
                     # Add other players
                     players = GLOBAL_CACHE.Party.GetPlayers()
-                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
                     for player in players:
                         player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
-                        if player_agent_id != 0 and player_agent_id != my_agent_id and GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
+                        # Skip self (already added above) and invalid agents
+                        if player_agent_id == 0 or player_agent_id == my_agent_id:
+                            continue
+                        if GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
                             player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
                             if player_name in players_set and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
                                 party_members.append(player_agent_id)
