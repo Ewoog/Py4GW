@@ -1256,48 +1256,60 @@ class CombatClass:
         """
         
         # Check if we have a pending follow-up skill that should be cast immediately
-        # This takes priority over the normal skill rotation to ensure Echo/Auspicious spells work correctly
+        # This takes ABSOLUTE priority - must cast immediately after Echo/Auspicious, no other actions allowed
         if self.pending_followup_skill_slot >= 0:
             slot = self.pending_followup_skill_slot
             skill_id = self.skills[slot].skill_id
             
-            # Try to cast the follow-up skill
-            is_skill_ready = self.IsSkillReady(slot)
-            if is_skill_ready:
-                is_ready_to_cast, target_agent_id = self.IsReadyToCast(slot)
-                if is_ready_to_cast and target_agent_id > 0 and GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
-                    # Cast the follow-up skill
-                    self.in_casting_routine = True
-                    
-                    if self.fast_casting_exists:
-                        activation, recharge = Routines.Checks.Skills.apply_fast_casting(skill_id, self.fast_casting_level)
-                    else:
-                        activation = GLOBAL_CACHE.Skill.Data.GetActivation(skill_id)
-                    
-                    self.aftercast = activation * 1000
-                    self.aftercast += GLOBAL_CACHE.Skill.Data.GetAftercast(skill_id) * 1000
-                    
-                    skill_type, _ = GLOBAL_CACHE.Skill.GetType(skill_id)
-                    if skill_type == SkillType.Attack.value:
-                        self.aftercast += self.GetWeaponAttackAftercast()
-                    
-                    self.aftercast += self.ping_handler.GetCurrentPing()
-                    self.aftercast_timer.Reset()
-                    
-                    GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[slot]+1, target_agent_id)
-                    
-                    # Clear the pending follow-up
-                    self.pending_followup_skill_slot = -1
-                    self.ResetSkillPointer()
-                    return True
+            # Check if we're still in aftercast from the previous spell (Echo/Auspicious)
+            # If so, wait for it to complete before casting the follow-up
+            if self.in_casting_routine:
+                # Still in aftercast, return False to wait
+                return False
             
-            # If we couldn't cast it, clear the pending state after a timeout
-            if self.followup_skill_timer.GetElapsedTime() > 3000:  # 3 second timeout
+            # Not in aftercast anymore, attempt to cast the follow-up immediately
+            # We skip most checks here because we already validated the skill was ready before casting Echo/Auspicious
+            
+            # Only do minimal validation: check if player can cast and target is valid
+            if GLOBAL_CACHE.Agent.IsCasting(GLOBAL_CACHE.Player.GetAgentID()):
+                # Player is casting, wait
+                return False
+            
+            if GLOBAL_CACHE.SkillBar.GetCasting() != 0:
+                # Something is being cast, wait
+                return False
+            
+            # Get target for the follow-up skill
+            target_agent_id = self.GetAppropiateTarget(slot)
+            if target_agent_id == 0 or not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
+                # Target not valid, clear pending and continue
                 self.pending_followup_skill_slot = -1
+                return False
             
-            # Don't proceed with normal skill rotation while we have a pending follow-up
-            # This prevents other skills from being cast between Echo/Auspicious and the target spell
-            return False
+            # Cast the follow-up skill immediately
+            self.in_casting_routine = True
+            
+            if self.fast_casting_exists:
+                activation, recharge = Routines.Checks.Skills.apply_fast_casting(skill_id, self.fast_casting_level)
+            else:
+                activation = GLOBAL_CACHE.Skill.Data.GetActivation(skill_id)
+            
+            self.aftercast = activation * 1000
+            self.aftercast += GLOBAL_CACHE.Skill.Data.GetAftercast(skill_id) * 1000
+            
+            skill_type, _ = GLOBAL_CACHE.Skill.GetType(skill_id)
+            if skill_type == SkillType.Attack.value:
+                self.aftercast += self.GetWeaponAttackAftercast()
+            
+            self.aftercast += self.ping_handler.GetCurrentPing()
+            self.aftercast_timer.Reset()
+            
+            GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[slot]+1, target_agent_id)
+            
+            # Clear the pending follow-up
+            self.pending_followup_skill_slot = -1
+            self.ResetSkillPointer()
+            return True
        
         slot = self.skill_pointer
         skill_id = self.skills[slot].skill_id
