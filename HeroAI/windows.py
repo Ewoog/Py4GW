@@ -1219,9 +1219,9 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
     
     # Dark Aura buff targeting configuration
     if PyImGui.collapsing_header("Dark Aura - Buff Targeting", PyImGui.TreeNodeFlags.DefaultOpen):
-        PyImGui.text("Select which party members to target with Dark Aura:")
+        PyImGui.text("Select which party member professions to buff with Dark Aura:")
         PyImGui.text_colored(
-            "Configure which professions receive the Dark Aura buff.",
+            "Click profession icons to toggle which professions receive the Dark Aura buff.",
             Utils.RGBToNormal(180, 180, 180, 255)
         )
         
@@ -1229,79 +1229,77 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
         has_dark_aura = dark_aura_id in skill_ids
         
         if has_dark_aura:
-            try:
-                # Import CustomBehaviors modules to access the buff configuration
-                from Widgets.CustomBehaviors.primitives.custom_behavior_loader import CustomBehaviorLoader
-                from Widgets.CustomBehaviors.primitives.skills.bonds.custom_buff_multiple_target import CustomBuffMultipleTarget
-                import os
+            import os
+            from Py4GWCoreLib.enums_src.GameData_enums import Profession
+            
+            # Get the py4gw root directory for texture paths
+            script_directory = os.path.dirname(os.path.abspath(__file__))
+            py4gw_root_directory = os.path.abspath(os.path.join(script_directory, os.pardir)) + "\\\\"
+            
+            PyImGui.spacing()
+            PyImGui.bullet_text("Buff configuration:")
+            
+            # List of all professions (excluding _None)
+            all_professions = [
+                Profession.Warrior, Profession.Ranger, Profession.Monk,
+                Profession.Necromancer, Profession.Mesmer, Profession.Elementalist,
+                Profession.Assassin, Profession.Ritualist, Profession.Paragon,
+                Profession.Dervish
+            ]
+            
+            icon_size = 26
+            for profession in all_professions:
+                profession_id = profession.value
+                is_enabled = settings.DarkAuraBuffTargeting.get(profession_id, True)
                 
-                # Get the current behavior instance
-                custom_behavior = CustomBehaviorLoader().custom_combat_behavior
+                texture_path = py4gw_root_directory + f"Textures\\Profession_Icons\\[{profession_id}] - {profession.name}.png"
                 
-                if custom_behavior is not None:
-                    # Try to find the Dark Aura utility in the behavior
-                    dark_aura_utility = None
-                    
-                    # Check if the behavior has a dark_aura attribute (for NecromancerDarkAuraSupport)
-                    if hasattr(custom_behavior, 'dark_aura'):
-                        dark_aura_utility = custom_behavior.dark_aura
-                    else:
-                        # Otherwise, search through all skills
-                        try:
-                            skills = custom_behavior.get_skills_final_list() if hasattr(custom_behavior, 'get_skills_final_list') else []
-                            for skill in skills:
-                                if skill.custom_skill.skill_name == "Dark_Aura":
-                                    dark_aura_utility = skill
-                                    break
-                        except Exception:
-                            pass
-                    
-                    if dark_aura_utility is not None:
-                        # Get the buff configuration from the Dark Aura utility
-                        buff_configuration = dark_aura_utility.get_buff_configuration()
-                        
-                        if buff_configuration is not None:
-                            # Get the py4gw root directory for texture paths
-                            script_directory = os.path.dirname(os.path.abspath(__file__))
-                            py4gw_root_directory = os.path.abspath(os.path.join(script_directory, os.pardir)) + "\\\\"
-                            
-                            # Render the buff configuration UI
-                            buff_configuration.render_buff_configuration(py4gw_root_directory)
-                            
-                            PyImGui.spacing()
-                            PyImGui.text_colored(
-                                "Buff configuration is active and working!",
-                                Utils.RGBToNormal(0, 255, 0, 255)
-                            )
-                        else:
-                            PyImGui.text_colored(
-                                "Dark Aura utility found but no buff configuration available.",
-                                Utils.RGBToNormal(255, 165, 0, 255)
-                            )
-                    else:
-                        PyImGui.text_colored(
-                            "Dark Aura utility not found in current behavior.",
-                            Utils.RGBToNormal(255, 165, 0, 255)
-                        )
-                        PyImGui.text_colored(
-                            "Make sure you have a necromancer build with Dark Aura loaded in CustomBehaviors.",
-                            Utils.RGBToNormal(180, 180, 180, 255)
-                        )
+                # Check if texture exists
+                if not os.path.exists(texture_path):
+                    # Fallback to text button if texture not found
+                    if ImGui.toggle_button(f"{profession.name}##DarkAura_{profession.name}", is_enabled, 80, 26):
+                        settings.DarkAuraBuffTargeting[profession_id] = not is_enabled
+                        settings.save_settings()
                 else:
-                    PyImGui.text_colored(
-                        "No CustomBehavior loaded. Load a necromancer build with Dark Aura first.",
-                        Utils.RGBToNormal(255, 165, 0, 255)
-                    )
+                    # Draw profession icon with border if enabled
+                    if is_enabled:
+                        PyImGui.push_style_var(ImGui.ImGuiStyleVar.FrameBorderSize, 3)
+                        PyImGui.push_style_color(PyImGui.ImGuiCol.Border, Utils.ColorToTuple(Utils.RGBToColor(3, 244, 60, 255)))
+                        
+                    clicked = ImGui.ImageButton(f"dark_aura_toggle_{profession.name}", texture_path, icon_size, icon_size)
                     
-            except ImportError as e:
+                    if is_enabled:
+                        PyImGui.pop_style_var(1)
+                        PyImGui.pop_style_color(1)
+                    
+                    if clicked:
+                        settings.DarkAuraBuffTargeting[profession_id] = not is_enabled
+                        settings.save_settings()
+                    
+                    tooltip_text = f"{'Deactivate' if is_enabled else 'Activate'} buff for {profession.name}"
+                    ImGui.show_tooltip(tooltip_text)
+                
+                PyImGui.same_line(0, 5)
+            
+            PyImGui.new_line()
+            PyImGui.spacing()
+            
+            # Show summary of enabled professions
+            enabled_professions = [
+                Profession(prof_id).name 
+                for prof_id, enabled in settings.DarkAuraBuffTargeting.items() 
+                if enabled
+            ]
+            
+            if enabled_professions:
                 PyImGui.text_colored(
-                    f"CustomBehaviors module not available: {str(e)}",
-                    Utils.RGBToNormal(255, 0, 0, 255)
+                    f"Buffing: {', '.join(enabled_professions)}",
+                    Utils.RGBToNormal(0, 255, 0, 255)
                 )
-            except Exception as e:
+            else:
                 PyImGui.text_colored(
-                    f"Error loading Dark Aura configuration: {str(e)}",
-                    Utils.RGBToNormal(255, 0, 0, 255)
+                    "No professions selected (Dark Aura will not buff anyone)",
+                    Utils.RGBToNormal(255, 165, 0, 255)
                 )
         else:
             PyImGui.text_colored("Dark Aura not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))

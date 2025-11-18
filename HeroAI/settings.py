@@ -113,6 +113,20 @@ class Settings:
         self.ArcaneMimicryTargetAgentID = 0  # Which ally to target with Arcane Mimicry
         self.ArcaneMimicryEliteSkillID = 0  # Which elite skill to copy with Arcane Mimicry
         
+        # Dark Aura buff targeting configuration (per profession)
+        # Dictionary mapping profession value (1-10) to boolean (True = buff enabled)
+        self.DarkAuraBuffTargeting = {
+            1: True,   # Warrior
+            2: True,   # Ranger
+            3: True,   # Monk
+            4: True,   # Necromancer
+            5: True,   # Mesmer
+            6: True,   # Elementalist
+            7: True,   # Assassin
+            8: True,   # Ritualist
+            9: True,   # Paragon
+            10: True,  # Dervish
+        }
         
         base_path = Console.get_projects_path()
         self.ini_path = os.path.join(base_path, "Widgets", "Config", "HeroAI.ini")
@@ -197,6 +211,10 @@ class Settings:
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicrySkillSlot", str(self.ArcaneMimicrySkillSlot))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetAgentID", str(self.ArcaneMimicryTargetAgentID))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryEliteSkillID", str(self.ArcaneMimicryEliteSkillID))
+        
+        # Dark Aura buff targeting settings
+        for profession_id, enabled in self.DarkAuraBuffTargeting.items():
+            self.account_ini_handler.write_key("DarkAuraBuffTargeting", f"Profession_{profession_id}", str(enabled))
 
         for hero_email, (x, y, w, h, collapsed) in self.HeroPanelPositions.items():
             self.account_ini_handler.write_key("HeroPanelPositions", hero_email, f"{x},{y},{w},{h},{collapsed}")
@@ -235,6 +253,14 @@ class Settings:
         self.ArcaneMimicrySkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicrySkillSlot", 0)
         self.ArcaneMimicryTargetAgentID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetAgentID", 0)
         self.ArcaneMimicryEliteSkillID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryEliteSkillID", 0)
+        
+        # Dark Aura buff targeting settings
+        for profession_id in range(1, 11):  # Professions 1-10
+            self.DarkAuraBuffTargeting[profession_id] = self.account_ini_handler.read_bool(
+                "DarkAuraBuffTargeting", 
+                f"Profession_{profession_id}", 
+                True  # Default to all professions enabled
+            )
 
         self.HeroPanelPositions.clear()        
         self.import_hero_panel_positions(self.account_ini_handler)
