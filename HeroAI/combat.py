@@ -1014,16 +1014,19 @@ class CombatClass:
             if skill.custom_skill_data.Nature != SkillNature.Interrupt.value:
                 continue
             
-            # Check if the skill is ready
+            # Check if the skill is ready (recharge, energy, adrenaline, etc.)
             if not self.IsSkillReady(slot):
                 continue
             
-            # Check if we can cast it on this target
-            is_ready, _ = self.IsReadyToCast(slot)
-            if is_ready:
-                # Verify this interrupt skill can target the casting enemy
-                target_allegiance = skill.custom_skill_data.TargetAllegiance
-                if target_allegiance in [Skilltarget.Enemy.value, Skilltarget.EnemyCasting.value, Skilltarget.EnemyCastingSpell.value]:
+            # Verify this interrupt skill can target enemies
+            target_allegiance = skill.custom_skill_data.TargetAllegiance
+            if target_allegiance not in [Skilltarget.Enemy.value, Skilltarget.EnemyCasting.value, Skilltarget.EnemyCastingSpell.value]:
+                continue
+            
+            # Check if we can cast it on the casting enemy (validates conditions, range, etc.)
+            if GLOBAL_CACHE.Agent.IsLiving(casting_enemy):
+                is_ready, _ = self.IsReadyToCast(slot)
+                if is_ready:
                     return slot, casting_enemy
         
         return None, None
