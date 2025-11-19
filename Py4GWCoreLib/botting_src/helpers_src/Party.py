@@ -77,10 +77,8 @@ class _Party:
     def unflag_hero(self, hero_index):
         from ...GlobalCache import GLOBAL_CACHE
         from ...Routines import Routines
-        # Convert hero_index to agent_id to ensure we only unflag heroes
-        agent_id = GLOBAL_CACHE.Party.Heroes.GetHeroAgentIDByPartyPosition(hero_index)
-        if agent_id:
-            GLOBAL_CACHE.Party.Heroes.UnflagHero(agent_id)
+        # UnflagHero takes hero_index directly, not agent_id
+        GLOBAL_CACHE.Party.Heroes.UnflagHero(hero_index)
         yield from Routines.Yield.wait(500)
 
     @_yield_step(label="FlagAllHeroes", counter_key="FLAG_ALL_HEROES")
