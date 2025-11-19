@@ -64,17 +64,23 @@ class _Party:
         yield from Routines.Yield.wait(250)
 
     @_yield_step(label="FlagHero", counter_key="FLAG_HERO")
-    def flag_hero(self, hero_id, x, y):
+    def flag_hero(self, hero_index, x, y):
         from ...GlobalCache import GLOBAL_CACHE
         from ...Routines import Routines
-        GLOBAL_CACHE.Party.Heroes.FlagHero(hero_id, x, y)
+        # Convert hero_index to agent_id to ensure we only flag heroes
+        agent_id = GLOBAL_CACHE.Party.Heroes.GetHeroAgentIDByPartyPosition(hero_index)
+        if agent_id:
+            GLOBAL_CACHE.Party.Heroes.FlagHero(agent_id, x, y)
         yield from Routines.Yield.wait(500)
 
     @_yield_step(label="UnflagHero", counter_key="UNFLAG_HERO")
-    def unflag_hero(self, hero_id):
+    def unflag_hero(self, hero_index):
         from ...GlobalCache import GLOBAL_CACHE
         from ...Routines import Routines
-        GLOBAL_CACHE.Party.Heroes.UnflagHero(hero_id)
+        # Convert hero_index to agent_id to ensure we only unflag heroes
+        agent_id = GLOBAL_CACHE.Party.Heroes.GetHeroAgentIDByPartyPosition(hero_index)
+        if agent_id:
+            GLOBAL_CACHE.Party.Heroes.UnflagHero(agent_id)
         yield from Routines.Yield.wait(500)
 
     @_yield_step(label="FlagAllHeroes", counter_key="FLAG_ALL_HEROES")
