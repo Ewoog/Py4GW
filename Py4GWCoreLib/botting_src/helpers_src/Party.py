@@ -92,6 +92,11 @@ class _Party:
     def unflag_all_heroes(self):
         from ...Routines import Routines
         from ...GlobalCache import GLOBAL_CACHE
+        # Unflag each hero individually to ensure heroes flagged with FlagHero are also unflagged
+        hero_count = GLOBAL_CACHE.Party.GetHeroCount()
+        for i in range(hero_count):
+            GLOBAL_CACHE.Party.Heroes.UnflagHero(i)
+        # Also call UnflagAllHeroes to clear the "all heroes" flag
         GLOBAL_CACHE.Party.Heroes.UnflagAllHeroes()
         yield from Routines.Yield.wait(500)
 
