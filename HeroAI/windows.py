@@ -1087,10 +1087,35 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 
                 selected_skill_id = skill_ids[settings.ArcaneEchoSkillSlot]
                 if selected_skill_id > 0:
-                    PyImGui.text_colored(
-                        f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
-                        Utils.RGBToNormal(0, 255, 0, 255)
-                    )
+                    # Sanity check: Warn if configured skill is a buff but not in the expected slot
+                    buff_skill_ids = [
+                        GLOBAL_CACHE.Skill.GetID("Dark_Aura"),
+                        GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon"),
+                        GLOBAL_CACHE.Skill.GetID("Strength_of_Honor"),
+                        GLOBAL_CACHE.Skill.GetID("Spell_Breaker")
+                    ]
+                    
+                    # Check if the configured skill to copy is a buff skill
+                    is_buff_skill = selected_skill_id in buff_skill_ids
+                    
+                    # Get the actual skill at the configured slot
+                    actual_skill_at_slot = skill_ids[settings.ArcaneEchoSkillSlot] if settings.ArcaneEchoSkillSlot < len(skill_ids) else 0
+                    
+                    if is_buff_skill and actual_skill_at_slot != selected_skill_id:
+                        # Mismatch detected - configured buff skill is not in the expected slot
+                        PyImGui.text_colored(
+                            f"WARNING: Configured buff skill is not at slot {settings.ArcaneEchoSkillSlot + 1}!",
+                            Utils.RGBToNormal(255, 0, 0, 255)
+                        )
+                        PyImGui.text_colored(
+                            f"Please reconfigure Arcane Echo to match your current skillbar.",
+                            Utils.RGBToNormal(255, 165, 0, 255)
+                        )
+                    else:
+                        PyImGui.text_colored(
+                            f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                            Utils.RGBToNormal(0, 255, 0, 255)
+                        )
             else:
                 PyImGui.text_colored("No other skills available to copy", Utils.RGBToNormal(255, 165, 0, 255))
         else:
