@@ -416,41 +416,80 @@ class CombatClass:
                 if mode == 'player':
                     # Player-based targeting - find lowest health ally that's in the player list
                     players_set = config.get('players', set())
+                    
+                    # Debug logging
+                    from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
+                    ConsoleLog("HeroAI", f"Buff targeting for {skill_name}: mode={mode}, players_set={players_set}")
+                    
                     if not players_set:
                         # No players selected - don't cast the buff
+                        ConsoleLog("HeroAI", f"No players selected for {skill_name}, returning 0")
                         return 0
                     
                     # Get all party members
                     party_members = []
+                    
+                    # Add current player (self)
+                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                    my_name = GLOBAL_CACHE.Player.GetName()
+                    ConsoleLog("HeroAI", f"Checking self: {my_name} in {players_set}? {my_name in players_set}")
+                    if my_name in players_set and GLOBAL_CACHE.Agent.IsLiving(my_agent_id):
+                        has_effect = self.HasEffect(my_agent_id, self.skills[slot].skill_id)
+                        ConsoleLog("HeroAI", f"Self ({my_name}) has effect? {has_effect}")
+                        if not has_effect:
+                            party_members.append(my_agent_id)
+                            ConsoleLog("HeroAI", f"Added self ({my_name}) to party_members")
+                        else:
+                            ConsoleLog("HeroAI", f"Self ({my_name}) already has buff, skipping")
                     
                     # Add heroes
                     heroes = GLOBAL_CACHE.Party.GetHeroes()
                     for hero in heroes:
                         if hero.agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(hero.agent_id):
                             hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else "Hero"
-                            if hero_name in players_set and not self.HasEffect(hero.agent_id, self.skills[slot].skill_id):
-                                party_members.append(hero.agent_id)
+                            ConsoleLog("HeroAI", f"Checking hero: {hero_name} in {players_set}? {hero_name in players_set}")
+                            if hero_name in players_set:
+                                has_effect = self.HasEffect(hero.agent_id, self.skills[slot].skill_id)
+                                ConsoleLog("HeroAI", f"Hero ({hero_name}) has effect? {has_effect}")
+                                if not has_effect:
+                                    party_members.append(hero.agent_id)
+                                    ConsoleLog("HeroAI", f"Added hero ({hero_name}) to party_members")
+                                else:
+                                    ConsoleLog("HeroAI", f"Hero ({hero_name}) already has buff, skipping")
                     
                     # Add other players
                     players = GLOBAL_CACHE.Party.GetPlayers()
-                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
                     for player in players:
                         player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
-                        if player_agent_id != 0 and player_agent_id != my_agent_id and GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
+                        # Skip self (already added above) and invalid agents
+                        if player_agent_id == 0 or player_agent_id == my_agent_id:
+                            continue
+                        if GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
                             player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
-                            if player_name in players_set and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
-                                party_members.append(player_agent_id)
+                            ConsoleLog("HeroAI", f"Checking player: {player_name} in {players_set}? {player_name in players_set}")
+                            if player_name in players_set:
+                                has_effect = self.HasEffect(player_agent_id, self.skills[slot].skill_id)
+                                ConsoleLog("HeroAI", f"Player ({player_name}) has effect? {has_effect}")
+                                if not has_effect:
+                                    party_members.append(player_agent_id)
+                                    ConsoleLog("HeroAI", f"Added player ({player_name}) to party_members")
+                                else:
+                                    ConsoleLog("HeroAI", f"Player ({player_name}) already has buff, skipping")
                     
                     # Return lowest health ally from the selected players
+                    ConsoleLog("HeroAI", f"Total party_members for {skill_name}: {len(party_members)}")
                     if party_members:
-                        lowest_health = 1.0
+                        lowest_health = 2.0  # Initialize to > 1.0 so any health value will be lower
                         lowest_agent = 0
                         for agent_id in party_members:
                             health = GLOBAL_CACHE.Agent.GetHealth(agent_id)
+                            ConsoleLog("HeroAI", f"Agent {agent_id} health: {health}")
                             if health < lowest_health:
                                 lowest_health = health
                                 lowest_agent = agent_id
+                        ConsoleLog("HeroAI", f"Returning target agent_id: {lowest_agent} with health {lowest_health}")
                         return lowest_agent
+                    ConsoleLog("HeroAI", f"No valid party members found, returning 0")
                     return 0
                     
                 else:  # profession mode
@@ -483,7 +522,7 @@ class CombatClass:
                     
                     # Return lowest health ally from enabled professions
                     if party_members:
-                        lowest_health = 1.0
+                        lowest_health = 2.0  # Initialize to > 1.0 so any health value will be lower
                         lowest_agent = 0
                         for agent_id in party_members:
                             health = GLOBAL_CACHE.Agent.GetHealth(agent_id)

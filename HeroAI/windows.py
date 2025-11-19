@@ -1087,10 +1087,35 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 
                 selected_skill_id = skill_ids[settings.ArcaneEchoSkillSlot]
                 if selected_skill_id > 0:
-                    PyImGui.text_colored(
-                        f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
-                        Utils.RGBToNormal(0, 255, 0, 255)
-                    )
+                    # Sanity check: Warn if configured skill is a buff but not in the expected slot
+                    buff_skill_ids = [
+                        GLOBAL_CACHE.Skill.GetID("Dark_Aura"),
+                        GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon"),
+                        GLOBAL_CACHE.Skill.GetID("Strength_of_Honor"),
+                        GLOBAL_CACHE.Skill.GetID("Spell_Breaker")
+                    ]
+                    
+                    # Check if the configured skill to copy is a buff skill
+                    is_buff_skill = selected_skill_id in buff_skill_ids
+                    
+                    # Get the actual skill at the configured slot
+                    actual_skill_at_slot = skill_ids[settings.ArcaneEchoSkillSlot] if settings.ArcaneEchoSkillSlot < len(skill_ids) else 0
+                    
+                    if is_buff_skill and actual_skill_at_slot != selected_skill_id:
+                        # Mismatch detected - configured buff skill is not in the expected slot
+                        PyImGui.text_colored(
+                            f"WARNING: Configured buff skill is not at slot {settings.ArcaneEchoSkillSlot + 1}!",
+                            Utils.RGBToNormal(255, 0, 0, 255)
+                        )
+                        PyImGui.text_colored(
+                            f"Please reconfigure Arcane Echo to match your current skillbar.",
+                            Utils.RGBToNormal(255, 165, 0, 255)
+                        )
+                    else:
+                        PyImGui.text_colored(
+                            f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                            Utils.RGBToNormal(0, 255, 0, 255)
+                        )
             else:
                 PyImGui.text_colored("No other skills available to copy", Utils.RGBToNormal(255, 165, 0, 255))
         else:
@@ -1367,6 +1392,11 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 # Get current party members
                 party_members = []
                 
+                # Add current player (self)
+                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                my_name = GLOBAL_CACHE.Player.GetName()
+                party_members.append(('self', my_name, my_name))
+                
                 # Add heroes
                 heroes = GLOBAL_CACHE.Party.GetHeroes()
                 for hero in heroes:
@@ -1376,10 +1406,10 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 
                 # Add other players
                 players = GLOBAL_CACHE.Party.GetPlayers()
-                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
                 
                 for player in players:
                     player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                    # Skip self (already added above) and invalid agents
                     if player_agent_id == my_agent_id or player_agent_id == 0:
                         continue
                     
@@ -1391,12 +1421,16 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     for member_type, member_id, member_name in party_members:
                         is_enabled = member_id in config['players']
                         
-                        if ImGui.toggle_button(f"{member_name}##{skill_name}_{member_id}", is_enabled, 150, 24):
-                            # Toggle the state - add if not present, remove if present
-                            if member_id in config['players']:
-                                config['players'].discard(member_id)
-                            else:
+                        # toggle_button returns the new state, not a click indicator
+                        new_state = ImGui.toggle_button(f"{member_name}##{skill_name}_{member_id}", is_enabled, 150, 24)
+                        
+                        # Check if the state changed
+                        if new_state != is_enabled:
+                            # Update the set based on the new state
+                            if new_state:
                                 config['players'].add(member_id)
+                            else:
+                                config['players'].discard(member_id)
                             settings.save_requested = True
                             settings.write_settings()  # Immediately write to persist the change
                         
