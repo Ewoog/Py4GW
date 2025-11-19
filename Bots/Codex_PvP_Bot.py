@@ -48,6 +48,12 @@ codex_state = CodexPvPState()
 def detect_arena_and_spawns() -> tuple[int, tuple[float, float], tuple[float, float]]:
     """
     Detect which arena we're in and identify team/enemy spawn locations.
+    
+    Analyzes the current map and agent positions to determine:
+    - Arena map ID
+    - Team spawn location (average of allied player positions)
+    - Enemy spawn location (from enemy positions or estimated from map bounds)
+    
     Returns: (map_id, team_spawn, enemy_spawn)
     """
     map_id = GLOBAL_CACHE.Map.GetMapID()
