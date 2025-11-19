@@ -1548,7 +1548,24 @@ class CombatClass:
         if (settings.ArcaneEchoSkillSlot < len(self.skills) and 
             skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
             skill_id != self.arcane_echo):
-            # Check if Arcane Echo is ready
+            # First check if we should use the full Auspicious → Arcane Echo → target chain
+            # This happens when Auspicious targets Arcane Echo and both are ready
+            auspicious_target_skillbar_slot = settings.AuspiciousIncantationSkillSlot
+            auspicious_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(auspicious_target_skillbar_slot + 1)
+            
+            if auspicious_target_skill_id == self.arcane_echo:
+                # Auspicious is configured to target Arcane Echo (chain setup)
+                # Check if both Auspicious and Arcane Echo are ready
+                is_auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
+                is_arcane_ready = Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo)
+                
+                if is_auspicious_ready and is_arcane_ready:
+                    # Both are ready - skip target spell and use the full chain
+                    Py4GW.Console.Log("EchoFollowup", f"Target spell ready but full chain (Auspicious → Arcane → target) is available - skipping target spell", Py4GW.Console.MessageType.Info)
+                    self.AdvanceSkillPointer()
+                    return False
+            
+            # Standard check: if Arcane Echo is ready (but not chained with Auspicious)
             if Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo):
                 # Skip this spell, let Arcane Echo cast first
                 self.AdvanceSkillPointer()
