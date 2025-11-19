@@ -117,6 +117,30 @@ class Settings:
         self.ArcaneMimicryTargetHeroID = 0
         self.ArcaneMimicryEliteSkillID = 0  # Which elite skill to copy with Arcane Mimicry
         
+        # Buff targeting configuration for multiple skills
+        # Each skill has: mode ('profession' or 'player'), profession dict, and player set
+        self.BuffTargetingConfig = {
+            'Dark_Aura': {
+                'mode': 'profession',  # 'profession' or 'player'
+                'professions': {i: True for i in range(1, 11)},  # All professions enabled by default
+                'players': set()  # Set of player emails/names when in player mode
+            },
+            'Great_Dwarf_Weapon': {
+                'mode': 'profession',
+                'professions': {i: True for i in range(1, 11)},
+                'players': set()
+            },
+            'Strength_of_Honor': {
+                'mode': 'profession',
+                'professions': {i: True for i in range(1, 11)},
+                'players': set()
+            },
+            'Spell_Breaker': {
+                'mode': 'profession',
+                'professions': {i: True for i in range(1, 11)},
+                'players': set()
+            }
+        }
         
         base_path = Console.get_projects_path()
         self.ini_path = os.path.join(base_path, "Widgets", "Config", "HeroAI.ini")
@@ -202,6 +226,19 @@ class Settings:
         # Legacy fields
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicrySkillSlot", str(self.ArcaneMimicrySkillSlot))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryEliteSkillID", str(self.ArcaneMimicryEliteSkillID))
+        
+        # Buff targeting settings for all supported skills
+        for skill_name, config in self.BuffTargetingConfig.items():
+            section_name = f"BuffTargeting_{skill_name}"
+            self.account_ini_handler.write_key(section_name, "mode", config['mode'])
+            
+            # Save profession configuration
+            for profession_id, enabled in config['professions'].items():
+                self.account_ini_handler.write_key(section_name, f"Profession_{profession_id}", str(enabled))
+            
+            # Save player list (convert set to comma-separated string)
+            player_list = ','.join(config['players']) if config['players'] else ''
+            self.account_ini_handler.write_key(section_name, "players", player_list)
 
         for hero_email, (x, y, w, h, collapsed) in self.HeroPanelPositions.items():
             self.account_ini_handler.write_key("HeroPanelPositions", hero_email, f"{x},{y},{w},{h},{collapsed}")
@@ -244,6 +281,26 @@ class Settings:
         self.ArcaneMimicryTargetEmail = self.account_ini_handler.read_key("MesmerSkills", "ArcaneMimicryTargetEmail", "")
         self.ArcaneMimicryTargetHeroID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetHeroID", 0)
         self.ArcaneMimicryEliteSkillID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryEliteSkillID", 0)
+        
+        # Buff targeting settings for all supported skills
+        for skill_name in self.BuffTargetingConfig.keys():
+            section_name = f"BuffTargeting_{skill_name}"
+            
+            # Load mode
+            mode = self.account_ini_handler.read_string(section_name, "mode", "profession")
+            self.BuffTargetingConfig[skill_name]['mode'] = mode
+            
+            # Load profession configuration
+            for profession_id in range(1, 11):
+                enabled = self.account_ini_handler.read_bool(section_name, f"Profession_{profession_id}", True)
+                self.BuffTargetingConfig[skill_name]['professions'][profession_id] = enabled
+            
+            # Load player list
+            player_list_str = self.account_ini_handler.read_string(section_name, "players", "")
+            if player_list_str:
+                self.BuffTargetingConfig[skill_name]['players'] = set(player_list_str.split(','))
+            else:
+                self.BuffTargetingConfig[skill_name]['players'] = set()
 
         self.HeroPanelPositions.clear()        
         self.import_hero_panel_positions(self.account_ini_handler)

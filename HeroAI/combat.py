@@ -382,18 +382,116 @@ class CombatClass:
         if self.skills[slot].skill_id == self.arcane_mimicry:
             from HeroAI.settings import Settings
             settings = Settings()
+            # Use the configured target agent ID if available
+            if settings.ArcaneMimicryTargetAgentID > 0:
+                # Verify the target is still valid (alive, ally, and in party)
+                target_id = settings.ArcaneMimicryTargetAgentID
+                if GLOBAL_CACHE.Agent.IsLiving(target_id):
+                    # Additional validation: ensure target is actually an ally in our party
+                    target_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
+                    if target_allegiance == Allegiance.Ally:
+                        return target_id
+            # If no valid target configured, fall through to default OtherAlly targeting
+        
+        # Special handling for buff skills - use buff targeting configuration
+        buff_skill_names = {
+            GLOBAL_CACHE.Skill.GetID("Dark_Aura"): 'Dark_Aura',
+            GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon"): 'Great_Dwarf_Weapon',
+            GLOBAL_CACHE.Skill.GetID("Strength_of_Honor"): 'Strength_of_Honor',
+            GLOBAL_CACHE.Skill.GetID("Spell_Breaker"): 'Spell_Breaker'
+        }
+        
+        if self.skills[slot].skill_id in buff_skill_names:
+            from HeroAI.settings import Settings
+            from Py4GWCoreLib.enums_src.GameData_enums import Profession
+            settings = Settings()
+            settings.ensure_initialized()
             
-            # Use party slot if configured (simple and handles map changes)
-            if settings.ArcaneMimicryTargetPartySlot >= 0:
-                target_id = self._resolve_party_slot_to_agent_id(settings.ArcaneMimicryTargetPartySlot)
-                if target_id and target_id > 0:
-                    if GLOBAL_CACHE.Agent.IsLiving(target_id):
-                        agent_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
-                        if agent_allegiance == Allegiance.Ally:
-                            return target_id
-                # If configured by party slot but can't find the target, return 0 (don't use default targeting)
-                return 0
-            # If no party slot configured, fall through to default OtherAlly targeting
+            skill_name = buff_skill_names[self.skills[slot].skill_id]
+            config = settings.BuffTargetingConfig.get(skill_name, {})
+            
+            if config:
+                mode = config.get('mode', 'profession')
+                
+                if mode == 'player':
+                    # Player-based targeting - find lowest health ally that's in the player list
+                    players_set = config.get('players', set())
+                    if not players_set:
+                        # No players selected - don't cast the buff
+                        return 0
+                    
+                    # Get all party members
+                    party_members = []
+                    
+                    # Add heroes
+                    heroes = GLOBAL_CACHE.Party.GetHeroes()
+                    for hero in heroes:
+                        if hero.agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(hero.agent_id):
+                            hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else "Hero"
+                            if hero_name in players_set and not self.HasEffect(hero.agent_id, self.skills[slot].skill_id):
+                                party_members.append(hero.agent_id)
+                    
+                    # Add other players
+                    players = GLOBAL_CACHE.Party.GetPlayers()
+                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                    for player in players:
+                        player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                        if player_agent_id != 0 and player_agent_id != my_agent_id and GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
+                            player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                            if player_name in players_set and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
+                                party_members.append(player_agent_id)
+                    
+                    # Return lowest health ally from the selected players
+                    if party_members:
+                        lowest_health = 1.0
+                        lowest_agent = 0
+                        for agent_id in party_members:
+                            health = GLOBAL_CACHE.Agent.GetHealth(agent_id)
+                            if health < lowest_health:
+                                lowest_health = health
+                                lowest_agent = agent_id
+                        return lowest_agent
+                    return 0
+                    
+                else:  # profession mode
+                    # Profession-based targeting - find lowest health ally of enabled profession
+                    professions_dict = config.get('professions', {})
+                    if not any(professions_dict.values()):
+                        # No professions selected - don't cast the buff
+                        return 0
+                    
+                    # Get all party members of enabled professions
+                    party_members = []
+                    
+                    # Add heroes
+                    heroes = GLOBAL_CACHE.Party.GetHeroes()
+                    for hero in heroes:
+                        if hero.agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(hero.agent_id):
+                            prof_id, _ = GLOBAL_CACHE.Agent.GetProfessionIDs(hero.agent_id)  # Returns (primary, secondary)
+                            if professions_dict.get(prof_id, False) and not self.HasEffect(hero.agent_id, self.skills[slot].skill_id):
+                                party_members.append(hero.agent_id)
+                    
+                    # Add other players
+                    players = GLOBAL_CACHE.Party.GetPlayers()
+                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                    for player in players:
+                        player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                        if player_agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
+                            prof_id, _ = GLOBAL_CACHE.Agent.GetProfessionIDs(player_agent_id)  # Returns (primary, secondary)
+                            if professions_dict.get(prof_id, False) and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
+                                party_members.append(player_agent_id)
+                    
+                    # Return lowest health ally from enabled professions
+                    if party_members:
+                        lowest_health = 1.0
+                        lowest_agent = 0
+                        for agent_id in party_members:
+                            health = GLOBAL_CACHE.Agent.GetHealth(agent_id)
+                            if health < lowest_health:
+                                lowest_health = health
+                                lowest_agent = agent_id
+                        return lowest_agent
+                    return 0
 
         if target_allegiance == Skilltarget.Enemy:
             v_target = self.GetPartyTarget()
@@ -1186,45 +1284,48 @@ class CombatClass:
         """
         
         # Check if we have a pending follow-up skill that should be cast immediately
+        # This takes priority over the normal skill rotation to ensure Echo/Auspicious spells work correctly
         if self.pending_followup_skill_slot >= 0:
-            # Check if enough time has passed since the previous skill
-            if self.followup_skill_timer.GetElapsedTime() > 100:  # Small delay to ensure previous skill finished
-                slot = self.pending_followup_skill_slot
-                skill_id = self.skills[slot].skill_id
-                
-                # Try to cast the follow-up skill
-                is_skill_ready = self.IsSkillReady(slot)
-                if is_skill_ready:
-                    is_ready_to_cast, target_agent_id = self.IsReadyToCast(slot)
-                    if is_ready_to_cast and target_agent_id > 0 and GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
-                        # Cast the follow-up skill
-                        self.in_casting_routine = True
-                        
-                        if self.fast_casting_exists:
-                            activation, recharge = Routines.Checks.Skills.apply_fast_casting(skill_id, self.fast_casting_level)
-                        else:
-                            activation = GLOBAL_CACHE.Skill.Data.GetActivation(skill_id)
-                        
-                        self.aftercast = activation * 1000
-                        self.aftercast += GLOBAL_CACHE.Skill.Data.GetAftercast(skill_id) * 1000
-                        
-                        skill_type, _ = GLOBAL_CACHE.Skill.GetType(skill_id)
-                        if skill_type == SkillType.Attack.value:
-                            self.aftercast += self.GetWeaponAttackAftercast()
-                        
-                        self.aftercast += self.ping_handler.GetCurrentPing()
-                        self.aftercast_timer.Reset()
-                        
-                        GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[slot]+1, target_agent_id)
-                        
-                        # Clear the pending follow-up
-                        self.pending_followup_skill_slot = -1
-                        self.ResetSkillPointer()
-                        return True
-                
-                # If we couldn't cast it, clear the pending state after a timeout
-                if self.followup_skill_timer.GetElapsedTime() > 3000:  # 3 second timeout
+            slot = self.pending_followup_skill_slot
+            skill_id = self.skills[slot].skill_id
+            
+            # Try to cast the follow-up skill
+            is_skill_ready = self.IsSkillReady(slot)
+            if is_skill_ready:
+                is_ready_to_cast, target_agent_id = self.IsReadyToCast(slot)
+                if is_ready_to_cast and target_agent_id > 0 and GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
+                    # Cast the follow-up skill
+                    self.in_casting_routine = True
+                    
+                    if self.fast_casting_exists:
+                        activation, recharge = Routines.Checks.Skills.apply_fast_casting(skill_id, self.fast_casting_level)
+                    else:
+                        activation = GLOBAL_CACHE.Skill.Data.GetActivation(skill_id)
+                    
+                    self.aftercast = activation * 1000
+                    self.aftercast += GLOBAL_CACHE.Skill.Data.GetAftercast(skill_id) * 1000
+                    
+                    skill_type, _ = GLOBAL_CACHE.Skill.GetType(skill_id)
+                    if skill_type == SkillType.Attack.value:
+                        self.aftercast += self.GetWeaponAttackAftercast()
+                    
+                    self.aftercast += self.ping_handler.GetCurrentPing()
+                    self.aftercast_timer.Reset()
+                    
+                    GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[slot]+1, target_agent_id)
+                    
+                    # Clear the pending follow-up
                     self.pending_followup_skill_slot = -1
+                    self.ResetSkillPointer()
+                    return True
+            
+            # If we couldn't cast it, clear the pending state after a timeout
+            if self.followup_skill_timer.GetElapsedTime() > 3000:  # 3 second timeout
+                self.pending_followup_skill_slot = -1
+            
+            # Don't proceed with normal skill rotation while we have a pending follow-up
+            # This prevents other skills from being cast between Echo/Auspicious and the target spell
+            return False
        
         slot = self.skill_pointer
         skill_id = self.skills[slot].skill_id
@@ -1254,6 +1355,82 @@ class CombatClass:
 
         if not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
             return False
+        
+        # Special check for Arcane Echo: ensure target spell is ready
+        if skill_id == self.arcane_echo:
+            from HeroAI.settings import Settings
+            settings = Settings()
+            followup_slot = settings.ArcaneEchoSkillSlot
+            
+            # Verify the followup slot is valid
+            if 0 <= followup_slot < len(self.skills):
+                followup_skill_id = self.skills[followup_slot].skill_id
+                
+                # Check if the followup skill is ready (not on cooldown)
+                if not Routines.Checks.Skills.IsSkillIDReady(followup_skill_id):
+                    self.AdvanceSkillPointer()
+                    return False
+        
+        # Special check for Auspicious Incantation: ensure we have enough energy for both
+        # Auspicious Incantation AND the target spell
+        if skill_id == self.auspicious_incantation:
+            from HeroAI.settings import Settings
+            settings = Settings()
+            followup_slot = settings.AuspiciousIncantationSkillSlot
+            
+            # Verify the followup slot is valid
+            if 0 <= followup_slot < len(self.skills):
+                followup_skill_id = self.skills[followup_slot].skill_id
+                
+                # Check if the followup skill is ready (not on cooldown)
+                if not Routines.Checks.Skills.IsSkillIDReady(followup_skill_id):
+                    self.AdvanceSkillPointer()
+                    return False
+                
+                # Check if we have enough energy for both spells
+                current_energy = self.GetEnergyValues(GLOBAL_CACHE.Player.GetAgentID()) * GLOBAL_CACHE.Agent.GetMaxEnergy(GLOBAL_CACHE.Player.GetAgentID())
+                
+                # Energy cost for Auspicious Incantation itself
+                auspicious_cost = Routines.Checks.Skills.GetEnergyCostWithEffects(skill_id, GLOBAL_CACHE.Player.GetAgentID())
+                if self.expertise_exists:
+                    auspicious_cost = Routines.Checks.Skills.apply_expertise_reduction(auspicious_cost, self.expertise_level, skill_id)
+                
+                # Energy cost for the followup spell
+                followup_cost = Routines.Checks.Skills.GetEnergyCostWithEffects(followup_skill_id, GLOBAL_CACHE.Player.GetAgentID())
+                if self.expertise_exists:
+                    followup_cost = Routines.Checks.Skills.apply_expertise_reduction(followup_cost, self.expertise_level, followup_skill_id)
+                
+                total_energy_needed = auspicious_cost + followup_cost
+                
+                if current_energy < total_energy_needed:
+                    self.AdvanceSkillPointer()
+                    return False
+        
+        # Check if this is a target spell for Arcane Echo or Auspicious Incantation
+        # If so, and the Echo/Auspicious spell is available, skip this spell
+        # Priority: Auspicious (highest) -> Arcane -> target spell
+        from HeroAI.settings import Settings
+        settings = Settings()
+        
+        # Check if current skill is the Auspicious target and Auspicious is ready
+        if (settings.AuspiciousIncantationSkillSlot < len(self.skills) and 
+            skill_id == self.skills[settings.AuspiciousIncantationSkillSlot].skill_id and
+            skill_id != self.auspicious_incantation):
+            # Check if Auspicious Incantation is ready
+            if Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation):
+                # Skip this spell, let Auspicious cast first
+                self.AdvanceSkillPointer()
+                return False
+        
+        # Check if current skill is the Arcane Echo target and Arcane Echo is ready
+        if (settings.ArcaneEchoSkillSlot < len(self.skills) and 
+            skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
+            skill_id != self.arcane_echo):
+            # Check if Arcane Echo is ready
+            if Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo):
+                # Skip this spell, let Arcane Echo cast first
+                self.AdvanceSkillPointer()
+                return False
             
         self.in_casting_routine = True
 

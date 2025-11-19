@@ -1035,9 +1035,10 @@ def DrawControlPanelWindow(cached_data:CacheData):
     cached_data.HeroAI_windows.control_window.end()
 
 def DrawCustomSkillsWindow(cached_data: CacheData):
-    """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, and Arcane Mimicry"""
+    """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, Arcane Mimicry, and Buff Targeting"""
     from HeroAI.settings import Settings
     settings = Settings()
+    settings.ensure_initialized()  # Ensure settings are loaded for current account
     
     PyImGui.text("Configure Custom Skills")
     PyImGui.separator()
@@ -1248,6 +1249,188 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 PyImGui.text_colored("No party members found", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    
+    # Helper function to draw buff targeting configuration for a skill
+    def draw_buff_targeting_config(skill_name: str, skill_display_name: str, has_skill: bool):
+        """Draw buff targeting UI for a specific skill"""
+        if PyImGui.collapsing_header(f"{skill_display_name} - Buff Targeting", PyImGui.TreeNodeFlags.DefaultOpen):
+            if not has_skill:
+                PyImGui.text_colored(f"{skill_display_name} not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+                return
+            
+            import os
+            from Py4GWCoreLib.enums_src.GameData_enums import Profession
+            
+            # Get the py4gw root directory for texture paths
+            script_directory = os.path.dirname(os.path.abspath(__file__))
+            py4gw_root_directory = os.path.abspath(os.path.join(script_directory, os.pardir)) + "\\\\"
+            
+            config = settings.BuffTargetingConfig[skill_name]
+            
+            # Mode selection dropdown
+            PyImGui.text("Targeting mode:")
+            mode_options = ["By Profession", "By Player"]
+            current_mode_index = 0 if config['mode'] == 'profession' else 1
+            new_mode_index = ImGui.combo(f"##TargetMode_{skill_name}", current_mode_index, mode_options)
+            
+            if new_mode_index != current_mode_index:
+                config['mode'] = 'profession' if new_mode_index == 0 else 'player'
+                settings.save_requested = True
+                settings.write_settings()  # Immediately write to persist the change
+            
+            PyImGui.spacing()
+            
+            if config['mode'] == 'profession':
+                # Profession-based targeting
+                PyImGui.text("Select which professions to buff:")
+                PyImGui.text_colored(
+                    "Click profession icons to toggle.",
+                    Utils.RGBToNormal(180, 180, 180, 255)
+                )
+                
+                PyImGui.spacing()
+                PyImGui.bullet_text("Buff configuration:")
+                
+                all_professions = [
+                    Profession.Warrior, Profession.Ranger, Profession.Monk,
+                    Profession.Necromancer, Profession.Mesmer, Profession.Elementalist,
+                    Profession.Assassin, Profession.Ritualist, Profession.Paragon,
+                    Profession.Dervish
+                ]
+                
+                icon_size = 26
+                for profession in all_professions:
+                    profession_id = profession.value
+                    is_enabled = config['professions'].get(profession_id, True)
+                    
+                    texture_path = py4gw_root_directory + f"Textures\\Profession_Icons\\[{profession_id}] - {profession.name}.png"
+                    
+                    if not os.path.exists(texture_path):
+                        if ImGui.toggle_button(f"{profession.name}##{skill_name}_{profession.name}", is_enabled, 80, 26):
+                            config['professions'][profession_id] = not is_enabled
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
+                    else:
+                        if is_enabled:
+                            PyImGui.push_style_var(ImGui.ImGuiStyleVar.FrameBorderSize, 3)
+                            PyImGui.push_style_color(PyImGui.ImGuiCol.Border, Utils.ColorToTuple(Utils.RGBToColor(3, 244, 60, 255)))
+                        
+                        clicked = ImGui.ImageButton(f"{skill_name}_toggle_{profession.name}", texture_path, icon_size, icon_size)
+                        
+                        if is_enabled:
+                            PyImGui.pop_style_var(1)
+                            PyImGui.pop_style_color(1)
+                        
+                        if clicked:
+                            config['professions'][profession_id] = not is_enabled
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
+                        
+                        tooltip_text = f"{'Deactivate' if is_enabled else 'Activate'} buff for {profession.name}"
+                        ImGui.show_tooltip(tooltip_text)
+                    
+                    PyImGui.same_line(0, 5)
+                
+                PyImGui.new_line()
+                PyImGui.spacing()
+                
+                # Show summary
+                enabled_professions = [
+                    Profession(prof_id).name 
+                    for prof_id, enabled in config['professions'].items() 
+                    if enabled
+                ]
+                
+                if enabled_professions:
+                    PyImGui.text_colored(
+                        f"Buffing: {', '.join(enabled_professions)}",
+                        Utils.RGBToNormal(0, 255, 0, 255)
+                    )
+                else:
+                    PyImGui.text_colored(
+                        f"No professions selected ({skill_display_name} will not buff anyone)",
+                        Utils.RGBToNormal(255, 165, 0, 255)
+                    )
+            
+            else:  # player mode
+                # Player-based targeting
+                PyImGui.text("Select which party members to buff:")
+                PyImGui.text_colored(
+                    "Click on player names to toggle.",
+                    Utils.RGBToNormal(180, 180, 180, 255)
+                )
+                
+                PyImGui.spacing()
+                
+                # Get current party members
+                party_members = []
+                
+                # Add heroes
+                heroes = GLOBAL_CACHE.Party.GetHeroes()
+                for hero in heroes:
+                    if hero.agent_id != 0:
+                        hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero"
+                        party_members.append(('hero', hero_name, hero_name))
+                
+                # Add other players
+                players = GLOBAL_CACHE.Party.GetPlayers()
+                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                
+                for player in players:
+                    player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                    if player_agent_id == my_agent_id or player_agent_id == 0:
+                        continue
+                    
+                    player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                    party_members.append(('player', player_name, player_name))
+                
+                if party_members:
+                    PyImGui.bullet_text("Party members:")
+                    for member_type, member_id, member_name in party_members:
+                        is_enabled = member_id in config['players']
+                        
+                        if ImGui.toggle_button(f"{member_name}##{skill_name}_{member_id}", is_enabled, 150, 24):
+                            # Toggle the state - add if not present, remove if present
+                            if member_id in config['players']:
+                                config['players'].discard(member_id)
+                            else:
+                                config['players'].add(member_id)
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
+                        
+                        PyImGui.same_line(0, 5)
+                        PyImGui.text(f"({member_type})")
+                    
+                    PyImGui.spacing()
+                    
+                    # Show summary
+                    if config['players']:
+                        PyImGui.text_colored(
+                            f"Buffing {len(config['players'])} player(s): {', '.join(config['players'])}",
+                            Utils.RGBToNormal(0, 255, 0, 255)
+                        )
+                    else:
+                        PyImGui.text_colored(
+                            f"No players selected ({skill_display_name} will not buff anyone)",
+                            Utils.RGBToNormal(255, 165, 0, 255)
+                        )
+                else:
+                    PyImGui.text_colored("No party members found", Utils.RGBToNormal(255, 165, 0, 255))
+    
+    # Draw buff targeting for each supported skill
+    buff_skills = [
+        ('Dark_Aura', 'Dark Aura', GLOBAL_CACHE.Skill.GetID("Dark_Aura")),
+        ('Great_Dwarf_Weapon', 'Great Dwarf Weapon', GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon")),
+        ('Strength_of_Honor', 'Strength of Honor', GLOBAL_CACHE.Skill.GetID("Strength_of_Honor")),
+        ('Spell_Breaker', 'Spell Breaker', GLOBAL_CACHE.Skill.GetID("Spell_Breaker"))
+    ]
+    
+    for skill_name, skill_display_name, skill_id in buff_skills:
+        has_skill = skill_id in skill_ids
+        draw_buff_targeting_config(skill_name, skill_display_name, has_skill)
+        PyImGui.spacing()
    
 
 
