@@ -1427,15 +1427,15 @@ class CombatClass:
             
             # PRIORITY CHECK: If Auspicious Incantation is targeting Arcane Echo and is ready, 
             # skip Arcane Echo to give Auspicious priority
-            auspicious_target_slot = settings.AuspiciousIncantationSkillSlot
-            if auspicious_target_slot < len(self.skills):
-                auspicious_target_skill_id = self.skills[auspicious_target_slot].skill_id
-                if auspicious_target_skill_id == self.arcane_echo:
-                    # Arcane Echo is the target of Auspicious Incantation
-                    if Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation):
-                        Py4GW.Console.Log("EchoFollowup", "Arcane Echo is target of Auspicious Incantation and Auspicious is ready - giving Auspicious priority", Py4GW.Console.MessageType.Info)
-                        self.AdvanceSkillPointer()
-                        return False
+            auspicious_target_skillbar_slot = settings.AuspiciousIncantationSkillSlot
+            # Get the skill ID from the skillbar slot (1-based for GetSkillIDBySlot)
+            auspicious_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(auspicious_target_skillbar_slot + 1)
+            if auspicious_target_skill_id == self.arcane_echo:
+                # Arcane Echo is the target of Auspicious Incantation
+                if Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation):
+                    Py4GW.Console.Log("EchoFollowup", "Arcane Echo is target of Auspicious Incantation and Auspicious is ready - giving Auspicious priority", Py4GW.Console.MessageType.Info)
+                    self.AdvanceSkillPointer()
+                    return False
             
             followup_skillbar_slot = settings.ArcaneEchoSkillSlot  # This is the SKILLBAR slot (0-7), not prioritized index
             
