@@ -1484,6 +1484,24 @@ class CombatClass:
                     self.AdvanceSkillPointer()
                     return False
                 
+                # CHAIN CHECK: If Auspicious targets Arcane Echo, also check Arcane Echo's target is ready
+                if followup_skill_id == self.arcane_echo:
+                    Py4GW.Console.Log("EchoFollowup", "Auspicious targets Arcane Echo - checking Arcane Echo's target is also ready", Py4GW.Console.MessageType.Info)
+                    arcane_echo_target_slot = settings.ArcaneEchoSkillSlot
+                    arcane_echo_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(arcane_echo_target_slot + 1)
+                    
+                    if arcane_echo_target_skill_id > 0:
+                        arcane_echo_target_name = GLOBAL_CACHE.Skill.GetName(arcane_echo_target_skill_id)
+                        is_arcane_target_ready = Routines.Checks.Skills.IsSkillIDReady(arcane_echo_target_skill_id)
+                        Py4GW.Console.Log("EchoFollowup", f"Arcane Echo's target spell {arcane_echo_target_name} ready: {is_arcane_target_ready}", Py4GW.Console.MessageType.Info)
+                        
+                        if not is_arcane_target_ready:
+                            Py4GW.Console.Log("EchoFollowup", f"Arcane Echo's target spell {arcane_echo_target_name} NOT READY - skipping chain", Py4GW.Console.MessageType.Warning)
+                            self.AdvanceSkillPointer()
+                            return False
+                    else:
+                        Py4GW.Console.Log("EchoFollowup", f"No target skill found for Arcane Echo in slot {arcane_echo_target_slot}", Py4GW.Console.MessageType.Error)
+                
                 # Check if we have enough energy for both spells
                 current_energy = self.GetEnergyValues(GLOBAL_CACHE.Player.GetAgentID()) * GLOBAL_CACHE.Agent.GetMaxEnergy(GLOBAL_CACHE.Player.GetAgentID())
                 
