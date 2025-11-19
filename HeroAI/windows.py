@@ -1152,11 +1152,12 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
         has_mimicry = mimicry_id in skill_ids
         
         if has_mimicry:
-            # Get all allies (heroes and other players)
+            # Get all allies (heroes and other players) with their emails
             ally_options = []
+            ally_emails = []
             ally_agent_ids = []
             
-            # Get heroes
+            # Get heroes - they don't have emails, so we'll use empty string
             heroes = GLOBAL_CACHE.Party.GetHeroes()
             for index, hero in enumerate(heroes):
                 hero_agent_id = hero.agent_id
@@ -1164,29 +1165,41 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     continue
                 
                 hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero {index + 1}"
-                ally_options.append(hero_name)
+                ally_options.append(f"{hero_name} (Hero)")
+                ally_emails.append("")  # Heroes don't have emails
                 ally_agent_ids.append(hero_agent_id)
             
-            # Get other players in party
-            players = GLOBAL_CACHE.Party.GetPlayers()
-            my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
-            
-            if len(players) > 1:
-                for player in players:
-                    player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+            # Get other players in party with their emails
+            try:
+                for account in GLOBAL_CACHE.ShMem.GetAllAccountData():
+                    agent_id = int(getattr(account, "PlayerID", 0) or 0)
+                    email = getattr(account, "AccountEmail", "")
+                    char_name = getattr(account, "CharacterName", "Unknown")
                     
-                    # Skip self
-                    if player_agent_id == my_agent_id or player_agent_id == 0:
+                    # Skip if no agent ID, no email, or it's the current player
+                    my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                    if agent_id <= 0 or not email or agent_id == my_agent_id:
                         continue
                     
-                    player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
-                    ally_options.append(player_name)
-                    ally_agent_ids.append(player_agent_id)
+                    # Check if this agent is in our party
+                    if GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                        ally_options.append(f"{char_name} ({email})")
+                        ally_emails.append(email)
+                        ally_agent_ids.append(agent_id)
+            except Exception:
+                pass
             
             if ally_options:
-                # Find current selection index
+                # Find current selection index based on email (new) or agent ID (old)
                 current_selection = 0
-                if settings.ArcaneMimicryTargetAgentID > 0:
+                if settings.ArcaneMimicryTargetEmail:
+                    # New email-based selection
+                    try:
+                        current_selection = ally_emails.index(settings.ArcaneMimicryTargetEmail)
+                    except ValueError:
+                        current_selection = 0
+                elif settings.ArcaneMimicryTargetAgentID > 0:
+                    # Old agent ID-based selection (for backwards compatibility)
                     try:
                         current_selection = ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)
                     except ValueError:
@@ -1194,20 +1207,34 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 
                 new_selection = ImGui.combo("##MimicryAlly", current_selection, ally_options)
                 if new_selection != current_selection:
+                    # Save the email (or empty string for heroes)
+                    settings.ArcaneMimicryTargetEmail = ally_emails[new_selection]
+                    # Also save agent ID for backwards compatibility display
                     settings.ArcaneMimicryTargetAgentID = ally_agent_ids[new_selection]
                     settings.save_settings()
                 
-                # Display currently configured target with agent ID for debugging
-                if settings.ArcaneMimicryTargetAgentID > 0:
+                # Display currently configured target
+                if settings.ArcaneMimicryTargetEmail or settings.ArcaneMimicryTargetAgentID > 0:
                     try:
-                        selected_name = ally_options[ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)]
-                        PyImGui.text_colored(
-                            f"Currently configured to target: {selected_name} (Agent ID: {settings.ArcaneMimicryTargetAgentID})",
-                            Utils.RGBToNormal(0, 255, 0, 255)
-                        )
+                        if settings.ArcaneMimicryTargetEmail:
+                            # Try to find by email first
+                            idx = ally_emails.index(settings.ArcaneMimicryTargetEmail)
+                            selected_name = ally_options[idx]
+                            PyImGui.text_colored(
+                                f"Currently configured to target: {selected_name}",
+                                Utils.RGBToNormal(0, 255, 0, 255)
+                            )
+                        elif settings.ArcaneMimicryTargetAgentID > 0:
+                            # Fallback to agent ID
+                            idx = ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)
+                            selected_name = ally_options[idx]
+                            PyImGui.text_colored(
+                                f"Currently configured to target: {selected_name}",
+                                Utils.RGBToNormal(0, 255, 0, 255)
+                            )
                     except (ValueError, IndexError):
                         PyImGui.text_colored(
-                            f"Configured target not found in current party (Agent ID: {settings.ArcaneMimicryTargetAgentID})",
+                            f"Configured target not found in current party",
                             Utils.RGBToNormal(255, 165, 0, 255)
                         )
             else:

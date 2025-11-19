@@ -333,6 +333,20 @@ class CombatClass:
     def get_combat_distance(self):
         return Range.Spellcast.value if self.in_aggro else Range.Earshot.value
 
+    def _resolve_email_to_agent_id(self, email: str) -> int:
+        """Resolve an account email to the current agent ID (handles map changes)."""
+        if not email:
+            return 0
+        try:
+            # Use SharedMemory to get current agent ID for the email
+            account = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(email)
+            if account is not None:
+                agent_id = int(getattr(account, "PlayerID", 0) or 0)
+                return agent_id if agent_id > 0 else 0
+        except Exception:
+            pass
+        return 0
+
     def GetAppropiateTarget(self, slot):
         v_target = 0
 
@@ -354,16 +368,30 @@ class CombatClass:
         if self.skills[slot].skill_id == self.arcane_mimicry:
             from HeroAI.settings import Settings
             settings = Settings()
-            # Use the configured target agent ID if available
-            if settings.ArcaneMimicryTargetAgentID > 0:
-                # Verify the target is still valid (alive, ally, and in party)
+            
+            # Use the configured target email if available (new approach, handles map changes)
+            if settings.ArcaneMimicryTargetEmail:
+                # Resolve email to current agent ID
+                target_id = self._resolve_email_to_agent_id(settings.ArcaneMimicryTargetEmail)
+                if target_id and target_id > 0:
+                    # Verify the target is still valid (alive and ally)
+                    if GLOBAL_CACHE.Agent.IsLiving(target_id):
+                        agent_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
+                        if agent_allegiance == Allegiance.Ally:
+                            return target_id
+                # If configured by email but can't find the target, return 0 (don't use default targeting)
+                return 0
+            
+            # Fallback to old agent ID approach for backwards compatibility
+            elif settings.ArcaneMimicryTargetAgentID > 0:
                 target_id = settings.ArcaneMimicryTargetAgentID
                 if GLOBAL_CACHE.Agent.IsLiving(target_id):
-                    # Additional validation: ensure target is actually an ally in our party
                     agent_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
                     if agent_allegiance == Allegiance.Ally:
                         return target_id
-            # If no valid target configured, fall through to default OtherAlly targeting
+                # If configured by agent ID but can't find the target, return 0 (don't use default targeting)
+                return 0
+            # If no target configured, fall through to default OtherAlly targeting
 
         if target_allegiance == Skilltarget.Enemy:
             v_target = self.GetPartyTarget()
