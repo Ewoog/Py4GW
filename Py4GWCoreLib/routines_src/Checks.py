@@ -372,6 +372,8 @@ class Checks:
                 hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Player.GetAgentID() != agent_id)
                 # Filter out allies - only keep non-ally agents (players and henchmen)
                 hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Agent.GetAllegiance(agent_id)[0] != 1)  # 1 = Ally allegiance
+                # Filter out party members (including friendly Priest in team spawn)
+                hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: not GLOBAL_CACHE.Party.IsPartyMember(agent_id))
                 # Add hostile agents to enemy array
                 enemy_array = enemy_array + hostile_agents
             
