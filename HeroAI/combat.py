@@ -1464,9 +1464,23 @@ class CombatClass:
         from HeroAI.settings import Settings
         settings = Settings()
         
+        # First, check if current skill is Arcane Echo and Auspicious Incantation targets it
+        # This ensures Auspicious has highest priority even when targeting Arcane Echo
+        if skill_id == self.arcane_echo:
+            # Get the skill that Auspicious targets (convert from 0-based slot to 1-based for API)
+            auspicious_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(settings.AuspiciousIncantationSkillSlot + 1)
+            if auspicious_target_skill_id == self.arcane_echo:
+                # Auspicious targets Arcane Echo, check if Auspicious is ready
+                if Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation):
+                    # Skip Arcane Echo, let Auspicious cast first
+                    Py4GW.Console.Log("EchoFollowup", "Skipping Arcane Echo because Auspicious Incantation (which targets it) is ready", Py4GW.Console.MessageType.Info)
+                    self.AdvanceSkillPointer()
+                    return False
+        
         # Check if current skill is the Auspicious target and Auspicious is ready
-        if (settings.AuspiciousIncantationSkillSlot < len(self.skills) and 
-            skill_id == self.skills[settings.AuspiciousIncantationSkillSlot].skill_id and
+        auspicious_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(settings.AuspiciousIncantationSkillSlot + 1)
+        if (auspicious_target_skill_id > 0 and 
+            skill_id == auspicious_target_skill_id and
             skill_id != self.auspicious_incantation):
             # Check if Auspicious Incantation is ready
             if Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation):
@@ -1475,8 +1489,9 @@ class CombatClass:
                 return False
         
         # Check if current skill is the Arcane Echo target and Arcane Echo is ready
-        if (settings.ArcaneEchoSkillSlot < len(self.skills) and 
-            skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
+        arcane_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(settings.ArcaneEchoSkillSlot + 1)
+        if (arcane_target_skill_id > 0 and 
+            skill_id == arcane_target_skill_id and
             skill_id != self.arcane_echo):
             # Check if Arcane Echo is ready
             if Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo):
