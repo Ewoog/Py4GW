@@ -110,9 +110,11 @@ class Settings:
         self.ArcaneEchoSkillSlot = 0  # Which skill to copy with Arcane Echo
         self.AuspiciousIncantationSkillSlot = 0  # Which skill to use after Auspicious Incantation
         self.ArcaneMimicrySkillSlot = 0  # Which skill to steal with Arcane Mimicry (deprecated, keeping for compatibility)
-        self.ArcaneMimicryTargetAgentID = 0  # Which ally to target with Arcane Mimicry (deprecated, use Email or HeroID)
-        self.ArcaneMimicryTargetEmail = ""  # Which player (by email) to target with Arcane Mimicry
-        self.ArcaneMimicryTargetHeroID = 0  # Which hero (by hero ID) to target with Arcane Mimicry
+        self.ArcaneMimicryTargetPartySlot = -1  # Which party member (by slot index 0-7) to target with Arcane Mimicry
+        # Deprecated fields kept for backwards compatibility
+        self.ArcaneMimicryTargetAgentID = 0
+        self.ArcaneMimicryTargetEmail = ""
+        self.ArcaneMimicryTargetHeroID = 0
         self.ArcaneMimicryEliteSkillID = 0  # Which elite skill to copy with Arcane Mimicry
         
         
@@ -196,10 +198,9 @@ class Settings:
         # Mesmer skill settings
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneEchoSkillSlot", str(self.ArcaneEchoSkillSlot))
         self.account_ini_handler.write_key("MesmerSkills", "AuspiciousIncantationSkillSlot", str(self.AuspiciousIncantationSkillSlot))
+        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetPartySlot", str(self.ArcaneMimicryTargetPartySlot))
+        # Legacy fields
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicrySkillSlot", str(self.ArcaneMimicrySkillSlot))
-        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetAgentID", str(self.ArcaneMimicryTargetAgentID))
-        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetEmail", str(self.ArcaneMimicryTargetEmail))
-        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetHeroID", str(self.ArcaneMimicryTargetHeroID))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryEliteSkillID", str(self.ArcaneMimicryEliteSkillID))
 
         for hero_email, (x, y, w, h, collapsed) in self.HeroPanelPositions.items():
@@ -236,6 +237,8 @@ class Settings:
         # Mesmer skill settings
         self.ArcaneEchoSkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneEchoSkillSlot", 0)
         self.AuspiciousIncantationSkillSlot = self.account_ini_handler.read_int("MesmerSkills", "AuspiciousIncantationSkillSlot", 0)
+        self.ArcaneMimicryTargetPartySlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetPartySlot", -1)
+        # Legacy fields
         self.ArcaneMimicrySkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicrySkillSlot", 0)
         self.ArcaneMimicryTargetAgentID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetAgentID", 0)
         self.ArcaneMimicryTargetEmail = self.account_ini_handler.read_key("MesmerSkills", "ArcaneMimicryTargetEmail", "")
