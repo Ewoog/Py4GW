@@ -406,9 +406,13 @@ class CombatClass:
                     my_name = GLOBAL_CACHE.Player.GetName()
                     ConsoleLog("HeroAI", f"Checking self: {my_name} in {players_set}? {my_name in players_set}")
                     if my_name in players_set and GLOBAL_CACHE.Agent.IsLiving(my_agent_id):
-                        if not self.HasEffect(my_agent_id, self.skills[slot].skill_id):
+                        has_effect = self.HasEffect(my_agent_id, self.skills[slot].skill_id)
+                        ConsoleLog("HeroAI", f"Self ({my_name}) has effect? {has_effect}")
+                        if not has_effect:
                             party_members.append(my_agent_id)
                             ConsoleLog("HeroAI", f"Added self ({my_name}) to party_members")
+                        else:
+                            ConsoleLog("HeroAI", f"Self ({my_name}) already has buff, skipping")
                     
                     # Add heroes
                     heroes = GLOBAL_CACHE.Party.GetHeroes()
@@ -416,9 +420,14 @@ class CombatClass:
                         if hero.agent_id != 0 and GLOBAL_CACHE.Agent.IsLiving(hero.agent_id):
                             hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else "Hero"
                             ConsoleLog("HeroAI", f"Checking hero: {hero_name} in {players_set}? {hero_name in players_set}")
-                            if hero_name in players_set and not self.HasEffect(hero.agent_id, self.skills[slot].skill_id):
-                                party_members.append(hero.agent_id)
-                                ConsoleLog("HeroAI", f"Added hero ({hero_name}) to party_members")
+                            if hero_name in players_set:
+                                has_effect = self.HasEffect(hero.agent_id, self.skills[slot].skill_id)
+                                ConsoleLog("HeroAI", f"Hero ({hero_name}) has effect? {has_effect}")
+                                if not has_effect:
+                                    party_members.append(hero.agent_id)
+                                    ConsoleLog("HeroAI", f"Added hero ({hero_name}) to party_members")
+                                else:
+                                    ConsoleLog("HeroAI", f"Hero ({hero_name}) already has buff, skipping")
                     
                     # Add other players
                     players = GLOBAL_CACHE.Party.GetPlayers()
@@ -430,9 +439,14 @@ class CombatClass:
                         if GLOBAL_CACHE.Agent.IsLiving(player_agent_id):
                             player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
                             ConsoleLog("HeroAI", f"Checking player: {player_name} in {players_set}? {player_name in players_set}")
-                            if player_name in players_set and not self.HasEffect(player_agent_id, self.skills[slot].skill_id):
-                                party_members.append(player_agent_id)
-                                ConsoleLog("HeroAI", f"Added player ({player_name}) to party_members")
+                            if player_name in players_set:
+                                has_effect = self.HasEffect(player_agent_id, self.skills[slot].skill_id)
+                                ConsoleLog("HeroAI", f"Player ({player_name}) has effect? {has_effect}")
+                                if not has_effect:
+                                    party_members.append(player_agent_id)
+                                    ConsoleLog("HeroAI", f"Added player ({player_name}) to party_members")
+                                else:
+                                    ConsoleLog("HeroAI", f"Player ({player_name}) already has buff, skipping")
                     
                     # Return lowest health ally from the selected players
                     ConsoleLog("HeroAI", f"Total party_members for {skill_name}: {len(party_members)}")
