@@ -451,14 +451,15 @@ class CombatClass:
                     # Return lowest health ally from the selected players
                     ConsoleLog("HeroAI", f"Total party_members for {skill_name}: {len(party_members)}")
                     if party_members:
-                        lowest_health = 1.0
+                        lowest_health = 2.0  # Initialize to > 1.0 so any health value will be lower
                         lowest_agent = 0
                         for agent_id in party_members:
                             health = GLOBAL_CACHE.Agent.GetHealth(agent_id)
+                            ConsoleLog("HeroAI", f"Agent {agent_id} health: {health}")
                             if health < lowest_health:
                                 lowest_health = health
                                 lowest_agent = agent_id
-                        ConsoleLog("HeroAI", f"Returning target agent_id: {lowest_agent}")
+                        ConsoleLog("HeroAI", f"Returning target agent_id: {lowest_agent} with health {lowest_health}")
                         return lowest_agent
                     ConsoleLog("HeroAI", f"No valid party members found, returning 0")
                     return 0
@@ -493,7 +494,7 @@ class CombatClass:
                     
                     # Return lowest health ally from enabled professions
                     if party_members:
-                        lowest_health = 1.0
+                        lowest_health = 2.0  # Initialize to > 1.0 so any health value will be lower
                         lowest_agent = 0
                         for agent_id in party_members:
                             health = GLOBAL_CACHE.Agent.GetHealth(agent_id)
