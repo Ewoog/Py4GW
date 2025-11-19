@@ -110,8 +110,9 @@ class Settings:
         self.ArcaneEchoSkillSlot = 0  # Which skill to copy with Arcane Echo
         self.AuspiciousIncantationSkillSlot = 0  # Which skill to use after Auspicious Incantation
         self.ArcaneMimicrySkillSlot = 0  # Which skill to steal with Arcane Mimicry (deprecated, keeping for compatibility)
-        self.ArcaneMimicryTargetAgentID = 0  # Which ally to target with Arcane Mimicry (deprecated, use ArcaneMimicryTargetEmail)
-        self.ArcaneMimicryTargetEmail = ""  # Which ally (by email) to target with Arcane Mimicry
+        self.ArcaneMimicryTargetAgentID = 0  # Which ally to target with Arcane Mimicry (deprecated, use Email or HeroID)
+        self.ArcaneMimicryTargetEmail = ""  # Which player (by email) to target with Arcane Mimicry
+        self.ArcaneMimicryTargetHeroID = 0  # Which hero (by hero ID) to target with Arcane Mimicry
         self.ArcaneMimicryEliteSkillID = 0  # Which elite skill to copy with Arcane Mimicry
         
         
@@ -198,6 +199,7 @@ class Settings:
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicrySkillSlot", str(self.ArcaneMimicrySkillSlot))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetAgentID", str(self.ArcaneMimicryTargetAgentID))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetEmail", str(self.ArcaneMimicryTargetEmail))
+        self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryTargetHeroID", str(self.ArcaneMimicryTargetHeroID))
         self.account_ini_handler.write_key("MesmerSkills", "ArcaneMimicryEliteSkillID", str(self.ArcaneMimicryEliteSkillID))
 
         for hero_email, (x, y, w, h, collapsed) in self.HeroPanelPositions.items():
@@ -236,7 +238,8 @@ class Settings:
         self.AuspiciousIncantationSkillSlot = self.account_ini_handler.read_int("MesmerSkills", "AuspiciousIncantationSkillSlot", 0)
         self.ArcaneMimicrySkillSlot = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicrySkillSlot", 0)
         self.ArcaneMimicryTargetAgentID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetAgentID", 0)
-        self.ArcaneMimicryTargetEmail = self.account_ini_handler.read_string("MesmerSkills", "ArcaneMimicryTargetEmail", "")
+        self.ArcaneMimicryTargetEmail = self.account_ini_handler.read_key("MesmerSkills", "ArcaneMimicryTargetEmail", "")
+        self.ArcaneMimicryTargetHeroID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryTargetHeroID", 0)
         self.ArcaneMimicryEliteSkillID = self.account_ini_handler.read_int("MesmerSkills", "ArcaneMimicryEliteSkillID", 0)
 
         self.HeroPanelPositions.clear()        

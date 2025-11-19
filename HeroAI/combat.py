@@ -347,6 +347,19 @@ class CombatClass:
             pass
         return 0
 
+    def _resolve_hero_id_to_agent_id(self, hero_id: int) -> int:
+        """Resolve a hero ID to the current agent ID (handles map changes)."""
+        if not hero_id or hero_id <= 0:
+            return 0
+        try:
+            heroes = GLOBAL_CACHE.Party.GetHeroes()
+            for hero in heroes:
+                if hasattr(hero, 'hero_id') and hero.hero_id.GetID() == hero_id:
+                    return hero.agent_id if hero.agent_id > 0 else 0
+        except Exception:
+            pass
+        return 0
+
     def GetAppropiateTarget(self, slot):
         v_target = 0
 
@@ -369,12 +382,21 @@ class CombatClass:
             from HeroAI.settings import Settings
             settings = Settings()
             
-            # Use the configured target email if available (new approach, handles map changes)
-            if settings.ArcaneMimicryTargetEmail:
-                # Resolve email to current agent ID
+            # Priority 1: Try hero ID (for heroes, persists across map changes)
+            if settings.ArcaneMimicryTargetHeroID and settings.ArcaneMimicryTargetHeroID > 0:
+                target_id = self._resolve_hero_id_to_agent_id(settings.ArcaneMimicryTargetHeroID)
+                if target_id and target_id > 0:
+                    if GLOBAL_CACHE.Agent.IsLiving(target_id):
+                        agent_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
+                        if agent_allegiance == Allegiance.Ally:
+                            return target_id
+                # If configured by hero ID but can't find the hero, return 0 (don't use default targeting)
+                return 0
+            
+            # Priority 2: Try email (for players, persists across map changes)
+            elif settings.ArcaneMimicryTargetEmail:
                 target_id = self._resolve_email_to_agent_id(settings.ArcaneMimicryTargetEmail)
                 if target_id and target_id > 0:
-                    # Verify the target is still valid (alive and ally)
                     if GLOBAL_CACHE.Agent.IsLiving(target_id):
                         agent_allegiance = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
                         if agent_allegiance == Allegiance.Ally:
@@ -382,7 +404,7 @@ class CombatClass:
                 # If configured by email but can't find the target, return 0 (don't use default targeting)
                 return 0
             
-            # Fallback to old agent ID approach for backwards compatibility
+            # Priority 3: Fallback to old agent ID approach (for backwards compatibility)
             elif settings.ArcaneMimicryTargetAgentID > 0:
                 target_id = settings.ArcaneMimicryTargetAgentID
                 if GLOBAL_CACHE.Agent.IsLiving(target_id):

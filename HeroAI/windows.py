@@ -1152,12 +1152,13 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
         has_mimicry = mimicry_id in skill_ids
         
         if has_mimicry:
-            # Get all allies (heroes and other players) with their emails
+            # Get all allies (heroes and other players) with their emails/hero IDs
             ally_options = []
             ally_emails = []
+            ally_hero_ids = []
             ally_agent_ids = []
             
-            # Get heroes - they don't have emails, so we'll use empty string
+            # Get heroes - they have hero IDs instead of emails
             heroes = GLOBAL_CACHE.Party.GetHeroes()
             for index, hero in enumerate(heroes):
                 hero_agent_id = hero.agent_id
@@ -1165,8 +1166,10 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     continue
                 
                 hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero {index + 1}"
+                hero_id = hero.hero_id.GetID() if hasattr(hero, 'hero_id') else 0
                 ally_options.append(f"{hero_name} (Hero)")
                 ally_emails.append("")  # Heroes don't have emails
+                ally_hero_ids.append(hero_id)  # Store hero ID for map change persistence
                 ally_agent_ids.append(hero_agent_id)
             
             # Get other players in party with their emails
@@ -1185,15 +1188,22 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     if GLOBAL_CACHE.Agent.IsAlive(agent_id):
                         ally_options.append(f"{char_name} ({email})")
                         ally_emails.append(email)
+                        ally_hero_ids.append(0)  # Players don't have hero IDs
                         ally_agent_ids.append(agent_id)
             except Exception:
                 pass
             
             if ally_options:
-                # Find current selection index based on email (new) or agent ID (old)
+                # Find current selection index based on hero ID (for heroes) or email (for players)
                 current_selection = 0
-                if settings.ArcaneMimicryTargetEmail:
-                    # New email-based selection
+                if settings.ArcaneMimicryTargetHeroID and settings.ArcaneMimicryTargetHeroID > 0:
+                    # Hero-based selection
+                    try:
+                        current_selection = ally_hero_ids.index(settings.ArcaneMimicryTargetHeroID)
+                    except ValueError:
+                        current_selection = 0
+                elif settings.ArcaneMimicryTargetEmail:
+                    # Email-based selection
                     try:
                         current_selection = ally_emails.index(settings.ArcaneMimicryTargetEmail)
                     except ValueError:
@@ -1207,17 +1217,32 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 
                 new_selection = ImGui.combo("##MimicryAlly", current_selection, ally_options)
                 if new_selection != current_selection:
-                    # Save the email (or empty string for heroes)
-                    settings.ArcaneMimicryTargetEmail = ally_emails[new_selection]
+                    # Save hero ID for heroes, email for players
+                    if ally_hero_ids[new_selection] > 0:
+                        # It's a hero
+                        settings.ArcaneMimicryTargetHeroID = ally_hero_ids[new_selection]
+                        settings.ArcaneMimicryTargetEmail = ""
+                    else:
+                        # It's a player
+                        settings.ArcaneMimicryTargetEmail = ally_emails[new_selection]
+                        settings.ArcaneMimicryTargetHeroID = 0
                     # Also save agent ID for backwards compatibility display
                     settings.ArcaneMimicryTargetAgentID = ally_agent_ids[new_selection]
                     settings.save_settings()
                 
                 # Display currently configured target
-                if settings.ArcaneMimicryTargetEmail or settings.ArcaneMimicryTargetAgentID > 0:
+                if settings.ArcaneMimicryTargetHeroID > 0 or settings.ArcaneMimicryTargetEmail or settings.ArcaneMimicryTargetAgentID > 0:
                     try:
-                        if settings.ArcaneMimicryTargetEmail:
-                            # Try to find by email first
+                        if settings.ArcaneMimicryTargetHeroID > 0:
+                            # Try to find by hero ID
+                            idx = ally_hero_ids.index(settings.ArcaneMimicryTargetHeroID)
+                            selected_name = ally_options[idx]
+                            PyImGui.text_colored(
+                                f"Currently configured to target: {selected_name}",
+                                Utils.RGBToNormal(0, 255, 0, 255)
+                            )
+                        elif settings.ArcaneMimicryTargetEmail:
+                            # Try to find by email
                             idx = ally_emails.index(settings.ArcaneMimicryTargetEmail)
                             selected_name = ally_options[idx]
                             PyImGui.text_colored(
