@@ -1153,66 +1153,100 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
         has_mimicry = mimicry_id in skill_ids
         
         if has_mimicry:
-            # Get all allies (heroes and other players)
-            ally_options = []
-            ally_agent_ids = []
+            # Get all party members (simple approach using party slots)
+            party_members = []
             
-            # Get heroes
-            heroes = GLOBAL_CACHE.Party.GetHeroes()
-            for index, hero in enumerate(heroes):
-                hero_agent_id = hero.agent_id
-                if hero_agent_id == 0:
-                    continue
-                
-                hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero {index + 1}"
-                ally_options.append(hero_name)
-                ally_agent_ids.append(hero_agent_id)
-            
-            # Get other players in party
-            players = GLOBAL_CACHE.Party.GetPlayers()
-            my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
-            
-            if len(players) > 1:
+            # Add player characters first
+            try:
+                players = GLOBAL_CACHE.Party.GetPlayers()
                 for player in players:
-                    player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
-                    
-                    # Skip self
-                    if player_agent_id == my_agent_id or player_agent_id == 0:
-                        continue
-                    
-                    player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
-                    ally_options.append(player_name)
-                    ally_agent_ids.append(player_agent_id)
+                    agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                    if agent_id > 0:
+                        char_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                        party_members.append((agent_id, char_name, False))  # (agent_id, name, is_hero)
+            except Exception:
+                pass
             
-            if ally_options:
-                # Find current selection index
-                current_selection = 0
-                if settings.ArcaneMimicryTargetAgentID > 0:
-                    try:
-                        current_selection = ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)
-                    except ValueError:
-                        current_selection = 0
+            # Add heroes
+            try:
+                heroes = GLOBAL_CACHE.Party.GetHeroes()
+                for hero in heroes:
+                    if hero.agent_id > 0:
+                        hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else "Hero"
+                        party_members.append((hero.agent_id, hero_name, True))  # (agent_id, name, is_hero)
+            except Exception:
+                pass
+            
+            if party_members:
+                # Build display options
+                ally_options = []
+                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                for idx, (agent_id, name, is_hero) in enumerate(party_members):
+                    # Skip self
+                    if agent_id == my_agent_id:
+                        continue
+                    label = f"Slot {idx}: {name}" + (" (Hero)" if is_hero else "")
+                    ally_options.append(label)
                 
-                new_selection = ImGui.combo("##MimicryAlly", current_selection, ally_options)
-                if new_selection != current_selection:
-                    settings.ArcaneMimicryTargetAgentID = ally_agent_ids[new_selection]
-                    settings.save_settings()
-                
-                # Display currently configured target with agent ID for debugging
-                if settings.ArcaneMimicryTargetAgentID > 0:
-                    try:
-                        selected_name = ally_options[ally_agent_ids.index(settings.ArcaneMimicryTargetAgentID)]
-                        PyImGui.text_colored(
-                            f"Currently configured to target: {selected_name} (Agent ID: {settings.ArcaneMimicryTargetAgentID})",
-                            Utils.RGBToNormal(0, 255, 0, 255)
-                        )
-                    except (ValueError, IndexError):
-                        PyImGui.text_colored(
-                            f"Configured target not found in current party (Agent ID: {settings.ArcaneMimicryTargetAgentID})",
-                            Utils.RGBToNormal(255, 165, 0, 255)
-                        )
+                if ally_options:
+                    # Find current selection index
+                    current_selection = 0
+                    if settings.ArcaneMimicryTargetPartySlot >= 0:
+                        # Adjust for skipped slots (self)
+                        adjusted_slot = 0
+                        for idx in range(len(party_members)):
+                            if party_members[idx][0] == my_agent_id:
+                                continue
+                            if idx == settings.ArcaneMimicryTargetPartySlot:
+                                current_selection = adjusted_slot
+                                break
+                            adjusted_slot += 1
+                    
+                    new_selection = ImGui.combo("##MimicryAlly", current_selection, ally_options)
+                    if new_selection != current_selection:
+                        # Map selection back to actual party slot
+                        adjusted_slot = 0
+                        actual_slot = -1
+                        for idx in range(len(party_members)):
+                            if party_members[idx][0] == my_agent_id:
+                                continue
+                            if adjusted_slot == new_selection:
+                                actual_slot = idx
+                                break
+                            adjusted_slot += 1
+                        
+                        if actual_slot >= 0:
+                            settings.ArcaneMimicryTargetPartySlot = actual_slot
+                            # Clear deprecated fields
+                            settings.ArcaneMimicryTargetHeroID = 0
+                            settings.ArcaneMimicryTargetEmail = ""
+                            settings.ArcaneMimicryTargetAgentID = 0
+                            settings.save_settings()
+                    
+                    # Display currently configured target
+                    if settings.ArcaneMimicryTargetPartySlot >= 0:
+                        if 0 <= settings.ArcaneMimicryTargetPartySlot < len(party_members):
+                            agent_id, name, is_hero = party_members[settings.ArcaneMimicryTargetPartySlot]
+                            if agent_id != my_agent_id:
+                                label = f"Slot {settings.ArcaneMimicryTargetPartySlot}: {name}" + (" (Hero)" if is_hero else "")
+                                PyImGui.text_colored(
+                                    f"Currently configured to target: {label}",
+                                    Utils.RGBToNormal(0, 255, 0, 255)
+                                )
+                            else:
+                                PyImGui.text_colored(
+                                    f"Configured slot is self (invalid)",
+                                    Utils.RGBToNormal(255, 165, 0, 255)
+                                )
+                        else:
+                            PyImGui.text_colored(
+                                f"Configured slot {settings.ArcaneMimicryTargetPartySlot} not found in current party",
+                                Utils.RGBToNormal(255, 165, 0, 255)
+                            )
+                else:
+                    PyImGui.text_colored("No other party members found", Utils.RGBToNormal(255, 165, 0, 255))
             else:
-                PyImGui.text_colored("No allies found in party", Utils.RGBToNormal(255, 165, 0, 255))
+                PyImGui.text_colored("No party members found", Utils.RGBToNormal(255, 165, 0, 255))
         else:
             PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
     
