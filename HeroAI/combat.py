@@ -104,6 +104,7 @@ class CombatClass:
         self.comfort_animal = GLOBAL_CACHE.Skill.GetID("Comfort_Animal")
         self.heal_as_one = GLOBAL_CACHE.Skill.GetID("Heal_as_One")
         self.heroic_refrain = GLOBAL_CACHE.Skill.GetID("Heroic_Refrain")
+        self.arcane_mimicry = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
         self.natures_blessing = GLOBAL_CACHE.Skill.GetID("Natures_Blessing")
         self.relentless_assault = GLOBAL_CACHE.Skill.GetID("Relentless_Assault")
         #junundu
@@ -342,6 +343,24 @@ class CombatClass:
         if self.skills[slot].skill_id == self.heroic_refrain:
             if not self.HasEffect(GLOBAL_CACHE.Player.GetAgentID(), self.heroic_refrain):
                 return GLOBAL_CACHE.Player.GetAgentID()
+
+        # Special handling for Arcane Mimicry - target based on party slot
+        if self.skills[slot].skill_id == self.arcane_mimicry:
+            # Get the configured target slot from HeroAI options
+            own_party_number = GLOBAL_CACHE.Party.GetOwnPartyNumber()
+            if own_party_number != -1:
+                hero_ai_options = GLOBAL_CACHE.ShMem.GetHeroAIOptions(GLOBAL_CACHE.Agent.GetEmail(GLOBAL_CACHE.Player.GetAgentID()))
+                if hero_ai_options is not None:
+                    target_slot = hero_ai_options.ArcaneMimicryTargetSlot
+                    # Get the agent ID for the target party slot
+                    players = GLOBAL_CACHE.Party.GetPlayers()
+                    if 0 <= target_slot < len(players):
+                        target_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(players[target_slot].login_number)
+                        # Verify the target is alive and in range
+                        if target_agent_id != 0 and GLOBAL_CACHE.Agent.IsAlive(target_agent_id):
+                            # Make sure we're not targeting ourselves
+                            if target_agent_id != GLOBAL_CACHE.Player.GetAgentID():
+                                return target_agent_id
 
         if target_allegiance == Skilltarget.Enemy:
             v_target = self.GetPartyTarget()

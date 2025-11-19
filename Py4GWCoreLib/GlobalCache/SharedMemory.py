@@ -83,6 +83,7 @@ class HeroAIOptionStruct(Structure):
         ("FlagPosX", c_float),
         ("FlagPosY", c_float),
         ("FlagFacingAngle", c_float),
+        ("ArcaneMimicryTargetSlot", c_int),  # Party slot to target for Arcane Mimicry (0-based)
     ] 
     
 class AllAccounts(Structure):
@@ -218,6 +219,7 @@ class Py4GWSharedMemoryManager:
             option.FlagPosX = 0.0
             option.FlagPosY = 0.0
             option.FlagFacingAngle = 0.0
+            option.ArcaneMimicryTargetSlot = 0  # Default to party slot 0 (party leader)
                
 
     def FindAccount(self, account_email: str) -> int:
