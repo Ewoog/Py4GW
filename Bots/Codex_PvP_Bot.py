@@ -29,7 +29,7 @@ KNOWN_ARENA_MAPS = {
 bot = Botting(
     BOT_NAME,
     upkeep_auto_inventory_management_active=False,
-    upkeep_auto_combat_active=True,  # Enable auto-combat for PvP
+    upkeep_hero_ai_active=True,  # Enable HeroAI for targeting
     upkeep_auto_loot_active=False,
 )
 
@@ -155,10 +155,10 @@ def navigate_to_enemies(bot: Botting, enemy_location: tuple[float, float]) -> Ge
 
 
 def engage_combat(bot: Botting) -> Generator:
-    """Engage in combat with enemies - use auto-combat system"""
-    ConsoleLog(BOT_NAME, "Engaging in combat", Console.MessageType.Info)
+    """Wait in combat area - HeroAI handles targeting and combat"""
+    ConsoleLog(BOT_NAME, "In combat area - HeroAI active", Console.MessageType.Info)
     
-    # Combat loop - continue until we win or lose
+    # Simple wait loop - HeroAI and multibox will handle targeting and combat
     while True:
         yield
         
@@ -175,23 +175,8 @@ def engage_combat(bot: Botting) -> Generator:
             yield from bot.Wait._coro_for_time(5000)
             continue
         
-        # The auto-combat system will handle targeting and skill usage
-        # Just need to ensure we're in combat range
-        
-        # Find nearest enemy
-        enemy_id = Routines.Targeting.GetEnemyAttacking(max_distance=Range.Compass.value)
-        if enemy_id and enemy_id > 0:
-            # Move toward enemy if too far
-            enemy_x, enemy_y = GLOBAL_CACHE.Agent.GetXY(enemy_id)
-            player_x, player_y = GLOBAL_CACHE.Player.GetXY()
-            
-            distance = ((enemy_x - player_x)**2 + (enemy_y - player_y)**2)**0.5
-            
-            if distance > Range.Compass.value:
-                # Too far, move closer
-                yield from bot.Move._coro_xy(enemy_x, enemy_y, "Approach enemy")
-        
-        yield from bot.Wait._coro_for_time(500)
+        # Just wait - HeroAI handles all targeting and combat
+        yield from bot.Wait._coro_for_time(1000)
 
 
 def handle_loss_or_victory(bot: Botting) -> Generator:
@@ -239,7 +224,7 @@ def codex_pvp_match_routine(bot: Botting) -> Generator:
     ConsoleLog(BOT_NAME, "Moving toward enemy team...", Console.MessageType.Info)
     yield from navigate_to_enemies(bot, enemy_spawn)
     
-    # Step 4: Engage in combat
+    # Step 4: Stay in combat area - HeroAI handles targeting and combat
     yield from engage_combat(bot)
     
     # Step 5: Handle post-match (loss or victory)

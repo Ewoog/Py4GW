@@ -8,7 +8,7 @@ A bot for playing Codex Arena PvP mode in Guild Wars with 4-account multibox sup
 - **Team Spawn Detection**: Identifies your team's spawn location by analyzing allied player positions
 - **Enemy Location Detection**: Finds enemy spawn by detecting enemy positions or estimating from map boundaries
 - **Auto Navigation**: Uses pathfinding to navigate to the enemy team
-- **Auto Combat**: Engages in PvP combat using the built-in combat system
+- **HeroAI Combat**: Uses HeroAI for automatic targeting and combat against enemy players
 - **Loss/Victory Handling**: Automatically handles returning to the Codex Arena outpost after matches
 - **Multibox Support**: Coordinates up to 4 accounts in a party for team PvP
 
@@ -35,7 +35,7 @@ A bot for playing Codex Arena PvP mode in Guild Wars with 4-account multibox sup
    - Identifies team spawn location from allied player positions
    - Locates enemy spawn (from enemy positions or estimates from map bounds)
 3. **Navigation**: Bot navigates toward the enemy spawn location
-4. **Combat**: Engages enemies using the auto-combat system
+4. **Combat**: HeroAI handles targeting and combat against enemy players
 5. **Match End**: Returns to Codex Arena outpost after victory or defeat
 
 ### Arena Detection
@@ -98,7 +98,7 @@ Make sure your accounts are configured in the Py4GW multibox system.
 
 The bot uses the standard Botting class configuration with:
 
-- **Auto Combat**: Enabled (for PvP engagement)
+- **HeroAI**: Enabled (for targeting enemy players and henchmen)
 - **Auto Loot**: Disabled (not needed in PvP)
 - **Auto Inventory Management**: Disabled (not needed in PvP)
 
@@ -111,10 +111,10 @@ You can customize these settings in the bot configuration UI.
 - Check that enemy spawn detection is working (visible in status UI)
 - Verify auto-pathing is enabled in configuration
 
-### Bot doesn't enter combat
-- Ensure auto-combat is enabled in configuration
-- Check that your skillbar is loaded with appropriate PvP skills
-- Verify the bot can find enemies (check targeting system)
+### Bot doesn't engage enemies
+- Ensure HeroAI is enabled in configuration
+- Verify skillbar is loaded with appropriate PvP skills
+- Check that HeroAI can detect enemy players (enabled for PvP)
 
 ### Multibox not working
 - Ensure all accounts are configured in Py4GW multibox settings
@@ -134,24 +134,26 @@ You can customize these settings in the bot configuration UI.
 - `detect_arena_and_spawns()`: Analyzes map and agents to determine locations
 - `wait_for_arena_entry()`: Waits for map transition to arena
 - `navigate_to_enemies()`: Pathfinding to enemy location
-- `engage_combat()`: Combat loop until match ends
+- `engage_combat()`: Waits in combat area while HeroAI handles targeting
 - `handle_loss_or_victory()`: Post-match cleanup
 - `codex_pvp_match_routine()`: Main match flow orchestrator
 
 ### Dependencies
 
-- `Py4GWCoreLib`: Core library with Botting class
-- `PyImGui`: UI rendering
-- `Py4GW`: Game interaction APIs
-- `GLOBAL_CACHE`: Access to game state (Map, Agent, Player)
-- `Routines`: Movement, targeting, and combat routines
+- Py4GWCoreLib (Botting, GLOBAL_CACHE, Routines, Range, Console)
+- PyImGui (UI rendering)
+- Py4GW (game interaction)
+- Standard library (typing for type hints)
+
+### Combat System
+
+The bot uses HeroAI for combat, which now supports targeting enemy players and hostile henchmen in PvP. The bot simply navigates to the enemy spawn area and lets HeroAI handle all targeting and skill usage through the multibox helper system.
 
 ## Known Limitations
 
-1. **Skill Usage**: The bot relies on the auto-combat system for skill usage. You need to configure appropriate PvP builds.
-2. **Strategy**: The bot uses a simple "rush enemy spawn" strategy. More complex tactics would require additional logic.
-3. **Terrain**: Some arenas may have terrain obstacles that affect pathfinding.
-4. **Party Coordination**: While multibox support exists, coordinated team tactics are limited to basic grouping.
+1. **Navigation**: Auto-pathing may have issues in some PvP arenas with complex terrain.
+2. **HeroAI Configuration**: Ensure HeroAI is properly configured for PvP combat in your settings.
+3. **Party Coordination**: While multibox support exists, coordinated team tactics are handled by HeroAI.
 
 ## Future Improvements
 
