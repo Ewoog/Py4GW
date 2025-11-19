@@ -1412,6 +1412,7 @@ class CombatClass:
         # If so, schedule the configured follow-up skill to be cast next
         if skill_id == self.arcane_echo or skill_id == self.auspicious_incantation:
             from HeroAI.settings import Settings
+            from Py4GWCoreLib.py4gwcorelib_src.Console import ConsoleLog
             settings = Settings()
             
             if skill_id == self.arcane_echo:
@@ -1422,10 +1423,37 @@ class CombatClass:
             # Verify the slot is valid and not the same skill
             if 0 <= followup_slot < len(self.skills):
                 followup_skill_id = self.skills[followup_slot].skill_id
+                
                 if followup_skill_id > 0 and followup_skill_id != skill_id:
-                    self.pending_followup_skill_slot = followup_slot
-                    self.followup_skill_timer.Reset()
-                    self.followup_skill_timer.Start()
+                    # Additional validation: ensure we're copying the right type of skill
+                    # Define buff skills that use the buff targeting system
+                    buff_skill_ids = [
+                        GLOBAL_CACHE.Skill.GetID("Dark_Aura"),
+                        GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon"),
+                        GLOBAL_CACHE.Skill.GetID("Strength_of_Honor"),
+                        GLOBAL_CACHE.Skill.GetID("Spell_Breaker")
+                    ]
+                    
+                    # Check if configured skill is in our skillbar at the expected slot
+                    actual_skill_at_slot = self.skills[followup_slot].skill_id
+                    if actual_skill_at_slot != followup_skill_id:
+                        ConsoleLog("HeroAI", f"Arcane Echo: Configured skill mismatch at slot {followup_slot}. Expected {followup_skill_id}, found {actual_skill_at_slot}")
+                    
+                    # Only copy buff skills if the configured slot contains a buff skill
+                    # This prevents Arcane Echo from copying wrong skills when buff spells are in different slots
+                    if followup_skill_id in buff_skill_ids:
+                        if actual_skill_at_slot in buff_skill_ids:
+                            ConsoleLog("HeroAI", f"Arcane Echo: Copying buff skill {GLOBAL_CACHE.Skill.GetName(actual_skill_at_slot)} from slot {followup_slot}")
+                            self.pending_followup_skill_slot = followup_slot
+                            self.followup_skill_timer.Reset()
+                            self.followup_skill_timer.Start()
+                        else:
+                            ConsoleLog("HeroAI", f"Arcane Echo: Slot {followup_slot} contains {GLOBAL_CACHE.Skill.GetName(actual_skill_at_slot)}, not configured buff {GLOBAL_CACHE.Skill.GetName(followup_skill_id)}. Skipping copy.")
+                    else:
+                        # Not a buff skill, use as configured
+                        self.pending_followup_skill_slot = followup_slot
+                        self.followup_skill_timer.Reset()
+                        self.followup_skill_timer.Start()
         
         self.ResetSkillPointer()
         return True
