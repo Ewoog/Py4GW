@@ -1511,8 +1511,8 @@ def NunduBayVialSpam(bot: Botting) -> None:
     def SpamVialOnHarbinger():
         enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
         for agent_id in enemy_array:
-            player_num = GLOBAL_CACHE.Agent.GetPlayerNumber(agent_id)
-            if player_num in [5405, 5409]:
+            model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+            if model_id in [5405, 5409]:
                 if GLOBAL_CACHE.Agent.IsAlive(agent_id):
                     vial_skill_id = GLOBAL_CACHE.Skill.GetID("Vial_of_Purified_Water")
                     vial_slot = 0
