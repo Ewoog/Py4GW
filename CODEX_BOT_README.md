@@ -8,7 +8,7 @@ This bot automates Codex Arena matches with two teams of 4 players each:
 - **Winning Team**: Uses Equipment Set 1, plays to win matches
 - **Losing Team**: Uses Equipment Set 2, designed to lose quickly
 
-The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins). Teams switch roles after earning 5 strongboxes, then the bot shuts down after both teams earn their 5 strongboxes (daily limit).
+The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins) and shuts down after earning 5 strongboxes (daily limit).
 
 ## Requirements
 
@@ -73,10 +73,8 @@ The bots use Py4GW's shared memory system to communicate:
 ### Strongbox Tracking
 
 - **Reward System**: 1 Strategist's Zaishen Strongbox earned per 5 consecutive wins
-- **Phase 1**: Team 1 plays until earning 5 strongboxes (max per day)
-- **Role Switch**: Teams automatically switch roles
-- **Phase 2**: Team 2 (now with switched roles) plays until earning 5 strongboxes
-- **Shutdown**: Bot stops after both teams earn their 5 strongboxes each
+- **Target**: Earn 5 strongboxes (max per day)
+- **Shutdown**: Bot stops after earning 5 strongboxes
 
 ### Match Logic
 
@@ -107,9 +105,9 @@ config.target_strongboxes = 5  # Strongboxes needed before role switch (default:
 ### GUI Settings
 
 - **Is Winning Team**: Toggle whether this instance is the winning or losing team
-- **Team Stats**: View current strongboxes earned for Team 1 and Team 2
+- **Strongboxes Earned**: View current strongboxes earned
 - **Consecutive Wins**: Track progress toward next strongbox (need 5 consecutive wins)
-- **Start/Stop**: Control the bot execution
+- **Progress Bar**: Visual progress toward 5 strongbox goal
 
 ## Troubleshooting
 

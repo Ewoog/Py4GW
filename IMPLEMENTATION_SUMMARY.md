@@ -13,8 +13,7 @@ Main bot implementation with the following components:
 - **Equipment management**: Automatically switches between equipment sets 1 and 2
 - **Strongbox tracking**: Monitors Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins)
 - **Consecutive win tracking**: Tracks consecutive wins toward next strongbox
-- **Role switching**: Automatically switches team roles after first team earns 5 strongboxes
-- **Auto-shutdown**: Stops after both teams earn 5 strongboxes each (daily limit)
+- **Auto-shutdown**: Stops after earning 5 strongboxes (daily limit)
 
 #### Technical Implementation
 - Uses `Py4GWCoreLib.Botting` class as framework base
@@ -81,11 +80,8 @@ Comprehensive documentation including:
    - Winning team checks for new Strategist's Zaishen Strongboxes
    - Consecutive wins incremented (resets to 0 after earning a strongbox)
    - Both teams return to step 1
-7. Role switching:
-   - After Team 1 earns 5 strongboxes, roles reverse
-   - Team 2 now aims for 5 strongboxes
-8. Shutdown:
-   - After Team 2 earns 5 strongboxes, both bots stop
+7. Shutdown:
+   - After earning 5 strongboxes, bot stops
 
 ### Synchronization Mechanism
 Uses Py4GW's SharedMemory system:
@@ -104,7 +100,7 @@ Uses Py4GW's SharedMemory system:
 - **Reset Stats**: Clear strongbox and consecutive win counters
 
 ### Code Configuration
-- `config.target_strongboxes`: Number of strongboxes before role switch (default: 5, max per day)
+- `config.target_strongboxes`: Number of strongboxes before shutdown (default: 5, max per day)
 - `STRATEGISTS_STRONGBOX_MODEL_ID`: Model ID for inventory tracking (36668)
 - Equipment set numbers: 1 for winning, 2 for losing
 - Timeout values: Queue (180s), Match (600s)
@@ -128,8 +124,7 @@ Uses Py4GW's SharedMemory system:
 - [ ] Consecutive wins tracked properly
 - [ ] Strongbox earned after 5 consecutive wins
 - [ ] Losing team returns to outpost
-- [ ] Role switching occurs at 5 strongboxes
-- [ ] Bot shuts down after both teams earn 5 strongboxes each
+- [ ] Bot shuts down after earning 5 strongboxes
 - [ ] Error recovery works (timeout, stuck states)
 
 ## Known Limitations
@@ -139,7 +134,7 @@ Uses Py4GW's SharedMemory system:
 3. **No Combat AI**: Winning team relies on natural gameplay/other bots
 4. **Fixed Map ID**: Hardcoded to Codex Arena (796)
 5. **Two-Instance Only**: Designed for exactly 2 bot instances
-6. **Daily Limit**: Maximum 5 Strategist's Zaishen Strongboxes per team per day
+6. **Daily Limit**: Maximum 5 Strategist's Zaishen Strongboxes per account per day
 
 ## Future Enhancements (Not Implemented)
 
@@ -150,6 +145,7 @@ Uses Py4GW's SharedMemory system:
 - Match history logging
 - Performance metrics tracking
 - Support for different arena types
+- Auto role switching between teams
 
 ## Security Considerations
 
@@ -179,7 +175,7 @@ Uses Py4GW's SharedMemory system:
 
 ## Conclusion
 
-The Codex Arena Bot successfully implements all requirements:
+The Codex Arena Bot successfully implements the core requirements:
 - Two teams of 4 (manual party formation)
 - Winning and losing team roles (configurable via GUI)
 - Equipment set switching (Set 1 vs Set 2)
@@ -187,7 +183,6 @@ The Codex Arena Bot successfully implements all requirements:
 - Automatic match completion handling
 - Strongbox tracking (1 per 5 consecutive wins)
 - Consecutive win tracking
-- Role switching mechanism (after 5 strongboxes)
-- Auto-shutdown after completion (both teams earn 5 strongboxes)
+- Auto-shutdown after earning 5 strongboxes
 
 The implementation follows Py4GW framework conventions and patterns, integrates with existing multibox infrastructure, and provides a user-friendly GUI for operation.
