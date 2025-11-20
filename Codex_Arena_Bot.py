@@ -33,8 +33,9 @@ from typing import Generator, Any
 
 BOT_NAME = "Codex Arena Bot"
 
-# Configuration
+# Configuration class for tracking bot state
 class CodexConfig:
+    """Configuration and state tracking for the Codex Arena bot."""
     def __init__(self):
         self.is_winning_team = True  # Toggle: True = winning team, False = losing team
         self.wins_team1 = 0  # Wins for team 1
