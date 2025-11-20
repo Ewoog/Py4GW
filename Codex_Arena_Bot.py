@@ -408,7 +408,7 @@ def _draw_settings():
     
     # Calculate progress percentage
     progress = config.strongboxes_earned / config.target_strongboxes
-    PyImGui.progress_bar(progress, (200, 20), f"{config.strongboxes_earned}/{config.target_strongboxes}")
+    PyImGui.progress_bar(progress, 200, 20, f"{config.strongboxes_earned}/{config.target_strongboxes}")
     
     PyImGui.separator()
     PyImGui.text("Status:")
