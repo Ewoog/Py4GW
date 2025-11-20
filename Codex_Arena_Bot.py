@@ -301,11 +301,11 @@ def losing_team_logic() -> Generator:
         config.in_match = False
 
 
-def bot_main_loop(bot: Botting) -> Generator:
-    """Main bot loop."""
-    from Py4GWCoreLib.Routines import Routines
-    
-    while config.bot_started:
+def run_codex_match(bot: Botting) -> None:
+    """Run a single Codex Arena match cycle."""
+    def _run_match():
+        from Py4GWCoreLib.Routines import Routines
+        
         # Check if we should shut down (both teams have earned 5 strongboxes)
         if config.current_role == "team1" and config.strongboxes_team1 >= config.target_strongboxes:
             # Switch roles
@@ -321,7 +321,7 @@ def bot_main_loop(bot: Botting) -> Generator:
             Py4GW.Console.Log(BOT_NAME, 
                             f"Both teams complete! Team 1: {config.strongboxes_team1} strongboxes, Team 2: {config.strongboxes_team2} strongboxes. Shutting down.", 
                             Py4GW.Console.MessageType.Success)
-            config.bot_started = False
+            bot.Stop()
             return
         
         # Travel to Codex Arena if not there
@@ -346,7 +346,7 @@ def bot_main_loop(bot: Botting) -> Generator:
         start_time = time.time()
         other_team_ready = False
         
-        while time.time() - start_time < timeout and config.bot_started:
+        while time.time() - start_time < timeout:
             signal = check_sync_signal()
             if signal == "READY_TO_QUEUE":
                 other_team_ready = True
@@ -374,7 +374,7 @@ def bot_main_loop(bot: Botting) -> Generator:
             # Failed to enter match, retry
             Py4GW.Console.Log(BOT_NAME, "Failed to enter match, retrying...", Py4GW.Console.MessageType.Warning)
             yield from Routines.Yield.wait(3000)
-            continue
+            return
         
         # Execute team-specific logic
         if config.is_winning_team:
@@ -396,12 +396,16 @@ def bot_main_loop(bot: Botting) -> Generator:
         
         # Brief pause before next iteration
         yield from Routines.Yield.wait(3000)
+    
+    bot.States.AddCustomState(lambda: _run_match(), "Run Codex Match")
 
 
 def create_bot_routine(bot: Botting) -> None:
     """Setup the bot routine."""
     bot.States.AddHeader(f"{BOT_NAME}")
-    bot.States.AddCustomState(lambda: bot_main_loop(bot), "Main Codex Loop")
+    # Add the match loop - it will keep repeating until bot is stopped
+    for _ in range(100):  # Run up to 100 matches (more than enough for 10 strongboxes)
+        run_codex_match(bot)
 
 
 bot.SetMainRoutine(create_bot_routine)
