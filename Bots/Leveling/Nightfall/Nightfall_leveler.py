@@ -1509,17 +1509,21 @@ def NunduBayVialSpam(bot: Botting) -> None:
     bot.Map.Travel(target_map_id=477)
     
     def SpamVialOnHarbinger():
-        enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
-        for agent_id in enemy_array:
-            model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
-            if model_id in [5405, 5409]:
-                if GLOBAL_CACHE.Agent.IsAlive(agent_id):
-                    vial_skill_id = GLOBAL_CACHE.Skill.GetID("Vial_of_Purified_Water")
-                    vial_slot = 0
-                    for slot in range(1, 9):
-                        if GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(slot) == vial_skill_id:
-                            vial_slot = slot
-                            break
+        vial_skill_id = GLOBAL_CACHE.Skill.GetID("Vial_of_Purified_Water")
+        vial_slot = 0
+        for slot in range(1, 9):
+            if GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(slot) == vial_skill_id:
+                vial_slot = slot
+                break
+        
+        while True:
+            enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+            target_found = False
+            
+            for agent_id in enemy_array:
+                model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+                if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                    target_found = True
                     
                     if vial_slot > 0:
                         while GLOBAL_CACHE.Agent.IsAlive(agent_id):
@@ -1531,8 +1535,11 @@ def NunduBayVialSpam(bot: Botting) -> None:
                             else:
                                 yield from Routines.Yield.wait(100)
                             yield
-                    return
-        yield from Routines.Yield.wait(1000)
+                    break
+            
+            if not target_found:
+                yield from Routines.Yield.wait(1000)
+            yield
     
     bot.States.AddCustomState(SpamVialOnHarbinger, "Spam Vial on Harbinger")
 #region MAIN
