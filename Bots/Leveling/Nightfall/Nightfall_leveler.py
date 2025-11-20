@@ -1516,30 +1516,22 @@ def NunduBayVialSpam(bot: Botting) -> None:
                 vial_slot = slot
                 break
         
-        while True:
-            enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
-            target_found = False
-            
-            for agent_id in enemy_array:
-                model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
-                if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
-                    target_found = True
-                    
-                    if vial_slot > 0:
-                        while GLOBAL_CACHE.Agent.IsAlive(agent_id):
-                            if GLOBAL_CACHE.SkillBar.IsSkillReady(vial_slot):
-                                yield from Routines.Yield.Agents.ChangeTarget(agent_id)
-                                yield from Routines.Yield.wait(100)
-                                GLOBAL_CACHE.SkillBar.UseSkill(vial_slot, agent_id)
-                                yield from Routines.Yield.wait(250)
-                            else:
-                                yield from Routines.Yield.wait(100)
-                            yield
-                    break
-            
-            if not target_found:
-                yield from Routines.Yield.wait(1000)
-            yield
+        enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+        for agent_id in enemy_array:
+            model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+            if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                if vial_slot > 0:
+                    while GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                        if GLOBAL_CACHE.SkillBar.IsSkillReady(vial_slot):
+                            yield from Routines.Yield.Agents.ChangeTarget(agent_id)
+                            yield from Routines.Yield.wait(100)
+                            GLOBAL_CACHE.SkillBar.UseSkill(vial_slot, agent_id)
+                            yield from Routines.Yield.wait(250)
+                        else:
+                            yield from Routines.Yield.wait(100)
+                        yield
+                return
+        yield
     
     bot.States.AddCustomState(SpamVialOnHarbinger, "Spam Vial on Harbinger")
 #region MAIN
