@@ -1508,6 +1508,20 @@ def UnlockMercenaryHeroes(bot: Botting) -> None:
 def NunduBayVialSpam(bot: Botting) -> None:
     bot.Map.Travel(target_map_id=477)
     
+    def WaitForHarbinger():
+        while True:
+            enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+            for agent_id in enemy_array:
+                model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+                if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                    player_pos = GLOBAL_CACHE.Player.GetXY()
+                    harbinger_pos = GLOBAL_CACHE.Agent.GetXY(agent_id)
+                    from Py4GWCoreLib.Py4GWcorelib import Utils
+                    distance = Utils.Distance(player_pos, harbinger_pos)
+                    if distance <= Range.Spellcast.value:
+                        return
+            yield from Routines.Yield.wait(500)
+    
     def SpamVialOnHarbinger():
         vial_skill_id = GLOBAL_CACHE.Skill.GetID("Vial_of_Purified_Water")
         vial_slot = 0
@@ -1534,6 +1548,7 @@ def NunduBayVialSpam(bot: Botting) -> None:
                 return
         yield
     
+    bot.States.AddCustomState(WaitForHarbinger, "Wait for Harbinger")
     bot.States.AddCustomState(SpamVialOnHarbinger, "Spam Vial on Harbinger")
 #region MAIN
 selected_step = 0
