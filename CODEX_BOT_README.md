@@ -1,6 +1,6 @@
 # Codex Arena Bot
 
-A Guild Wars automation bot for farming Codex Arena wins using multiboxing.
+A Guild Wars automation bot for farming Strategist's Zaishen Strongboxes using multiboxing.
 
 ## Overview
 
@@ -8,7 +8,7 @@ This bot automates Codex Arena matches with two teams of 4 players each:
 - **Winning Team**: Uses Equipment Set 1, plays to win matches
 - **Losing Team**: Uses Equipment Set 2, designed to lose quickly
 
-The bot runs until each team achieves 27 wins, then automatically shuts down.
+The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins). Teams switch roles after earning 5 strongboxes, then the bot shuts down after both teams earn their 5 strongboxes (daily limit).
 
 ## Requirements
 
@@ -68,14 +68,15 @@ The bots use Py4GW's shared memory system to communicate:
 1. **Ready Phase**: Both bots signal when they're ready to queue
 2. **Queue Phase**: Once both are ready, they enter the queue simultaneously
 3. **Match Phase**: Bots track when the match starts and ends
-4. **Repeat**: Process continues until win targets are met
+4. **Repeat**: Process continues until strongbox targets are met
 
-### Win Tracking
+### Strongbox Tracking
 
-- **Phase 1**: Team 1 plays until 27 wins
+- **Reward System**: 1 Strategist's Zaishen Strongbox earned per 5 consecutive wins
+- **Phase 1**: Team 1 plays until earning 5 strongboxes (max per day)
 - **Role Switch**: Teams automatically switch roles
-- **Phase 2**: Team 2 (now with switched roles) plays until 27 wins
-- **Shutdown**: Bot stops after both teams complete their runs
+- **Phase 2**: Team 2 (now with switched roles) plays until earning 5 strongboxes
+- **Shutdown**: Bot stops after both teams earn their 5 strongboxes each
 
 ### Match Logic
 
@@ -83,7 +84,8 @@ The bots use Py4GW's shared memory system to communicate:
 - Enters the match
 - Plays normally (automated combat if configured)
 - Waits for natural match completion
-- Increments win counter
+- Tracks consecutive wins
+- Checks for strongbox acquisition
 - Re-queues immediately
 
 **Losing Team:**
@@ -99,13 +101,14 @@ The bots use Py4GW's shared memory system to communicate:
 Edit `Codex_Arena_Bot.py` to modify:
 
 ```python
-config.target_wins = 27  # Wins needed before role switch (default: 27)
+config.target_strongboxes = 5  # Strongboxes needed before role switch (default: 5, max per day)
 ```
 
 ### GUI Settings
 
 - **Is Winning Team**: Toggle whether this instance is the winning or losing team
-- **Team Stats**: View current wins for Team 1 and Team 2
+- **Team Stats**: View current strongboxes earned for Team 1 and Team 2
+- **Consecutive Wins**: Track progress toward next strongbox (need 5 consecutive wins)
 - **Start/Stop**: Control the bot execution
 
 ## Troubleshooting

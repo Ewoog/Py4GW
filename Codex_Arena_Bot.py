@@ -1,17 +1,17 @@
 """
 Codex Arena Bot for Guild Wars
 
-This bot automates Codex Arena matches for farming wins. It supports multiboxing
-with two teams of 4 players each:
+This bot automates Codex Arena matches for farming Strategist's Zaishen Strongboxes.
+It supports multiboxing with two teams of 4 players each:
 - Winning team (Equipment Set 1)
 - Losing team (Equipment Set 2)
 
 Features:
 - Teams queue simultaneously using shared memory synchronization
 - Winning team plays to win, losing team returns to outpost after match
-- Tracks wins for each team (27 wins target)
-- Automatically switches roles after first team reaches 27 wins
-- Shuts down after both teams complete 27 wins each
+- Tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins)
+- Automatically switches roles after first team earns 5 strongboxes
+- Shuts down after both teams earn 5 strongboxes each (daily limit)
 
 Setup:
 1. Run this script on the leader of each team (8 accounts total, 2 instances)
@@ -38,14 +38,16 @@ class CodexConfig:
     """Configuration and state tracking for the Codex Arena bot."""
     def __init__(self):
         self.is_winning_team = True  # Toggle: True = winning team, False = losing team
-        self.wins_team1 = 0  # Wins for team 1
-        self.wins_team2 = 0  # Wins for team 2
-        self.target_wins = 27  # Wins needed before role switch
+        self.consecutive_wins = 0  # Consecutive wins counter
+        self.strongboxes_team1 = 0  # Strategist's Zaishen Strongboxes earned by team 1
+        self.strongboxes_team2 = 0  # Strategist's Zaishen Strongboxes earned by team 2
+        self.target_strongboxes = 5  # Strongboxes needed before role switch (max per day)
         self.current_role = "team1"  # "team1" or "team2"
         self.synced_queue = False  # Flag for synchronization
         self.in_match = False
         self.bot_started = False
         self.ready_to_queue = False
+        self.initial_strongbox_count = 0  # Track starting strongbox count
 
 config = CodexConfig()
 
@@ -58,6 +60,15 @@ bot = Botting(
 
 # Custom synchronization command for queue timing
 SYNC_QUEUE_COMMAND = SharedCommandType.CustomBehaviors  # Use existing custom command type
+
+# Strategist's Zaishen Strongbox model ID
+STRATEGISTS_STRONGBOX_MODEL_ID = 36668
+
+
+def get_strongbox_count() -> int:
+    """Get the current count of Strategist's Zaishen Strongboxes in inventory."""
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    return GLOBAL_CACHE.Inventory.GetModelCount(STRATEGISTS_STRONGBOX_MODEL_ID)
 
 
 def get_my_email() -> str:
@@ -173,10 +184,13 @@ def wait_for_match_start() -> Generator:
 
 
 def winning_team_logic() -> Generator:
-    """Logic for the winning team - wait a bit then win automatically."""
+    """Logic for the winning team - wait for match completion and track strongboxes."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Map
+    
+    # Get initial strongbox count before match ends
+    initial_strongboxes = get_strongbox_count()
     
     # Wait in match for some time (simulating play)
     Py4GW.Console.Log(BOT_NAME, "Winning team in match, waiting for completion...", 
@@ -196,14 +210,34 @@ def winning_team_logic() -> Generator:
         if instance_type == Map.InstanceType.Outpost:
             # Match ended, we're back in outpost
             config.in_match = False
-            if config.current_role == "team1":
-                config.wins_team1 += 1
-                Py4GW.Console.Log(BOT_NAME, f"Victory! Team 1 now has {config.wins_team1} wins.", 
-                                Py4GW.Console.MessageType.Success)
+            
+            # Check for new strongboxes
+            current_strongboxes = get_strongbox_count()
+            new_strongboxes = current_strongboxes - initial_strongboxes
+            
+            # Increment consecutive wins
+            config.consecutive_wins += 1
+            
+            # Check if we earned a strongbox (every 5 consecutive wins)
+            if new_strongboxes > 0:
+                if config.current_role == "team1":
+                    config.strongboxes_team1 += new_strongboxes
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Strongbox earned! Team 1 now has {config.strongboxes_team1}/5 strongboxes ({config.consecutive_wins} consecutive wins).", 
+                                    Py4GW.Console.MessageType.Success)
+                else:
+                    config.strongboxes_team2 += new_strongboxes
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Strongbox earned! Team 2 now has {config.strongboxes_team2}/5 strongboxes ({config.consecutive_wins} consecutive wins).", 
+                                    Py4GW.Console.MessageType.Success)
+                # Reset consecutive wins after earning a strongbox
+                if config.consecutive_wins >= 5:
+                    config.consecutive_wins = 0
             else:
-                config.wins_team2 += 1
-                Py4GW.Console.Log(BOT_NAME, f"Victory! Team 2 now has {config.wins_team2} wins.", 
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Victory! {config.consecutive_wins} consecutive wins (need 5 for strongbox).", 
                                 Py4GW.Console.MessageType.Success)
+            
             send_sync_signal("MATCH_END")
             return
         yield from Routines.Yield.wait(2000)
@@ -236,6 +270,8 @@ def losing_team_logic() -> Generator:
         if instance_type == Map.InstanceType.Outpost:
             # Back in outpost after losing
             config.in_match = False
+            # Reset consecutive wins on loss (losing team loses, so this doesn't apply to winning team)
+            # The losing team doesn't track consecutive wins
             Py4GW.Console.Log(BOT_NAME, "Returned to outpost after loss.", 
                             Py4GW.Console.MessageType.Info)
             send_sync_signal("MATCH_END")
@@ -270,17 +306,20 @@ def bot_main_loop(bot: Botting) -> Generator:
     from Py4GWCoreLib.Routines import Routines
     
     while config.bot_started:
-        # Check if we should shut down (both teams have 27 wins)
-        if config.current_role == "team1" and config.wins_team1 >= config.target_wins:
+        # Check if we should shut down (both teams have earned 5 strongboxes)
+        if config.current_role == "team1" and config.strongboxes_team1 >= config.target_strongboxes:
             # Switch roles
             config.current_role = "team2"
-            config.wins_team2 = 0
-            Py4GW.Console.Log(BOT_NAME, f"Switching roles! Team 1 has {config.wins_team1} wins. Now playing as team 2.", 
+            config.strongboxes_team2 = 0
+            config.consecutive_wins = 0  # Reset consecutive wins for new team
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Switching roles! Team 1 has {config.strongboxes_team1} strongboxes. Now playing as team 2.", 
                             Py4GW.Console.MessageType.Info)
             yield from Routines.Yield.wait(2000)
         
-        if config.current_role == "team2" and config.wins_team2 >= config.target_wins:
-            Py4GW.Console.Log(BOT_NAME, f"Both teams complete! Team 1: {config.wins_team1} wins, Team 2: {config.wins_team2} wins. Shutting down.", 
+        if config.current_role == "team2" and config.strongboxes_team2 >= config.target_strongboxes:
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Both teams complete! Team 1: {config.strongboxes_team1} strongboxes, Team 2: {config.strongboxes_team2} strongboxes. Shutting down.", 
                             Py4GW.Console.MessageType.Success)
             config.bot_started = False
             return
@@ -347,10 +386,12 @@ def bot_main_loop(bot: Botting) -> Generator:
         
         # Log current progress
         if config.current_role == "team1":
-            Py4GW.Console.Log(BOT_NAME, f"Team 1 wins: {config.wins_team1}/{config.target_wins}", 
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Team 1 progress: {config.strongboxes_team1}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
                             Py4GW.Console.MessageType.Info)
         else:
-            Py4GW.Console.Log(BOT_NAME, f"Team 2 wins: {config.wins_team2}/{config.target_wins}", 
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Team 2 progress: {config.strongboxes_team2}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
                             Py4GW.Console.MessageType.Info)
         
         # Brief pause before next iteration
@@ -385,16 +426,17 @@ def configure():
         PyImGui.Separator()
         PyImGui.Text("Progress:")
         PyImGui.Text(f"Current Phase: {config.current_role.upper()}")
-        PyImGui.Text(f"Team 1 Wins: {config.wins_team1}/{config.target_wins}")
-        PyImGui.Text(f"Team 2 Wins: {config.wins_team2}/{config.target_wins}")
+        PyImGui.Text(f"Team 1 Strongboxes: {config.strongboxes_team1}/{config.target_strongboxes}")
+        PyImGui.Text(f"Team 2 Strongboxes: {config.strongboxes_team2}/{config.target_strongboxes}")
+        PyImGui.Text(f"Consecutive Wins: {config.consecutive_wins}/5")
         
         # Calculate progress percentage
         if config.current_role == "team1":
-            progress = config.wins_team1 / config.target_wins
-            PyImGui.ProgressBar(progress, (200, 20), f"{config.wins_team1}/{config.target_wins}")
+            progress = config.strongboxes_team1 / config.target_strongboxes
+            PyImGui.ProgressBar(progress, (200, 20), f"{config.strongboxes_team1}/{config.target_strongboxes}")
         else:
-            progress = config.wins_team2 / config.target_wins
-            PyImGui.ProgressBar(progress, (200, 20), f"{config.wins_team2}/{config.target_wins}")
+            progress = config.strongboxes_team2 / config.target_strongboxes
+            PyImGui.ProgressBar(progress, (200, 20), f"{config.strongboxes_team2}/{config.target_strongboxes}")
         
         PyImGui.Separator()
         PyImGui.Text("Status:")
@@ -424,13 +466,14 @@ def configure():
         
         # Reset button
         if PyImGui.Button("Reset Stats", (100, 30)):
-            config.wins_team1 = 0
-            config.wins_team2 = 0
+            config.strongboxes_team1 = 0
+            config.strongboxes_team2 = 0
+            config.consecutive_wins = 0
             config.current_role = "team1"
             Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
         
         PyImGui.Separator()
-        PyImGui.TextWrapped("Instructions: Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Both will sync and queue together.")
+        PyImGui.TextWrapped("Instructions: Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earning 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Teams switch after earning 5 strongboxes.")
         
         PyImGui.End()
 
