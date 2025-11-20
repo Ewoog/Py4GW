@@ -1522,7 +1522,8 @@ def NunduBayVialSpam(bot: Botting) -> None:
             if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
                 if vial_slot > 0:
                     while GLOBAL_CACHE.Agent.IsAlive(agent_id):
-                        if GLOBAL_CACHE.SkillBar.IsSkillReady(vial_slot):
+                        skill_data = GLOBAL_CACHE.SkillBar.GetSkillData(vial_slot)
+                        if skill_data.recharge == 0:
                             yield from Routines.Yield.Agents.ChangeTarget(agent_id)
                             yield from Routines.Yield.wait(100)
                             GLOBAL_CACHE.SkillBar.UseSkill(vial_slot, agent_id)
