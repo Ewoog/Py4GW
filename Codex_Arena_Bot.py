@@ -411,75 +411,67 @@ def create_bot_routine(bot: Botting) -> None:
 bot.SetMainRoutine(create_bot_routine)
 
 
+def _draw_settings():
+    """Custom settings panel for the bot."""
+    import PyImGui
+    
+    PyImGui.text("Codex Arena Bot Configuration")
+    PyImGui.separator()
+    
+    # Team role toggle
+    changed, config.is_winning_team = PyImGui.checkbox("Is Winning Team", config.is_winning_team)
+    if changed:
+        Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
+                        Py4GW.Console.MessageType.Info)
+    
+    PyImGui.separator()
+    PyImGui.text("Progress:")
+    PyImGui.text(f"Current Phase: {config.current_role.upper()}")
+    PyImGui.text(f"Team 1 Strongboxes: {config.strongboxes_team1}/{config.target_strongboxes}")
+    PyImGui.text(f"Team 2 Strongboxes: {config.strongboxes_team2}/{config.target_strongboxes}")
+    PyImGui.text(f"Consecutive Wins: {config.consecutive_wins}/5")
+    
+    # Calculate progress percentage
+    if config.current_role == "team1":
+        progress = config.strongboxes_team1 / config.target_strongboxes
+        PyImGui.progress_bar(progress, (200, 20), f"{config.strongboxes_team1}/{config.target_strongboxes}")
+    else:
+        progress = config.strongboxes_team2 / config.target_strongboxes
+        PyImGui.progress_bar(progress, (200, 20), f"{config.strongboxes_team2}/{config.target_strongboxes}")
+    
+    PyImGui.separator()
+    PyImGui.text("Status:")
+    
+    if config.in_match:
+        PyImGui.text_colored((0, 1, 0, 1), "IN MATCH")
+    elif config.ready_to_queue:
+        PyImGui.text_colored((1, 1, 0, 1), "READY TO QUEUE")
+    else:
+        PyImGui.text_colored((0.5, 0.5, 0.5, 1), "IDLE")
+    
+    PyImGui.separator()
+    
+    # Reset button
+    if PyImGui.button("Reset Stats", (150, 25)):
+        config.strongboxes_team1 = 0
+        config.strongboxes_team2 = 0
+        config.consecutive_wins = 0
+        config.current_role = "team1"
+        Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
+    
+    PyImGui.separator()
+    PyImGui.text_wrapped("Instructions: Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earning 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Teams switch after earning 5 strongboxes.")
+
+
+# Override the settings tab with custom UI
+bot.UI.override_draw_config(lambda: _draw_settings())
+
+
 def configure():
     """Configure window - called by the framework."""
-    global bot, config
+    global bot
     bot.UI.draw_configure_window()
-    
-    # Custom configuration UI
-    if PyImGui.Begin(f"{BOT_NAME} - Configuration", True):
-        PyImGui.Text("Codex Arena Bot Configuration")
-        PyImGui.Separator()
         
-        # Team role toggle
-        changed, config.is_winning_team = PyImGui.Checkbox("Is Winning Team", config.is_winning_team)
-        if changed:
-            Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
-                            Py4GW.Console.MessageType.Info)
-        
-        PyImGui.Separator()
-        PyImGui.Text("Progress:")
-        PyImGui.Text(f"Current Phase: {config.current_role.upper()}")
-        PyImGui.Text(f"Team 1 Strongboxes: {config.strongboxes_team1}/{config.target_strongboxes}")
-        PyImGui.Text(f"Team 2 Strongboxes: {config.strongboxes_team2}/{config.target_strongboxes}")
-        PyImGui.Text(f"Consecutive Wins: {config.consecutive_wins}/5")
-        
-        # Calculate progress percentage
-        if config.current_role == "team1":
-            progress = config.strongboxes_team1 / config.target_strongboxes
-            PyImGui.ProgressBar(progress, (200, 20), f"{config.strongboxes_team1}/{config.target_strongboxes}")
-        else:
-            progress = config.strongboxes_team2 / config.target_strongboxes
-            PyImGui.ProgressBar(progress, (200, 20), f"{config.strongboxes_team2}/{config.target_strongboxes}")
-        
-        PyImGui.Separator()
-        PyImGui.Text("Status:")
-        
-        if config.in_match:
-            PyImGui.TextColored((0, 1, 0, 1), "IN MATCH")
-        elif config.ready_to_queue:
-            PyImGui.TextColored((1, 1, 0, 1), "READY TO QUEUE")
-        else:
-            PyImGui.TextColored((0.5, 0.5, 0.5, 1), "IDLE")
-        
-        PyImGui.Separator()
-        
-        # Start/Stop button
-        if config.bot_started:
-            if PyImGui.Button("Stop Bot", (100, 30)):
-                config.bot_started = False
-                bot.Stop()
-                Py4GW.Console.Log(BOT_NAME, "Bot stopped by user.", Py4GW.Console.MessageType.Info)
-        else:
-            if PyImGui.Button("Start Bot", (100, 30)):
-                config.bot_started = True
-                bot.Start()
-                Py4GW.Console.Log(BOT_NAME, "Bot started by user.", Py4GW.Console.MessageType.Success)
-        
-        PyImGui.SameLine()
-        
-        # Reset button
-        if PyImGui.Button("Reset Stats", (100, 30)):
-            config.strongboxes_team1 = 0
-            config.strongboxes_team2 = 0
-            config.consecutive_wins = 0
-            config.current_role = "team1"
-            Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
-        
-        PyImGui.Separator()
-        PyImGui.TextWrapped("Instructions: Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earning 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Teams switch after earning 5 strongboxes.")
-        
-        PyImGui.End()
 
 
 def main():
