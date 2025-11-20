@@ -22,6 +22,11 @@ skill_template = "OABDQZxWSDNxM3gpBVVtg7ibhA"
 input_skill_slot = 1
 target_agentID = 0
 
+# Hero skill casting variables
+hero_index_input = 1  # Hero index (1-7)
+hero_skill_slot_input = 1  # Skill slot (1-8)
+hero_target_agent_id_input = 0  # Target agent ID
+
 def draw_skilldata(input_skill_id):
 
     PyImGui.separator()
@@ -128,6 +133,7 @@ def draw_window():
     global skill_template
     global input_skill_slot
     global target_agentID
+    global hero_index_input, hero_skill_slot_input, hero_target_agent_id_input
 
     # Refresh skillbar context
     skillbar_instance.GetContext()
@@ -159,6 +165,30 @@ def draw_window():
             if PyImGui.button("Use Selected Skill"):
                 skillbar_instance.UseSkill(input_skill_slot, target_agentID)
                 #function can accept 0 and will take current Target
+            PyImGui.separator()
+            
+            # Hero skill casting section
+            PyImGui.text("Hero Skill Casting")
+            PyImGui.text("Manually cast a hero's skill:")
+            
+            hero_index_input = PyImGui.input_int("Hero Index (1-7)", hero_index_input)
+            if hero_index_input < 1:
+                hero_index_input = 1
+            elif hero_index_input > 7:
+                hero_index_input = 7
+            
+            hero_skill_slot_input = PyImGui.input_int("Hero Skill Slot (1-8)", hero_skill_slot_input)
+            if hero_skill_slot_input < 1:
+                hero_skill_slot_input = 1
+            elif hero_skill_slot_input > 8:
+                hero_skill_slot_input = 8
+            
+            hero_target_agent_id_input = PyImGui.input_int("Hero Target Agent ID", hero_target_agent_id_input)
+            
+            if PyImGui.button("Use Hero Skill"):
+                result = skillbar_instance.HeroUseSkill(hero_target_agent_id_input, hero_skill_slot_input, hero_index_input)
+                Py4GW.Console.Log(Module_Name, f"Hero {hero_index_input} skill {hero_skill_slot_input} cast: {result}")
+            
             PyImGui.separator()
         
         PyImGui.separator()

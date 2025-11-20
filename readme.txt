@@ -8,6 +8,7 @@
 - **Agent Handling**: Manage agents (NPCs, enemies, allies) with ease.
 - **Inventory Management**: Automate inventory-related tasks such as item handling and categorization.
 - **Pathfinding and Navigation**: Built-in tools for pathfinding and movement.
+- **Hero Management**: Full control over heroes including manual skill casting, skillbar templates, and AI behavior.
 - **Widgets**: Extensible widgets for customizing user experiences, including travel, titles, and more.
 - **Event Hooks**: Hook into game events and create your own custom logic.
 - **Multi-Account Support**: Efficiently manage multiple accounts simultaneously.
@@ -56,6 +57,29 @@ Py4GW/
 │   ├── Barebones_Example_module.py # Minimal example script
 │   └── requirements.txt           # Dependency file
 
+
+---
+
+## 📖 Key Features and Documentation
+
+### Manual Hero Skill Casting
+
+Py4GW supports manual control of hero skills, allowing you to override hero AI and cast skills at precise moments. This is useful for combos, interrupts, and strategic gameplay.
+
+**Quick Example:**
+```python
+import PySkillbar
+
+skillbar = PySkillbar.Skillbar()
+skillbar.GetContext()
+
+# Make hero 1 use skill slot 1 on current target
+result = skillbar.HeroUseSkill(0, 1, 1)
+```
+
+**See also:**
+- [Hero Skill Casting Documentation](docs/HERO_SKILL_CASTING.md)
+- [DEMO_HeroSkillCasting.py](DEMO/DEMO_HeroSkillCasting.py) - Interactive demo
 
 ---
 
