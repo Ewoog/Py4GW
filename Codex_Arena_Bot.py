@@ -419,8 +419,9 @@ def _draw_settings():
     PyImGui.separator()
     
     # Team role toggle
-    changed, config.is_winning_team = PyImGui.checkbox("Is Winning Team", config.is_winning_team)
-    if changed:
+    new_value = PyImGui.checkbox("Is Winning Team", config.is_winning_team)
+    if new_value != config.is_winning_team:
+        config.is_winning_team = new_value
         Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
                         Py4GW.Console.MessageType.Info)
     
