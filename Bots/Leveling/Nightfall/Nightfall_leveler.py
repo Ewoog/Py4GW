@@ -1508,6 +1508,37 @@ def UnlockMercenaryHeroes(bot: Botting) -> None:
 def NunduBayVialSpam(bot: Botting) -> None:
     bot.Map.Travel(target_map_id=477)
     
+    def FollowElderJonah():
+        from Py4GWCoreLib.Py4GWcorelib import Utils
+        while True:
+            harbinger_id = 0
+            enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+            for agent_id in enemy_array:
+                model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+                if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                    harbinger_id = agent_id
+                    break
+            
+            if harbinger_id > 0:
+                player_pos = GLOBAL_CACHE.Player.GetXY()
+                harbinger_pos = GLOBAL_CACHE.Agent.GetXY(harbinger_id)
+                distance = Utils.Distance(player_pos, harbinger_pos)
+                if distance <= Range.Spirit.value:
+                    return
+            
+            npc_array = GLOBAL_CACHE.AgentArray.GetNPCMinipetArray()
+            for agent_id in npc_array:
+                model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+                if model_id == 5286:
+                    jonah_pos = GLOBAL_CACHE.Agent.GetXY(agent_id)
+                    player_pos = GLOBAL_CACHE.Player.GetXY()
+                    distance = Utils.Distance(player_pos, jonah_pos)
+                    if distance > 200:
+                        yield from Routines.Yield.Movement.Move(jonah_pos[0], jonah_pos[1])
+                    break
+            
+            yield from Routines.Yield.wait(500)
+    
     def WaitForHarbinger():
         while True:
             enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
@@ -1548,6 +1579,7 @@ def NunduBayVialSpam(bot: Botting) -> None:
                 return
         yield
     
+    bot.States.AddCustomState(FollowElderJonah, "Follow Elder Jonah")
     bot.States.AddCustomState(WaitForHarbinger, "Wait for Harbinger")
     bot.States.AddCustomState(SpamVialOnHarbinger, "Spam Vial on Harbinger")
 #region MAIN
