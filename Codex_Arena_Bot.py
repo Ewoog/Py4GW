@@ -181,7 +181,8 @@ def enter_queue() -> Generator:
     
     # Enter challenge/queue
     Map.EnterChallenge()
-    yield from Routines.Yield.wait(1000)
+    # Wait for queue to process (can take up to 35 seconds to find a match)
+    yield from Routines.Yield.wait(35000)
 
 
 def wait_for_match_start(bot: Botting) -> Generator:
