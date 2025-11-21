@@ -397,8 +397,9 @@ def run_codex_match(bot: Botting) -> None:
                         f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
                         Py4GW.Console.MessageType.Info)
         
-        # Brief pause before next iteration
-        yield from Routines.Yield.wait(3000)
+        # Brief pause before next iteration (only for winning team; losing team requeues immediately)
+        if config.is_winning_team:
+            yield from Routines.Yield.wait(3000)
     
     bot.States.AddCustomState(lambda: _run_match(), "Run Codex Match")
 
