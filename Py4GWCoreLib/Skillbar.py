@@ -2,6 +2,7 @@ from PyAgent import AttributeClass
 import PySkillbar
 
 from Py4GWCoreLib.py4gwcorelib_src.Utils import Utils
+from Py4GWCoreLib.Party import Party
 
 class SkillBar:
     @staticmethod
@@ -264,7 +265,6 @@ class SkillBar:
         result = skillbar_instance.LoadHeroSkillTemplate(hero_id, skill_template)
         if not result:
             # Try to get hero name for better error message
-            from Py4GWCoreLib.Party import Party
             try:
                 hero_name = Party.Heroes.GetHeroNameById(hero_id)
                 print(f"Warning: Failed to load skill template for hero '{hero_name}' (ID: {hero_id}). "
@@ -287,7 +287,6 @@ class SkillBar:
         Example:
             SkillBar.LoadHeroSkillTemplateByName("Koss", "OQATEjpUjIACVAAAAAAAAAA")
         """
-        from Py4GWCoreLib.Party import Party
         hero_id = Party.Heroes.GetHeroIdByName(hero_name)
         if hero_id is None or hero_id == 0:  # 0 is NoHero
             print(f"Error: Could not find hero with name '{hero_name}' or hero is not valid")
