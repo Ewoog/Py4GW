@@ -34,7 +34,10 @@ BOT_NAME = "Codex Arena Bot"
 
 # Arena map IDs and priest coordinates
 SEABED_ARENA_MAP_ID = 829
-DELDRIMOR_ARENA_MAP_ID = 828  # TODO: Verify this ID - not found in enums
+# Note: Deldrimor Arena explorable map ID is unknown. 
+# Based on the pattern (825, 826, 827, ?, 829, 831), it's likely 828 or 830.
+# Using 828 as a best guess. This may need to be updated once the correct ID is discovered.
+DELDRIMOR_ARENA_MAP_ID = 828  # TODO: Verify this ID - needs to be confirmed in-game
 
 # Priest coordinates for arenas
 # Format: {map_id: {"blue": (x, y), "red": (x, y)}}
@@ -307,7 +310,10 @@ def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
             map_changed = True
             if not config.in_match:
                 config.in_match = True
-                Py4GW.Console.Log(BOT_NAME, "Entered the Arena!", Py4GW.Console.MessageType.Success)
+                map_name = GLOBAL_CACHE.Map.GetMapName(current_map_id)
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Entered the Arena! Map ID: {current_map_id}, Map Name: {map_name}", 
+                                Py4GW.Console.MessageType.Success)
         
         # Exit when map changed AND at least 1 minute has passed
         if map_changed and elapsed >= min_wait_time:
@@ -350,8 +356,14 @@ def winning_team_logic(bot: Botting) -> Generator:
         
         # Check if we're in Seabed Arena or Deldrimor Arena and kill enemy priest
         if current_map_id in PRIEST_COORDINATES:
+            arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
+            if current_map_id == DELDRIMOR_ARENA_MAP_ID:
+                Py4GW.Console.Log(BOT_NAME, 
+                                "WARNING: Using estimated map ID (828) for Deldrimor Arena. " +
+                                "If this doesn't work, please verify the correct map ID.", 
+                                Py4GW.Console.MessageType.Warning)
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Detected special arena (Map ID: {current_map_id}), attempting to kill enemy priest...", 
+                            f"Detected {arena_name} (Map ID: {current_map_id}), attempting to kill enemy priest...", 
                             Py4GW.Console.MessageType.Info)
             yield from kill_enemy_priest(bot, current_map_id)
         
