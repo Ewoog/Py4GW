@@ -414,11 +414,11 @@ def _draw_settings():
     PyImGui.text("Status:")
     
     if config.in_match:
-        PyImGui.text_colored((0, 1, 0, 1), "IN MATCH")
+        PyImGui.text_colored("IN MATCH", (0, 1, 0, 1))
     elif config.ready_to_queue:
-        PyImGui.text_colored((1, 1, 0, 1), "READY TO QUEUE")
+        PyImGui.text_colored("READY TO QUEUE", (1, 1, 0, 1))
     else:
-        PyImGui.text_colored((0.5, 0.5, 0.5, 1), "IDLE")
+        PyImGui.text_colored("IDLE", (0.5, 0.5, 0.5, 1))
     
     PyImGui.separator()
     
