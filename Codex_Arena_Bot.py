@@ -42,9 +42,10 @@ class CodexConfig:
         self.target_strongboxes = 5  # Strongboxes to earn before stopping (max per day)
         self.synced_queue = False  # Flag for synchronization
         self.in_match = False
-        self.bot_started = False
         self.ready_to_queue = False
         self.initial_strongbox_count = 0  # Track starting strongbox count
+        self.partner_email = ""  # Email of the other team leader to sync with
+        self.partner_email_index = 0  # Index for combo box selection
 
 config = CodexConfig()
 
@@ -74,10 +75,36 @@ def get_my_email() -> str:
     return GLOBAL_CACHE.Player.GetAccountEmail()
 
 
+def get_available_accounts() -> list:
+    """Get list of all account emails from shared memory."""
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    my_email = get_my_email()
+    
+    try:
+        all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+        if not all_accounts:
+            return []
+        
+        account_emails = []
+        for account in all_accounts:
+            if account.AccountEmail != my_email:
+                account_emails.append(account.AccountEmail)
+        
+        return account_emails
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Failed to get accounts from shared memory: {e}", 
+                         Py4GW.Console.MessageType.Warning)
+        return []
+
+
 def send_sync_signal(signal_type: str):
     """Send synchronization signal to other accounts."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
+    
+    # Only send if partner email is configured and not empty/whitespace
+    if not config.partner_email or not config.partner_email.strip():
+        return
     
     # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END"
     if signal_type == "READY_TO_QUEUE":
@@ -91,11 +118,11 @@ def send_sync_signal(signal_type: str):
     else:
         params = (0.0, 0.0, 0.0, 0.0)
     
-    # Send to all other accounts in the same map
-    all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
-    for account in all_accounts:
-        if account.AccountEmail != my_email:
-            GLOBAL_CACHE.ShMem.SendMessage(my_email, account.AccountEmail, SYNC_QUEUE_COMMAND, params)
+    # Send only to the configured partner account
+    try:
+        GLOBAL_CACHE.ShMem.SendMessage(my_email, config.partner_email.strip(), SYNC_QUEUE_COMMAND, params)
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Failed to send sync signal: {e}", Py4GW.Console.MessageType.Warning)
 
 
 def check_sync_signal() -> str:
@@ -157,16 +184,16 @@ def enter_queue() -> Generator:
     yield from Routines.Yield.wait(1000)
 
 
-def wait_for_match_start() -> Generator:
+def wait_for_match_start(bot: Botting) -> Generator:
     """Wait until match starts (map changes to explorable)."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Map
     from Py4GWCoreLib.Routines import Routines
     
-    timeout = 300000  # 5 minute timeout (in milliseconds)
+    timeout = 300  # 5 minute timeout (in seconds)
     start_time = time.time()
     
-    while time.time() - start_time < timeout and config.bot_started:
+    while time.time() - start_time < timeout and bot.config.fsm_running:
         instance_type = GLOBAL_CACHE.Map.GetInstanceType()
         if instance_type == Map.InstanceType.Explorable:
             config.in_match = True
@@ -180,7 +207,7 @@ def wait_for_match_start() -> Generator:
     config.in_match = False
 
 
-def winning_team_logic() -> Generator:
+def winning_team_logic(bot: Botting) -> Generator:
     """Logic for the winning team - wait for match completion and track strongboxes."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -199,10 +226,10 @@ def winning_team_logic() -> Generator:
     # or the game mechanics would handle it
     
     # Wait for match to end (return to outpost)
-    timeout = 600000  # 10 minute timeout for full match (in milliseconds)
+    timeout = 600  # 10 minute timeout for full match (in seconds)
     start_time = time.time()
     
-    while time.time() - start_time < timeout and config.bot_started:
+    while time.time() - start_time < timeout and bot.config.fsm_running:
         instance_type = GLOBAL_CACHE.Map.GetInstanceType()
         if instance_type == Map.InstanceType.Outpost:
             # Match ended, we're back in outpost
@@ -243,7 +270,7 @@ def winning_team_logic() -> Generator:
         config.in_match = False
 
 
-def losing_team_logic() -> Generator:
+def losing_team_logic(bot: Botting) -> Generator:
     """Logic for the losing team - return to outpost after match."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -253,10 +280,10 @@ def losing_team_logic() -> Generator:
                      Py4GW.Console.MessageType.Info)
     
     # Wait for match to end (should lose)
-    timeout = 600000  # 10 minute timeout (in milliseconds)
+    timeout = 600  # 10 minute timeout (in seconds)
     start_time = time.time()
     
-    while time.time() - start_time < timeout and config.bot_started:
+    while time.time() - start_time < timeout and bot.config.fsm_running:
         instance_type = GLOBAL_CACHE.Map.GetInstanceType()
         if instance_type == Map.InstanceType.Outpost:
             # Back in outpost after losing
@@ -323,7 +350,7 @@ def run_codex_match(bot: Botting) -> None:
         Py4GW.Console.Log(BOT_NAME, "Waiting for other team to be ready...", Py4GW.Console.MessageType.Info)
         
         # Wait for confirmation from other team OR timeout
-        timeout = 120000  # 2 minute timeout (in milliseconds)
+        timeout = 120  # 2 minute timeout (in seconds)
         start_time = time.time()
         other_team_ready = False
         
@@ -349,7 +376,7 @@ def run_codex_match(bot: Botting) -> None:
         
         # Wait for match to start
         Py4GW.Console.Log(BOT_NAME, "Waiting for match to start...", Py4GW.Console.MessageType.Info)
-        yield from wait_for_match_start()
+        yield from wait_for_match_start(bot)
         
         if not config.in_match:
             # Failed to enter match, retry
@@ -360,10 +387,10 @@ def run_codex_match(bot: Botting) -> None:
         # Execute team-specific logic
         if config.is_winning_team:
             Py4GW.Console.Log(BOT_NAME, "Playing as winning team...", Py4GW.Console.MessageType.Info)
-            yield from winning_team_logic()
+            yield from winning_team_logic(bot)
         else:
             Py4GW.Console.Log(BOT_NAME, "Playing as losing team...", Py4GW.Console.MessageType.Info)
-            yield from losing_team_logic()
+            yield from losing_team_logic(bot)
         
         # Log current progress
         Py4GW.Console.Log(BOT_NAME, 
@@ -392,6 +419,38 @@ def _draw_settings():
     import PyImGui
     
     PyImGui.text("Codex Arena Bot Configuration")
+    PyImGui.separator()
+    
+    # Partner email selection
+    PyImGui.text("Partner Account Email:")
+    available_accounts = get_available_accounts()
+    
+    if available_accounts:
+        # Add empty option at the beginning
+        account_options = ["(None)"] + available_accounts
+        
+        # Update index if current partner email is in the list
+        if config.partner_email and config.partner_email in available_accounts:
+            config.partner_email_index = available_accounts.index(config.partner_email) + 1
+        elif not config.partner_email:
+            config.partner_email_index = 0
+        
+        # Draw combo box
+        new_index = PyImGui.combo("##partner_email_combo", config.partner_email_index, account_options)
+        
+        if new_index != config.partner_email_index:
+            config.partner_email_index = new_index
+            if new_index == 0:
+                config.partner_email = ""
+                Py4GW.Console.Log(BOT_NAME, "Partner email cleared.", 
+                                Py4GW.Console.MessageType.Info)
+            else:
+                config.partner_email = available_accounts[new_index - 1]
+                Py4GW.Console.Log(BOT_NAME, f"Partner email set to: {config.partner_email}", 
+                                Py4GW.Console.MessageType.Info)
+    else:
+        PyImGui.text_colored("No other accounts detected in shared memory", (1, 0.5, 0, 1))
+    
     PyImGui.separator()
     
     # Team role toggle
@@ -429,7 +488,7 @@ def _draw_settings():
         Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
     
     PyImGui.separator()
-    PyImGui.text_wrapped("Instructions: Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earn 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Bot stops after earning 5 strongboxes.")
+    PyImGui.text_wrapped("Instructions: Set the Partner Account Email to the email of the other team leader. Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earn 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Bot stops after earning 5 strongboxes.")
 
 
 # Override the settings tab with custom UI
