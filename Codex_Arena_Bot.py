@@ -44,6 +44,7 @@ class CodexConfig:
         self.in_match = False
         self.ready_to_queue = False
         self.initial_strongbox_count = 0  # Track starting strongbox count
+        self.partner_email = ""  # Email of the other team leader to sync with
 
 config = CodexConfig()
 
@@ -78,6 +79,10 @@ def send_sync_signal(signal_type: str):
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
+    # Only send if partner email is configured
+    if not config.partner_email:
+        return
+    
     # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END"
     if signal_type == "READY_TO_QUEUE":
         params = (1.0, 0.0, 0.0, 0.0)
@@ -90,11 +95,8 @@ def send_sync_signal(signal_type: str):
     else:
         params = (0.0, 0.0, 0.0, 0.0)
     
-    # Send to all other accounts in the same map
-    all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
-    for account in all_accounts:
-        if account.AccountEmail != my_email:
-            GLOBAL_CACHE.ShMem.SendMessage(my_email, account.AccountEmail, SYNC_QUEUE_COMMAND, params)
+    # Send only to the configured partner account
+    GLOBAL_CACHE.ShMem.SendMessage(my_email, config.partner_email, SYNC_QUEUE_COMMAND, params)
 
 
 def check_sync_signal() -> str:
@@ -393,6 +395,16 @@ def _draw_settings():
     PyImGui.text("Codex Arena Bot Configuration")
     PyImGui.separator()
     
+    # Partner email input
+    PyImGui.text("Partner Account Email:")
+    new_partner = PyImGui.input_text("##partner_email", config.partner_email, 256)
+    if new_partner != config.partner_email:
+        config.partner_email = new_partner
+        Py4GW.Console.Log(BOT_NAME, f"Partner email set to: {config.partner_email}", 
+                        Py4GW.Console.MessageType.Info)
+    
+    PyImGui.separator()
+    
     # Team role toggle
     new_value = PyImGui.checkbox("Is Winning Team", config.is_winning_team)
     if new_value != config.is_winning_team:
@@ -428,7 +440,7 @@ def _draw_settings():
         Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
     
     PyImGui.separator()
-    PyImGui.text_wrapped("Instructions: Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earn 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Bot stops after earning 5 strongboxes.")
+    PyImGui.text_wrapped("Instructions: Set the Partner Account Email to the email of the other team leader. Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earn 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Bot stops after earning 5 strongboxes.")
 
 
 # Override the settings tab with custom UI
