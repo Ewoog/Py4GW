@@ -163,7 +163,7 @@ def wait_for_match_start() -> Generator:
     from Py4GWCoreLib import Map
     from Py4GWCoreLib.Routines import Routines
     
-    timeout = 300  # 5 minute timeout
+    timeout = 300000  # 5 minute timeout (in milliseconds)
     start_time = time.time()
     
     while time.time() - start_time < timeout and config.bot_started:
@@ -199,7 +199,7 @@ def winning_team_logic() -> Generator:
     # or the game mechanics would handle it
     
     # Wait for match to end (return to outpost)
-    timeout = 600  # 10 minute timeout for full match
+    timeout = 600000  # 10 minute timeout for full match (in milliseconds)
     start_time = time.time()
     
     while time.time() - start_time < timeout and config.bot_started:
@@ -253,7 +253,7 @@ def losing_team_logic() -> Generator:
                      Py4GW.Console.MessageType.Info)
     
     # Wait for match to end (should lose)
-    timeout = 600  # 10 minute timeout
+    timeout = 600000  # 10 minute timeout (in milliseconds)
     start_time = time.time()
     
     while time.time() - start_time < timeout and config.bot_started:
@@ -323,7 +323,7 @@ def run_codex_match(bot: Botting) -> None:
         Py4GW.Console.Log(BOT_NAME, "Waiting for other team to be ready...", Py4GW.Console.MessageType.Info)
         
         # Wait for confirmation from other team OR timeout
-        timeout = 120  # 2 minute timeout
+        timeout = 120000  # 2 minute timeout (in milliseconds)
         start_time = time.time()
         other_team_ready = False
         
