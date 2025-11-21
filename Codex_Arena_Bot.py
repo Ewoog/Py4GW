@@ -279,7 +279,8 @@ def winning_team_logic(bot: Botting) -> Generator:
             new_strongboxes = current_strongboxes - initial_strongboxes
             
             # If we got a new strongbox, record it and reset consecutive wins
-            record_strongbox(new_strongboxes)
+            if new_strongboxes > 0:
+                record_strongbox(new_strongboxes)
         
         if map_changed:
             # Wait a moment for strongbox to appear in inventory after map change
