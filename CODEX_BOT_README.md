@@ -104,6 +104,8 @@ The bot includes special logic for **Seabed Arena** and **Deldrimor Arena**:
   - If on blue team → moves to red priest
   - If on red team → moves to blue priest
 - **HeroAI Combat**: Once at the priest location, HeroAI automatically handles combat
+- **Combat Wait**: Bot waits until out of combat before proceeding
+- **Normal Flow**: After combat completes, continues with normal match waiting logic
 - **Losing Team**: Does nothing special - just returns to outpost as normal
 
 **Arena Map IDs and Priest Locations:**

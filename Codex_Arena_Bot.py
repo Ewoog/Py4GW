@@ -276,8 +276,10 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
                          f"Arrived at {enemy_team.upper()} priest location! HeroAI will handle combat.", 
                          Py4GW.Console.MessageType.Success)
         # HeroAI will automatically engage enemies in range
-        # Just wait a bit to ensure we stay in the area
-        yield from Routines.Yield.wait(2000)
+        # Wait until combat is complete
+        Py4GW.Console.Log(BOT_NAME, "Waiting until out of combat...", Py4GW.Console.MessageType.Info)
+        yield from bot.Wait.UntilOutOfCombat()
+        Py4GW.Console.Log(BOT_NAME, "Out of combat, proceeding with match.", Py4GW.Console.MessageType.Success)
     else:
         Py4GW.Console.Log(BOT_NAME, 
                          f"Failed to reach {enemy_team.upper()} priest location within {timeout} seconds", 
