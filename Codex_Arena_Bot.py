@@ -163,7 +163,7 @@ def wait_for_match_start() -> Generator:
     from Py4GWCoreLib import Map
     from Py4GWCoreLib.Routines import Routines
     
-    timeout = 180  # 3 minute timeout
+    timeout = 300  # 5 minute timeout
     start_time = time.time()
     
     while time.time() - start_time < timeout and config.bot_started:
