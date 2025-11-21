@@ -423,7 +423,7 @@ def _draw_settings():
     PyImGui.separator()
     
     # Reset button
-    if PyImGui.button("Reset Stats", (150, 25)):
+    if PyImGui.button("Reset Stats", 150, 25):
         config.strongboxes_earned = 0
         config.consecutive_wins = 0
         Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
