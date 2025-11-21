@@ -55,7 +55,7 @@ Run the bot on both team leaders:
 
 ### 4. Starting the Bot
 
-1. Ensure both team leaders are in Codex Arena outpost (Map ID: 796)
+1. Ensure both team leaders are in Codex Arena outpost (Map ID: 830)
 2. Click "Start Bot" in both instances
 3. The bots will synchronize and begin queueing together
 
@@ -133,7 +133,7 @@ config.target_strongboxes = 5  # Strongboxes needed before role switch (default:
 ### Bot Gets Stuck
 
 - Check the console logs for error messages
-- Verify map ID is correct (796 for Codex Arena)
+- Verify map ID is correct (830 for Codex Arena)
 - Restart both bot instances if necessary
 
 ## Advanced Configuration

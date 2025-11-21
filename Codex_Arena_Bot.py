@@ -167,7 +167,7 @@ def travel_to_codex_arena() -> Generator:
     from Py4GWCoreLib.Routines import Routines
     
     # Codex Arena map ID
-    CODEX_ARENA_MAP_ID = 796
+    CODEX_ARENA_MAP_ID = 830
     
     current_map = GLOBAL_CACHE.Map.GetMapID()
     if current_map != CODEX_ARENA_MAP_ID:

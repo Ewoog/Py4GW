@@ -32,7 +32,7 @@ Main bot implementation with the following components:
 - `send_sync_signal()`: Broadcasts synchronization messages
 - `check_sync_signal()`: Receives and processes sync messages
 - `equip_set()`: Changes equipment sets
-- `travel_to_codex_arena()`: Navigates to Codex Arena (Map ID 796)
+- `travel_to_codex_arena()`: Navigates to Codex Arena (Map ID 830)
 - `enter_queue()`: Enters the arena queue
 - `wait_for_match_start()`: Monitors for match start
 - `winning_team_logic()`: Handles winning team behavior, tracks strongboxes
@@ -62,7 +62,7 @@ Comprehensive documentation including:
 3. Team members are manually invited to form two groups of 4
 
 ### Execution Flow
-1. Both teams travel to Codex Arena outpost (Map ID 796)
+1. Both teams travel to Codex Arena outpost (Map ID 830)
 2. Teams equip appropriate equipment sets:
    - Winning team: Equipment Set 1
    - Losing team: Equipment Set 2
@@ -132,7 +132,7 @@ Uses Py4GW's SharedMemory system:
 1. **Manual Party Formation**: Teams must be manually formed before starting
 2. **Population Dependent**: Codex Arena requires minimum population
 3. **No Combat AI**: Winning team relies on natural gameplay/other bots
-4. **Fixed Map ID**: Hardcoded to Codex Arena (796)
+4. **Fixed Map ID**: Hardcoded to Codex Arena (830)
 5. **Two-Instance Only**: Designed for exactly 2 bot instances
 6. **Daily Limit**: Maximum 5 Strategist's Zaishen Strongboxes per account per day
 
