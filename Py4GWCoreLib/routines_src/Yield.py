@@ -544,19 +544,19 @@ class Yield:
             yield from Yield.wait(500)
             
         @staticmethod
-        def LoadHeroSkillbar(hero_index:int, skill_template:str, log=False):
+        def LoadHeroSkillbar(hero_id:int, skill_template:str, log=False):
             """
-            Purpose: Load the specified hero skillbar.
+            Purpose: Load the specified hero skillbar by Hero ID.
             Args:
-                hero_index (int): The index of the hero (1-4).
-                skill_template (str): The name of the skill template to load.
-                log (bool) Optional: Whether to log the action. Default is True.
+                hero_id (int): The Hero ID (e.g., 1=Norgu, 6=Koss, etc. See PyParty.HeroType for full list).
+                skill_template (str): The skill template code to load.
+                log (bool) Optional: Whether to log the action. Default is False.
             Returns: None
             """
             
 
-            GLOBAL_CACHE.SkillBar.LoadHeroSkillTemplate(hero_index, skill_template)
-            ConsoleLog("LoadHeroSkillbar", f"Loading hero {hero_index} skill Template {skill_template}", log=log)
+            GLOBAL_CACHE.SkillBar.LoadHeroSkillTemplate(hero_id, skill_template)
+            ConsoleLog("LoadHeroSkillbar", f"Loading hero ID {hero_id} with skill template {skill_template}", log=log)
             yield from Yield.wait(500)
         
         @staticmethod    

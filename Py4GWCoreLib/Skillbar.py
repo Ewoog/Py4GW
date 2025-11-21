@@ -238,15 +238,23 @@ class SkillBar:
         skillbar_instance.LoadSkillTemplate(skill_template)
 
     @staticmethod
-    def LoadHeroSkillTemplate (hero_index, skill_template):
+    def LoadHeroSkillTemplate (hero_id, skill_template):
         """
-        Purpose: Load a Hero skill template by Hero index and Template.
+        Purpose: Load a Hero skill template onto a hero.
         Args:
-            hero_index: int, template_name (str): The name of the skill template to load.
-        Returns: None
+            hero_id (int): The Hero ID (e.g., 1=Norgu, 6=Koss, etc. See PyParty.HeroType).
+                          You can get the hero ID using Party.Heroes.GetHeroIDByPartyPosition() or
+                          Party.Heroes.GetHeroIdByName().
+            skill_template (str): The skill template code to load.
+        Returns:
+            bool: True if the template was loaded successfully, False otherwise.
         """
         skillbar_instance = PySkillbar.Skillbar()
-        skillbar_instance.LoadHeroSkillTemplate(hero_index, skill_template)
+        result = skillbar_instance.LoadHeroSkillTemplate(hero_id, skill_template)
+        if not result:
+            print(f"Warning: Failed to load skill template '{skill_template}' for hero ID {hero_id}. "
+                  f"Ensure the hero is in your party and the template is valid.")
+        return result
 
     @staticmethod
     def GetSkillbar():

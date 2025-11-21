@@ -12,8 +12,13 @@ class SkillbarCache:
     def LoadSkillTemplate(self, skill_template):
         self._action_queue_manager.AddAction("ACTION", self._skillbar_instance.LoadSkillTemplate, skill_template)
         
-    def LoadHeroSkillTemplate (self, hero_index, skill_template):
-        self._action_queue_manager.AddAction("ACTION", self._skillbar_instance.LoadHeroSkillTemplate, hero_index, skill_template)
+    def LoadHeroSkillTemplate (self, hero_id, skill_template):
+        """Load a hero skill template by Hero ID.
+        Args:
+            hero_id (int): The Hero ID (e.g., 1=Norgu, 6=Koss, etc.)
+            skill_template (str): The skill template code to load.
+        """
+        self._action_queue_manager.AddAction("ACTION", self._skillbar_instance.LoadHeroSkillTemplate, hero_id, skill_template)
         
     def GetSkillBySlot(self, slot):
         return self._skillbar_instance.GetSkill(slot)
