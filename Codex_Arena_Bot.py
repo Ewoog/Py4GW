@@ -220,6 +220,16 @@ def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
     config.in_match = False
 
 
+def record_strongbox(new_strongboxes: int) -> None:
+    """Record strongbox earned and reset consecutive wins counter."""
+    if new_strongboxes > 0:
+        config.strongboxes_earned += new_strongboxes
+        config.consecutive_wins = 0
+        Py4GW.Console.Log(BOT_NAME, 
+                        f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes. Consecutive wins reset.", 
+                        Py4GW.Console.MessageType.Success)
+
+
 def winning_team_logic(bot: Botting) -> Generator:
     """Logic for the winning team - win matches continuously, staying in map and auto-queued."""
     from Py4GWCoreLib.Routines import Routines
@@ -269,12 +279,7 @@ def winning_team_logic(bot: Botting) -> Generator:
             new_strongboxes = current_strongboxes - initial_strongboxes
             
             # If we got a new strongbox, record it and reset consecutive wins
-            if new_strongboxes > 0:
-                config.strongboxes_earned += new_strongboxes
-                config.consecutive_wins = 0
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes. Consecutive wins reset.", 
-                                Py4GW.Console.MessageType.Success)
+            record_strongbox(new_strongboxes)
         
         if map_changed:
             # Wait a moment for strongbox to appear in inventory after map change
@@ -286,11 +291,7 @@ def winning_team_logic(bot: Botting) -> Generator:
             
             # If we earned a strongbox, record it and reset consecutive wins counter
             if new_strongboxes > 0:
-                config.strongboxes_earned += new_strongboxes
-                config.consecutive_wins = 0
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes. Consecutive wins reset.", 
-                                Py4GW.Console.MessageType.Success)
+                record_strongbox(new_strongboxes)
             else:
                 # No strongbox yet - increment consecutive wins and log progress
                 config.consecutive_wins += 1
