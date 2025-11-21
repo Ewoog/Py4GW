@@ -208,66 +208,102 @@ def wait_for_match_start(bot: Botting) -> Generator:
 
 
 def winning_team_logic(bot: Botting) -> Generator:
-    """Logic for the winning team - wait for match completion and track strongboxes."""
+    """Logic for the winning team - win matches continuously, staying in map and auto-queued."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Map
     
-    # Get initial strongbox count before match ends
-    initial_strongboxes = get_strongbox_count()
-    
-    # Wait in match for some time (simulating play)
-    Py4GW.Console.Log(BOT_NAME, "Winning team in match, waiting for completion...", 
-                     Py4GW.Console.MessageType.Info)
-    yield from Routines.Yield.wait(30000)  # 30 seconds initial wait
-    
-    # In a real scenario, the team would play and win
-    # For automation, we just wait for the match to end naturally
-    # or the game mechanics would handle it
-    
-    # Wait for match to end (return to outpost)
-    timeout = 600  # 10 minute timeout for full match (in seconds)
-    start_time = time.time()
-    
-    while time.time() - start_time < timeout and bot.config.fsm_running:
-        instance_type = GLOBAL_CACHE.Map.GetInstanceType()
-        if instance_type == Map.InstanceType.Outpost:
-            # Match ended, we're back in outpost
+    # Winning team stays in explorable map after victories and is automatically re-queued
+    # Loop through multiple matches without returning to outpost
+    while bot.config.fsm_running:
+        # Check if we should shut down (earned 5 strongboxes)
+        if config.strongboxes_earned >= config.target_strongboxes:
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Target reached! Earned {config.strongboxes_earned} strongboxes. Returning to outpost.", 
+                            Py4GW.Console.MessageType.Success)
+            from Py4GWCoreLib import Party
+            Party.ReturnToOutpost()
+            yield from Routines.Yield.wait(5000)
             config.in_match = False
+            bot.Stop()
+            return
+        
+        # Get strongbox count before match ends
+        initial_strongboxes = get_strongbox_count()
+        
+        # Wait in match for some time (simulating play)
+        Py4GW.Console.Log(BOT_NAME, "Winning team in match, waiting for completion...", 
+                         Py4GW.Console.MessageType.Info)
+        yield from Routines.Yield.wait(30000)  # 30 seconds initial wait
+        
+        # Wait for match to end (victory) - track when strongbox appears or time passes
+        timeout = 600  # 10 minute timeout for full match (in seconds)
+        start_time = time.time()
+        victory_detected = False
+        
+        while time.time() - start_time < timeout and bot.config.fsm_running:
+            yield from Routines.Yield.wait(2000)
             
-            # Check for new strongboxes
+            # Check for new strongboxes to detect victory
             current_strongboxes = get_strongbox_count()
             new_strongboxes = current_strongboxes - initial_strongboxes
             
-            # Increment consecutive wins
-            config.consecutive_wins += 1
-            
-            # Check if we earned a strongbox (every 5 consecutive wins)
-            if new_strongboxes > 0:
-                config.strongboxes_earned += new_strongboxes
+            # If we got a new strongbox or enough time has passed, assume victory
+            if new_strongboxes > 0 or (time.time() - start_time > 90 and not victory_detected):
+                victory_detected = True
+                
+                # Increment consecutive wins
+                config.consecutive_wins += 1
+                
+                # Check if we earned a strongbox (every 5 consecutive wins)
+                if new_strongboxes > 0:
+                    config.strongboxes_earned += new_strongboxes
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes ({config.consecutive_wins} consecutive wins).", 
+                                    Py4GW.Console.MessageType.Success)
+                    # Reset consecutive wins after earning a strongbox
+                    if config.consecutive_wins >= 5:
+                        config.consecutive_wins = 0
+                else:
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Victory! {config.consecutive_wins} consecutive wins (need 5 for strongbox).", 
+                                    Py4GW.Console.MessageType.Success)
+                
+                # Winning team stays in map and is automatically re-queued by the game
+                Py4GW.Console.Log(BOT_NAME, "Victory! Waiting for automatic re-queue and next match...", 
+                                Py4GW.Console.MessageType.Info)
+                config.in_match = False
+                
+                # Log current progress
                 Py4GW.Console.Log(BOT_NAME, 
-                                f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes ({config.consecutive_wins} consecutive wins).", 
-                                Py4GW.Console.MessageType.Success)
-                # Reset consecutive wins after earning a strongbox
-                if config.consecutive_wins >= 5:
-                    config.consecutive_wins = 0
-            else:
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Victory! {config.consecutive_wins} consecutive wins (need 5 for strongbox).", 
-                                Py4GW.Console.MessageType.Success)
-            
-            send_sync_signal("MATCH_END")
+                                f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
+                                Py4GW.Console.MessageType.Info)
+                break
+        
+        if not victory_detected:
+            # Timeout - something went wrong, force return to outpost
+            Py4GW.Console.Log(BOT_NAME, "Match timeout, forcing return to outpost...", 
+                            Py4GW.Console.MessageType.Warning)
+            from Py4GWCoreLib import Party
+            Party.ReturnToOutpost()
+            yield from Routines.Yield.wait(5000)
+            config.in_match = False
             return
-        yield from Routines.Yield.wait(2000)
-    
-    # Timeout - force return to outpost
-    if config.in_match:
-        Py4GW.Console.Log(BOT_NAME, "Match timeout, forcing return to outpost...", 
-                        Py4GW.Console.MessageType.Warning)
-        from Py4GWCoreLib import Party
-        Party.ReturnToOutpost()
-        yield from Routines.Yield.wait(5000)
-        config.in_match = False
+        
+        # Wait for next match to start (automatically queued by game)
+        Py4GW.Console.Log(BOT_NAME, "Waiting for next match to start...", Py4GW.Console.MessageType.Info)
+        yield from wait_for_match_start(bot)
+        
+        if not config.in_match:
+            # Failed to enter next match, return to outpost
+            Py4GW.Console.Log(BOT_NAME, "Failed to enter next match, returning to outpost...", 
+                            Py4GW.Console.MessageType.Warning)
+            from Py4GWCoreLib import Party
+            Party.ReturnToOutpost()
+            yield from Routines.Yield.wait(5000)
+            return
+        
+        # Continue loop for next match
 
 
 def losing_team_logic(bot: Botting) -> Generator:
@@ -388,18 +424,17 @@ def run_codex_match(bot: Botting) -> None:
         if config.is_winning_team:
             Py4GW.Console.Log(BOT_NAME, "Playing as winning team...", Py4GW.Console.MessageType.Info)
             yield from winning_team_logic(bot)
+            # Winning team logic handles multiple matches internally and only returns when done
+            # No need to log progress or wait here
         else:
             Py4GW.Console.Log(BOT_NAME, "Playing as losing team...", Py4GW.Console.MessageType.Info)
             yield from losing_team_logic(bot)
-        
-        # Log current progress
-        Py4GW.Console.Log(BOT_NAME, 
-                        f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
-                        Py4GW.Console.MessageType.Info)
-        
-        # Brief pause before next iteration (only for winning team; losing team requeues immediately)
-        if config.is_winning_team:
-            yield from Routines.Yield.wait(3000)
+            
+            # Log current progress for losing team
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
+                            Py4GW.Console.MessageType.Info)
+            # Losing team requeues immediately (no delay)
     
     bot.States.AddCustomState(lambda: _run_match(), "Run Codex Match")
 
