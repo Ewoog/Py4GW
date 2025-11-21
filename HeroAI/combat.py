@@ -390,8 +390,8 @@ class CombatClass:
                 target_id = settings.ArcaneMimicryTargetAgentID
                 if GLOBAL_CACHE.Agent.IsLiving(target_id):
                     # Additional validation: ensure target is actually an ally in our party
-                    target_allegiance, _ = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
-                    if target_allegiance == Allegiance.Ally.value:
+                    allegiance_value, _ = GLOBAL_CACHE.Agent.GetAllegiance(target_id)
+                    if allegiance_value == Allegiance.Ally.value:
                         return target_id
             # If no valid target configured, fall through to default OtherAlly targeting
         
