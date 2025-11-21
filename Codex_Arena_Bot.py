@@ -63,6 +63,9 @@ SYNC_QUEUE_COMMAND = SharedCommandType.CustomBehaviors  # Use existing custom co
 # Strategist's Zaishen Strongbox model ID
 STRATEGISTS_STRONGBOX_MODEL_ID = 36668
 
+# Delay (in milliseconds) to wait after map change for strongbox to appear in inventory
+STRONGBOX_DETECTION_DELAY_MS = 2000
+
 
 def get_strongbox_count() -> int:
     """Get the current count of Strategist's Zaishen Strongboxes in inventory."""
@@ -284,7 +287,7 @@ def winning_team_logic(bot: Botting) -> Generator:
         
         if map_changed:
             # Wait a moment for strongbox to appear in inventory after map change
-            yield from Routines.Yield.wait(2000)
+            yield from Routines.Yield.wait(STRONGBOX_DETECTION_DELAY_MS)
             
             # Check for strongbox after map change
             current_strongboxes = get_strongbox_count()
