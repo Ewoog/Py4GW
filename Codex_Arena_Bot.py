@@ -45,6 +45,7 @@ class CodexConfig:
         self.ready_to_queue = False
         self.initial_strongbox_count = 0  # Track starting strongbox count
         self.partner_email = ""  # Email of the other team leader to sync with
+        self.partner_email_index = 0  # Index for combo box selection
 
 config = CodexConfig()
 
@@ -72,6 +73,20 @@ def get_my_email() -> str:
     """Get the current account email."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     return GLOBAL_CACHE.Player.GetAccountEmail()
+
+
+def get_available_accounts() -> list:
+    """Get list of all account emails from shared memory."""
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    my_email = get_my_email()
+    
+    all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+    account_emails = []
+    for account in all_accounts:
+        if account.AccountEmail != my_email:
+            account_emails.append(account.AccountEmail)
+    
+    return account_emails
 
 
 def send_sync_signal(signal_type: str):
@@ -398,23 +413,35 @@ def _draw_settings():
     PyImGui.text("Codex Arena Bot Configuration")
     PyImGui.separator()
     
-    # Partner email input
+    # Partner email selection
     PyImGui.text("Partner Account Email:")
-    new_partner = PyImGui.input_text("##partner_email", config.partner_email, 256)
-    if new_partner != config.partner_email:
-        # Strip whitespace and validate basic email format
-        new_partner = new_partner.strip()
-        if new_partner and '@' in new_partner and '.' in new_partner:
-            config.partner_email = new_partner
-            Py4GW.Console.Log(BOT_NAME, f"Partner email set to: {config.partner_email}", 
-                            Py4GW.Console.MessageType.Info)
-        elif new_partner:
-            Py4GW.Console.Log(BOT_NAME, "Invalid email format. Please enter a valid email address.", 
-                            Py4GW.Console.MessageType.Warning)
-        else:
-            config.partner_email = ""
-            Py4GW.Console.Log(BOT_NAME, "Partner email cleared.", 
-                            Py4GW.Console.MessageType.Info)
+    available_accounts = get_available_accounts()
+    
+    if available_accounts:
+        # Add empty option at the beginning
+        account_options = ["(None)"] + available_accounts
+        
+        # Update index if current partner email is in the list
+        if config.partner_email and config.partner_email in available_accounts:
+            config.partner_email_index = available_accounts.index(config.partner_email) + 1
+        elif not config.partner_email:
+            config.partner_email_index = 0
+        
+        # Draw combo box
+        new_index = PyImGui.combo("##partner_email_combo", config.partner_email_index, account_options)
+        
+        if new_index != config.partner_email_index:
+            config.partner_email_index = new_index
+            if new_index == 0:
+                config.partner_email = ""
+                Py4GW.Console.Log(BOT_NAME, "Partner email cleared.", 
+                                Py4GW.Console.MessageType.Info)
+            else:
+                config.partner_email = available_accounts[new_index - 1]
+                Py4GW.Console.Log(BOT_NAME, f"Partner email set to: {config.partner_email}", 
+                                Py4GW.Console.MessageType.Info)
+    else:
+        PyImGui.text_colored("No other accounts detected in shared memory", (1, 0.5, 0, 1))
     
     PyImGui.separator()
     
