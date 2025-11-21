@@ -156,7 +156,7 @@ def enter_queue() -> Generator:
     yield from Routines.Yield.wait(1000)
 
 
-def wait_for_match_start() -> Generator:
+def wait_for_match_start(bot: Botting) -> Generator:
     """Wait until match starts (map changes to explorable)."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Map
@@ -179,7 +179,7 @@ def wait_for_match_start() -> Generator:
     config.in_match = False
 
 
-def winning_team_logic() -> Generator:
+def winning_team_logic(bot: Botting) -> Generator:
     """Logic for the winning team - wait for match completion and track strongboxes."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -242,7 +242,7 @@ def winning_team_logic() -> Generator:
         config.in_match = False
 
 
-def losing_team_logic() -> Generator:
+def losing_team_logic(bot: Botting) -> Generator:
     """Logic for the losing team - return to outpost after match."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -348,7 +348,7 @@ def run_codex_match(bot: Botting) -> None:
         
         # Wait for match to start
         Py4GW.Console.Log(BOT_NAME, "Waiting for match to start...", Py4GW.Console.MessageType.Info)
-        yield from wait_for_match_start()
+        yield from wait_for_match_start(bot)
         
         if not config.in_match:
             # Failed to enter match, retry
@@ -359,10 +359,10 @@ def run_codex_match(bot: Botting) -> None:
         # Execute team-specific logic
         if config.is_winning_team:
             Py4GW.Console.Log(BOT_NAME, "Playing as winning team...", Py4GW.Console.MessageType.Info)
-            yield from winning_team_logic()
+            yield from winning_team_logic(bot)
         else:
             Py4GW.Console.Log(BOT_NAME, "Playing as losing team...", Py4GW.Console.MessageType.Info)
-            yield from losing_team_logic()
+            yield from losing_team_logic(bot)
         
         # Log current progress
         Py4GW.Console.Log(BOT_NAME, 
