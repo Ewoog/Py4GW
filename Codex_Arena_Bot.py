@@ -284,6 +284,8 @@ def winning_team_logic(bot: Botting) -> Generator:
             # If we got a new strongbox, record it and reset consecutive wins
             if new_strongboxes > 0:
                 record_strongbox(new_strongboxes)
+                # Update initial count so we don't count the same strongbox again
+                initial_strongboxes = current_strongboxes
         
         if map_changed:
             # Wait a moment for strongbox to appear in inventory after map change
@@ -296,6 +298,8 @@ def winning_team_logic(bot: Botting) -> Generator:
             # If we earned a strongbox, record it and reset consecutive wins counter
             if new_strongboxes > 0:
                 record_strongbox(new_strongboxes)
+                # Update initial count so we don't count the same strongbox again
+                initial_strongboxes = current_strongboxes
             else:
                 # No strongbox yet - increment consecutive wins and log progress
                 config.consecutive_wins += 1
