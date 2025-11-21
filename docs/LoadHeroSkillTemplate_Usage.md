@@ -81,15 +81,18 @@ You can find hero IDs in the `PyParty.HeroType` enum:
 
 ## Common Mistakes
 
-### ❌ Wrong: Using party position directly
+### ❌ Wrong: Confusing hero ID with party position
 ```python
-# This will try to load the template on hero with ID=1 (Norgu), not the first hero in party!
+# This will load the template on hero with ID=1 (Norgu), NOT the first hero in your party!
+# Only use this if you actually want to load it on Norgu specifically.
 SkillBar.LoadHeroSkillTemplate(1, "OQATEjpUjIACVAAAAAAAAAA")
 ```
 
+**Why this is usually wrong**: If you have Koss as your first hero, this won't load the template on Koss (ID=6). It will try to load it on Norgu (ID=1), who might not even be in your party, causing it to fail.
+
 ### ✅ Correct: Use HeroType enum or get the actual hero ID
 ```python
-# Method A: Use enum
+# Method A: If you want to load on a specific hero (e.g., Koss), use the enum
 from PyParty import HeroType
 SkillBar.LoadHeroSkillTemplate(HeroType.Koss, "OQATEjpUjIACVAAAAAAAAAA")
 

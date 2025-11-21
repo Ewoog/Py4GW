@@ -28,8 +28,10 @@ class SkillbarCache:
         """
         from Py4GWCoreLib.Party import Party
         hero_id = Party.Heroes.GetHeroIdByName(hero_name)
-        if hero_id:
-            self.LoadHeroSkillTemplate(hero_id, skill_template)
+        if hero_id is None or hero_id == 0:  # 0 is NoHero
+            print(f"Error: Could not find hero with name '{hero_name}' or hero is not valid")
+            return
+        self.LoadHeroSkillTemplate(hero_id, skill_template)
         
     def GetSkillBySlot(self, slot):
         return self._skillbar_instance.GetSkill(slot)

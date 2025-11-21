@@ -263,8 +263,15 @@ class SkillBar:
         skillbar_instance = PySkillbar.Skillbar()
         result = skillbar_instance.LoadHeroSkillTemplate(hero_id, skill_template)
         if not result:
-            print(f"Warning: Failed to load skill template '{skill_template}' for hero ID {hero_id}. "
-                  f"Ensure the hero is in your party and the template is valid.")
+            # Try to get hero name for better error message
+            from Py4GWCoreLib.Party import Party
+            try:
+                hero_name = Party.Heroes.GetHeroNameById(hero_id)
+                print(f"Warning: Failed to load skill template for hero '{hero_name}' (ID: {hero_id}). "
+                      f"Ensure the hero is in your party and the template code is valid.")
+            except:
+                print(f"Warning: Failed to load skill template for hero ID {hero_id}. "
+                      f"Ensure the hero is in your party and the template code is valid.")
         return result
     
     @staticmethod
@@ -282,8 +289,8 @@ class SkillBar:
         """
         from Py4GWCoreLib.Party import Party
         hero_id = Party.Heroes.GetHeroIdByName(hero_name)
-        if not hero_id:
-            print(f"Error: Could not find hero with name '{hero_name}'")
+        if hero_id is None or hero_id == 0:  # 0 is NoHero
+            print(f"Error: Could not find hero with name '{hero_name}' or hero is not valid")
             return False
         return SkillBar.LoadHeroSkillTemplate(hero_id, skill_template)
 
