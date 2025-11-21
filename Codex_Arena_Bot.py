@@ -42,6 +42,9 @@ DELDRIMOR_ARENA_MAP_ID = 828  # TODO: Verify this ID - needs to be confirmed in-
 # Movement tolerance for priest location (200 units = close enough to engage)
 PRIEST_LOCATION_TOLERANCE = 200
 
+# Movement timeout when traveling to priest location (90 seconds to account for obstacles)
+PRIEST_MOVEMENT_TIMEOUT = 90
+
 # Priest coordinates for arenas
 # Format: {map_id: {"blue": (x, y), "red": (x, y)}}
 PRIEST_COORDINATES = {
@@ -262,8 +265,8 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     follower = Movement.FollowXY(tolerance=PRIEST_LOCATION_TOLERANCE)
     follower.move_to_waypoint(priest_x, priest_y)
     
-    # Wait until we arrive or timeout (90 seconds to account for potential obstacles)
-    timeout = 90
+    # Wait until we arrive or timeout
+    timeout = PRIEST_MOVEMENT_TIMEOUT
     start_time = time.time()
     while time.time() - start_time < timeout and bot.config.fsm_running:
         follower.update()
@@ -354,7 +357,7 @@ def winning_team_logic(bot: Botting) -> Generator:
             arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
             if current_map_id == DELDRIMOR_ARENA_MAP_ID:
                 Py4GW.Console.Log(BOT_NAME, 
-                                "WARNING: Using estimated map ID (828) for Deldrimor Arena. " +
+                                f"WARNING: Using estimated map ID ({DELDRIMOR_ARENA_MAP_ID}) for Deldrimor Arena. " +
                                 "If this doesn't work, please verify the correct map ID.", 
                                 Py4GW.Console.MessageType.Warning)
             Py4GW.Console.Log(BOT_NAME, 
