@@ -79,8 +79,8 @@ def send_sync_signal(signal_type: str):
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
-    # Only send if partner email is configured
-    if not config.partner_email:
+    # Only send if partner email is configured and not empty/whitespace
+    if not config.partner_email or not config.partner_email.strip():
         return
     
     # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END"
@@ -96,7 +96,10 @@ def send_sync_signal(signal_type: str):
         params = (0.0, 0.0, 0.0, 0.0)
     
     # Send only to the configured partner account
-    GLOBAL_CACHE.ShMem.SendMessage(my_email, config.partner_email, SYNC_QUEUE_COMMAND, params)
+    try:
+        GLOBAL_CACHE.ShMem.SendMessage(my_email, config.partner_email.strip(), SYNC_QUEUE_COMMAND, params)
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Failed to send sync signal: {e}", Py4GW.Console.MessageType.Warning)
 
 
 def check_sync_signal() -> str:
@@ -399,9 +402,19 @@ def _draw_settings():
     PyImGui.text("Partner Account Email:")
     new_partner = PyImGui.input_text("##partner_email", config.partner_email, 256)
     if new_partner != config.partner_email:
-        config.partner_email = new_partner
-        Py4GW.Console.Log(BOT_NAME, f"Partner email set to: {config.partner_email}", 
-                        Py4GW.Console.MessageType.Info)
+        # Strip whitespace and validate basic email format
+        new_partner = new_partner.strip()
+        if new_partner and '@' in new_partner and '.' in new_partner:
+            config.partner_email = new_partner
+            Py4GW.Console.Log(BOT_NAME, f"Partner email set to: {config.partner_email}", 
+                            Py4GW.Console.MessageType.Info)
+        elif new_partner:
+            Py4GW.Console.Log(BOT_NAME, "Invalid email format. Please enter a valid email address.", 
+                            Py4GW.Console.MessageType.Warning)
+        else:
+            config.partner_email = ""
+            Py4GW.Console.Log(BOT_NAME, "Partner email cleared.", 
+                            Py4GW.Console.MessageType.Info)
     
     PyImGui.separator()
     
