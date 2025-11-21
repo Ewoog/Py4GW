@@ -282,11 +282,12 @@ def winning_team_logic(bot: Botting) -> Generator:
             current_strongboxes = get_strongbox_count()
             new_strongboxes = current_strongboxes - initial_strongboxes
             
+            # If we earned a strongbox, reset consecutive wins counter
             if new_strongboxes > 0:
-                # Reset consecutive wins after earning a strongbox
                 if config.consecutive_wins >= 5:
                     config.consecutive_wins = 0
             else:
+                # No strongbox yet - log progress toward next one
                 Py4GW.Console.Log(BOT_NAME, 
                                 f"Victory! {config.consecutive_wins} consecutive wins (need 5 for strongbox).", 
                                 Py4GW.Console.MessageType.Success)
