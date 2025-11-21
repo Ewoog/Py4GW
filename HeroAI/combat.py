@@ -324,8 +324,10 @@ class CombatClass:
             current_target = GLOBAL_CACHE.Player.GetTargetID()
             if current_target != party_target:
                 if GLOBAL_CACHE.Agent.IsLiving(party_target):
-                    _, alliegeance = GLOBAL_CACHE.Agent.GetAllegiance(party_target)
-                    if alliegeance != 'Ally' and alliegeance != 'NPC/Minipet' and self.is_combat_enabled:
+                    allegiance_value, _ = GLOBAL_CACHE.Agent.GetAllegiance(party_target)
+                    # Only target if it's an enemy (allegiance 3)
+                    # Don't target: Ally (1), Neutral (2), SpiritPet (4), Minion (5), or NpcMinipet (6)
+                    if allegiance_value == Allegiance.Enemy.value and self.is_combat_enabled:
                         self.SafeChangeTarget(party_target)
                         return party_target
         return 0
