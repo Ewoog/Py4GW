@@ -39,6 +39,9 @@ SEABED_ARENA_MAP_ID = 829
 # Using 828 as a best guess. This may need to be updated once the correct ID is discovered.
 DELDRIMOR_ARENA_MAP_ID = 828  # TODO: Verify this ID - needs to be confirmed in-game
 
+# Movement tolerance for priest location (200 units = close enough to engage)
+PRIEST_LOCATION_TOLERANCE = 200
+
 # Priest coordinates for arenas
 # Format: {map_id: {"blue": (x, y), "red": (x, y)}}
 PRIEST_COORDINATES = {
@@ -256,7 +259,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
                      Py4GW.Console.MessageType.Info)
     
     # Move to priest location
-    follower = Movement.FollowXY(tolerance=200)
+    follower = Movement.FollowXY(tolerance=PRIEST_LOCATION_TOLERANCE)
     follower.move_to_waypoint(priest_x, priest_y)
     
     # Wait until we arrive or timeout (90 seconds to account for potential obstacles)
