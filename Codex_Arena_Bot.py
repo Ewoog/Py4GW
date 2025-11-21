@@ -323,7 +323,7 @@ def run_codex_match(bot: Botting) -> None:
         Py4GW.Console.Log(BOT_NAME, "Waiting for other team to be ready...", Py4GW.Console.MessageType.Info)
         
         # Wait for confirmation from other team OR timeout
-        timeout = 60  # 1 minute timeout
+        timeout = 120  # 2 minute timeout
         start_time = time.time()
         other_team_ready = False
         
