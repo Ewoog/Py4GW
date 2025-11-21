@@ -238,16 +238,27 @@ class SkillBar:
         skillbar_instance.LoadSkillTemplate(skill_template)
 
     @staticmethod
-    def LoadHeroSkillTemplate (hero_id, skill_template):
+    def LoadHeroSkillTemplate(hero_id, skill_template):
         """
-        Purpose: Load a Hero skill template onto a hero.
+        Purpose: Load a Hero skill template onto a hero by their Hero ID.
         Args:
             hero_id (int): The Hero ID (e.g., 1=Norgu, 6=Koss, etc. See PyParty.HeroType).
-                          You can get the hero ID using Party.Heroes.GetHeroIDByPartyPosition() or
-                          Party.Heroes.GetHeroIdByName().
+                          You can get the hero ID using:
+                          - Party.Heroes.GetHeroIdByName("Koss") 
+                          - Party.Heroes.GetHeroIDByPartyPosition(0) for first hero
+                          - PyParty.HeroType.Koss for Koss, etc.
             skill_template (str): The skill template code to load.
         Returns:
             bool: True if the template was loaded successfully, False otherwise.
+        
+        Example:
+            # Load a template on Koss
+            from PyParty import HeroType
+            SkillBar.LoadHeroSkillTemplate(HeroType.Koss, "OQATEjpUjIACVAAAAAAAAAA")
+            
+            # Or by name
+            hero_id = Party.Heroes.GetHeroIdByName("Koss")
+            SkillBar.LoadHeroSkillTemplate(hero_id, "OQATEjpUjIACVAAAAAAAAAA")
         """
         skillbar_instance = PySkillbar.Skillbar()
         result = skillbar_instance.LoadHeroSkillTemplate(hero_id, skill_template)
@@ -255,6 +266,26 @@ class SkillBar:
             print(f"Warning: Failed to load skill template '{skill_template}' for hero ID {hero_id}. "
                   f"Ensure the hero is in your party and the template is valid.")
         return result
+    
+    @staticmethod
+    def LoadHeroSkillTemplateByName(hero_name, skill_template):
+        """
+        Purpose: Load a Hero skill template onto a hero by their name.
+        Args:
+            hero_name (str): The hero name (e.g., "Koss", "Norgu", etc.)
+            skill_template (str): The skill template code to load.
+        Returns:
+            bool: True if the template was loaded successfully, False otherwise.
+            
+        Example:
+            SkillBar.LoadHeroSkillTemplateByName("Koss", "OQATEjpUjIACVAAAAAAAAAA")
+        """
+        from Py4GWCoreLib.Party import Party
+        hero_id = Party.Heroes.GetHeroIdByName(hero_name)
+        if not hero_id:
+            print(f"Error: Could not find hero with name '{hero_name}'")
+            return False
+        return SkillBar.LoadHeroSkillTemplate(hero_id, skill_template)
 
     @staticmethod
     def GetSkillbar():
