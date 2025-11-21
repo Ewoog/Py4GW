@@ -30,8 +30,7 @@ class MapCache:
         return current_map.instance_type.GetName() == "Loading"
     
     def GetInstanceType(self):
-        current_map = PyMap.PyMap()
-        return current_map.instance_type.Get()
+        return self._map_instance.instance_type.Get()
     
     def GetMapName(self, mapid: int | None = None) -> str:
         if mapid is None:
