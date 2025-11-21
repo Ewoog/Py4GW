@@ -180,8 +180,10 @@ class Agents:
             hostile_agents = AgentArray.Filter.ByCondition(all_agents, lambda agent_id: GLOBAL_CACHE.Agent.IsLiving(agent_id))
             hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Agent.IsAlive(agent_id))
             hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Player.GetAgentID() != agent_id)
-            # Filter out allies - only keep non-ally agents (players and henchmen)
-            hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Agent.GetAllegiance(agent_id)[0] != 1)  # 1 = Ally allegiance
+            # Filter out allies, neutrals, and NPCs - only keep enemy players/henchmen
+            hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Agent.GetAllegiance(agent_id)[0] not in [1, 2, 6])  # 1=Ally, 2=Neutral, 6=NpcMinipet
+            # Filter out party members
+            hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: not GLOBAL_CACHE.Party.IsPartyMember(agent_id))
             # Add hostile agents to enemy array
             enemy_array = enemy_array + hostile_agents
         
