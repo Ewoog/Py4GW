@@ -160,6 +160,11 @@ def equip_set(set_number: int) -> Generator:
     yield from Routines.Yield.wait(500)
 
 
+def disable_auto_combat():
+    """Disable auto combat for the bot."""
+    bot.config.upkeep.auto_combat.set_now("active", False)
+
+
 def travel_to_codex_arena() -> Generator:
     """Travel to Codex Arena outpost."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -235,7 +240,7 @@ def winning_team_logic(bot: Botting) -> Generator:
                             Py4GW.Console.MessageType.Success)
             from Py4GWCoreLib import Party
             # Disable auto combat when returning to outpost
-            bot.config.upkeep.auto_combat.set_now("active", False)
+            disable_auto_combat()
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             config.in_match = False
@@ -310,7 +315,7 @@ def winning_team_logic(bot: Botting) -> Generator:
                             Py4GW.Console.MessageType.Warning)
             from Py4GWCoreLib import Party
             # Disable auto combat when returning to outpost
-            bot.config.upkeep.auto_combat.set_now("active", False)
+            disable_auto_combat()
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             config.in_match = False
@@ -329,7 +334,7 @@ def winning_team_logic(bot: Botting) -> Generator:
                             Py4GW.Console.MessageType.Warning)
             from Py4GWCoreLib import Party
             # Disable auto combat when returning to outpost
-            bot.config.upkeep.auto_combat.set_now("active", False)
+            disable_auto_combat()
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             return
