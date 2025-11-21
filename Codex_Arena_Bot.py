@@ -32,6 +32,23 @@ from typing import Generator, Any
 
 BOT_NAME = "Codex Arena Bot"
 
+# Arena map IDs and priest coordinates
+SEABED_ARENA_MAP_ID = 829
+DELDRIMOR_ARENA_MAP_ID = 828  # TODO: Verify this ID - not found in enums
+
+# Priest coordinates for arenas
+# Format: {map_id: {"blue": (x, y), "red": (x, y)}}
+PRIEST_COORDINATES = {
+    SEABED_ARENA_MAP_ID: {
+        "blue": (9737, 4344),
+        "red": (4368, 6953)
+    },
+    DELDRIMOR_ARENA_MAP_ID: {
+        "blue": (-9344, 2803),
+        "red": (-8999, 7488)
+    }
+}
+
 # Configuration class for tracking bot state
 class CodexConfig:
     """Configuration and state tracking for the Codex Arena bot."""
@@ -186,6 +203,91 @@ def enter_queue() -> Generator:
     yield from Routines.Yield.wait(35000)
 
 
+def get_player_team(map_id: int) -> str:
+    """
+    Determine which team the player is on based on proximity to spawn points.
+    Returns 'blue' or 'red' or 'unknown'.
+    """
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib.Py4GWcorelib import Utils
+    
+    if map_id not in PRIEST_COORDINATES:
+        return "unknown"
+    
+    player_pos = GLOBAL_CACHE.Player.GetXY()
+    blue_spawn = PRIEST_COORDINATES[map_id]["blue"]
+    red_spawn = PRIEST_COORDINATES[map_id]["red"]
+    
+    dist_to_blue = Utils.Distance(player_pos, blue_spawn)
+    dist_to_red = Utils.Distance(player_pos, red_spawn)
+    
+    return "blue" if dist_to_blue < dist_to_red else "red"
+
+
+def kill_enemy_priest(bot: Botting, map_id: int) -> Generator:
+    """
+    Move to the enemy priest location and kill it.
+    Only called for winning team in Seabed Arena or Deldrimor Arena.
+    """
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib.Routines import Routines
+    from Py4GWCoreLib.routines_src.Movement import Movement
+    from Py4GWCoreLib.routines_src.Agents import Agents
+    
+    if map_id not in PRIEST_COORDINATES:
+        return
+    
+    # Determine our team
+    our_team = get_player_team(map_id)
+    if our_team == "unknown":
+        Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping priest kill", 
+                         Py4GW.Console.MessageType.Warning)
+        return
+    
+    # Get enemy priest location (opposite team)
+    enemy_team = "red" if our_team == "blue" else "blue"
+    priest_x, priest_y = PRIEST_COORDINATES[map_id][enemy_team]
+    
+    Py4GW.Console.Log(BOT_NAME, 
+                     f"Moving to {enemy_team} priest at ({priest_x}, {priest_y})...", 
+                     Py4GW.Console.MessageType.Info)
+    
+    # Move to priest location
+    follower = Movement.FollowXY(tolerance=200)
+    follower.move_to_waypoint(priest_x, priest_y)
+    
+    # Wait until we arrive or timeout (60 seconds)
+    timeout = 60
+    start_time = time.time()
+    while time.time() - start_time < timeout and bot.config.fsm_running:
+        follower.update()
+        if follower.has_arrived():
+            break
+        yield from Routines.Yield.wait(100)
+    
+    if follower.has_arrived():
+        Py4GW.Console.Log(BOT_NAME, "Arrived at priest location!", Py4GW.Console.MessageType.Success)
+        
+        # Look for nearby enemies (priest)
+        # Wait a bit for enemies to be in range and engage them
+        yield from Routines.Yield.wait(2000)
+        
+        # Find and attack nearby enemies
+        nearby_enemy = Agents.GetNearestEnemy(max_distance=1500)
+        if nearby_enemy:
+            Py4GW.Console.Log(BOT_NAME, "Found enemy priest, engaging...", Py4GW.Console.MessageType.Info)
+            GLOBAL_CACHE.Player.ChangeTarget(nearby_enemy)
+            # Attack will be handled by combat routine if enabled
+            # Wait a few seconds for combat to start
+            yield from Routines.Yield.wait(3000)
+        else:
+            Py4GW.Console.Log(BOT_NAME, "No enemies found near priest location", 
+                             Py4GW.Console.MessageType.Warning)
+    else:
+        Py4GW.Console.Log(BOT_NAME, "Failed to reach priest location in time", 
+                         Py4GW.Console.MessageType.Warning)
+
+
 def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
     """Wait until match starts (map changes from outpost) or at least 1 minute."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -245,6 +347,13 @@ def winning_team_logic(bot: Botting) -> Generator:
         
         # Get current map ID to detect map changes
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
+        
+        # Check if we're in Seabed Arena or Deldrimor Arena and kill enemy priest
+        if current_map_id in PRIEST_COORDINATES:
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Detected special arena (Map ID: {current_map_id}), attempting to kill enemy priest...", 
+                            Py4GW.Console.MessageType.Info)
+            yield from kill_enemy_priest(bot, current_map_id)
         
         # Wait in the arena until the map changes (up to 10 minutes)
         Py4GW.Console.Log(BOT_NAME, "Winning team in arena, waiting for map change...", 
