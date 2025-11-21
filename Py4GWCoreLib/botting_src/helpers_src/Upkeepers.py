@@ -35,6 +35,8 @@ class _Upkeepers:
         handler = get_widget_handler()
         while True:   
             if not self._config.upkeep.hero_ai.is_active():
+                if handler.is_widget_enabled("HeroAI"):
+                    handler.disable_widget("HeroAI")
                 yield from Routines.Yield.wait(500)
                 continue
             
@@ -47,8 +49,10 @@ class _Upkeepers:
                 yield from Routines.Yield.Movement.StopMovement()
                 self.cancel_movement_triggered = True
                     
-            if not handler.is_widget_enabled("HeroAI"):
+            if self._config.upkeep.hero_ai.is_active() and not handler.is_widget_enabled("HeroAI"):
                 handler.enable_widget("HeroAI")
+            elif not self._config.upkeep.hero_ai.is_active() and handler.is_widget_enabled("HeroAI"):
+                handler.disable_widget("HeroAI")
             yield from Routines.Yield.wait(500)
         
     def upkeep_auto_inventory_management(self):

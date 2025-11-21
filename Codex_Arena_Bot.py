@@ -234,6 +234,8 @@ def winning_team_logic(bot: Botting) -> Generator:
                             f"Target reached! Earned {config.strongboxes_earned} strongboxes. Returning to outpost.", 
                             Py4GW.Console.MessageType.Success)
             from Py4GWCoreLib import Party
+            # Disable auto combat when returning to outpost
+            bot.config.upkeep.auto_combat.set_now("active", False)
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             config.in_match = False
@@ -307,6 +309,8 @@ def winning_team_logic(bot: Botting) -> Generator:
             Py4GW.Console.Log(BOT_NAME, "Match timeout, forcing return to outpost...", 
                             Py4GW.Console.MessageType.Warning)
             from Py4GWCoreLib import Party
+            # Disable auto combat when returning to outpost
+            bot.config.upkeep.auto_combat.set_now("active", False)
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             config.in_match = False
@@ -324,6 +328,8 @@ def winning_team_logic(bot: Botting) -> Generator:
             Py4GW.Console.Log(BOT_NAME, "Failed to enter next match, returning to outpost...", 
                             Py4GW.Console.MessageType.Warning)
             from Py4GWCoreLib import Party
+            # Disable auto combat when returning to outpost
+            bot.config.upkeep.auto_combat.set_now("active", False)
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             return
@@ -463,7 +469,9 @@ def run_codex_match(bot: Botting) -> None:
         
         # Execute team-specific logic
         if config.is_winning_team:
-            Py4GW.Console.Log(BOT_NAME, "Playing as winning team...", Py4GW.Console.MessageType.Info)
+            # Enable auto combat for winning team to be aggressive
+            bot.config.upkeep.auto_combat.set_now("active", True)
+            Py4GW.Console.Log(BOT_NAME, "Playing as winning team (auto combat enabled)...", Py4GW.Console.MessageType.Info)
             yield from winning_team_logic(bot)
             # Winning team logic handles multiple matches internally and only returns when done
             # No need to log progress or wait here
