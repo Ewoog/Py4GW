@@ -65,10 +65,11 @@ Run the bot on both team leaders:
 
 The bots use Py4GW's shared memory system to communicate:
 
-1. **Ready Phase**: Both bots signal when they're ready to queue
+1. **Ready Phase**: Both bots signal when they're ready to queue (first match only)
 2. **Queue Phase**: Once both are ready, they enter the queue simultaneously
 3. **Match Phase**: Bots track when the match starts and ends
 4. **Repeat**: Process continues until strongbox targets are met
+   - **Note**: After the first match, the losing team immediately re-enters the queue without waiting for synchronization, allowing for faster cycling
 
 ### Strongbox Tracking
 
@@ -90,7 +91,7 @@ The bots use Py4GW's shared memory system to communicate:
 - Enters the match
 - Attempts to return to outpost after a set time
 - Does not increment win counter (loss expected)
-- Re-queues after returning to outpost
+- **Immediately re-enters queue** after returning to outpost (no synchronization wait on subsequent matches)
 
 ## Configuration Options
 
