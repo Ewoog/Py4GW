@@ -42,7 +42,6 @@ class CodexConfig:
         self.target_strongboxes = 5  # Strongboxes to earn before stopping (max per day)
         self.synced_queue = False  # Flag for synchronization
         self.in_match = False
-        self.bot_started = False
         self.ready_to_queue = False
         self.initial_strongbox_count = 0  # Track starting strongbox count
 
@@ -163,10 +162,10 @@ def wait_for_match_start() -> Generator:
     from Py4GWCoreLib import Map
     from Py4GWCoreLib.Routines import Routines
     
-    timeout = 300000  # 5 minute timeout (in milliseconds)
+    timeout = 300  # 5 minute timeout (in seconds)
     start_time = time.time()
     
-    while time.time() - start_time < timeout and config.bot_started:
+    while time.time() - start_time < timeout and bot.config.fsm_running:
         instance_type = GLOBAL_CACHE.Map.GetInstanceType()
         if instance_type == Map.InstanceType.Explorable:
             config.in_match = True
@@ -199,10 +198,10 @@ def winning_team_logic() -> Generator:
     # or the game mechanics would handle it
     
     # Wait for match to end (return to outpost)
-    timeout = 600000  # 10 minute timeout for full match (in milliseconds)
+    timeout = 600  # 10 minute timeout for full match (in seconds)
     start_time = time.time()
     
-    while time.time() - start_time < timeout and config.bot_started:
+    while time.time() - start_time < timeout and bot.config.fsm_running:
         instance_type = GLOBAL_CACHE.Map.GetInstanceType()
         if instance_type == Map.InstanceType.Outpost:
             # Match ended, we're back in outpost
@@ -253,10 +252,10 @@ def losing_team_logic() -> Generator:
                      Py4GW.Console.MessageType.Info)
     
     # Wait for match to end (should lose)
-    timeout = 600000  # 10 minute timeout (in milliseconds)
+    timeout = 600  # 10 minute timeout (in seconds)
     start_time = time.time()
     
-    while time.time() - start_time < timeout and config.bot_started:
+    while time.time() - start_time < timeout and bot.config.fsm_running:
         instance_type = GLOBAL_CACHE.Map.GetInstanceType()
         if instance_type == Map.InstanceType.Outpost:
             # Back in outpost after losing
@@ -323,7 +322,7 @@ def run_codex_match(bot: Botting) -> None:
         Py4GW.Console.Log(BOT_NAME, "Waiting for other team to be ready...", Py4GW.Console.MessageType.Info)
         
         # Wait for confirmation from other team OR timeout
-        timeout = 120000  # 2 minute timeout (in milliseconds)
+        timeout = 120  # 2 minute timeout (in seconds)
         start_time = time.time()
         other_team_ready = False
         
