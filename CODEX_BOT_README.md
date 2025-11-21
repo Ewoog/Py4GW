@@ -81,8 +81,8 @@ The bots use Py4GW's shared memory system to communicate:
 
 **Winning Team:**
 - Enters the match
-- **Special Arena Behavior**: In Seabed Arena or Deldrimor Arena, automatically moves to enemy priest location and engages
-- Plays normally (automated combat if configured)
+- **Special Arena Behavior**: In Seabed Arena or Deldrimor Arena, automatically moves to enemy priest location (HeroAI handles combat)
+- Plays normally (HeroAI handles combat automatically)
 - Waits for natural match completion
 - Tracks consecutive wins
 - Checks for strongbox acquisition
@@ -90,7 +90,7 @@ The bots use Py4GW's shared memory system to communicate:
 
 **Losing Team:**
 - Enters the match
-- Does NOT engage in special arena behavior (no priest killing)
+- Does NOT engage in special arena behavior (no priest movement)
 - Attempts to return to outpost after a set time
 - Does not increment win counter (loss expected)
 - **Immediately re-enters queue** after returning to outpost (no synchronization wait on subsequent matches)
@@ -103,7 +103,7 @@ The bot includes special logic for **Seabed Arena** and **Deldrimor Arena**:
 - **Priest Targeting**: Winning team moves to the opposite team's priest location
   - If on blue team → moves to red priest
   - If on red team → moves to blue priest
-- **Engagement**: Targets and engages the enemy priest upon arrival
+- **HeroAI Combat**: Once at the priest location, HeroAI automatically handles combat
 - **Losing Team**: Does nothing special - just returns to outpost as normal
 
 **Arena Map IDs and Priest Locations:**

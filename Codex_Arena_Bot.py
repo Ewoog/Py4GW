@@ -227,15 +227,15 @@ def get_player_team(map_id: int) -> str:
     return "blue" if dist_to_blue < dist_to_red else "red"
 
 
-def kill_enemy_priest(bot: Botting, map_id: int) -> Generator:
+def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     """
-    Move to the enemy priest location and kill it.
+    Move to the enemy priest location.
+    HeroAI will handle the actual combat automatically.
     Only called for winning team in Seabed Arena or Deldrimor Arena.
     """
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.routines_src.Movement import Movement
-    from Py4GWCoreLib.routines_src.Agents import Agents
     
     if map_id not in PRIEST_COORDINATES:
         return
@@ -243,7 +243,7 @@ def kill_enemy_priest(bot: Botting, map_id: int) -> Generator:
     # Determine our team
     our_team = get_player_team(map_id)
     if our_team == "unknown":
-        Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping priest kill", 
+        Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping priest movement", 
                          Py4GW.Console.MessageType.Warning)
         return
     
@@ -252,15 +252,15 @@ def kill_enemy_priest(bot: Botting, map_id: int) -> Generator:
     priest_x, priest_y = PRIEST_COORDINATES[map_id][enemy_team]
     
     Py4GW.Console.Log(BOT_NAME, 
-                     f"Moving to {enemy_team} priest at ({priest_x}, {priest_y})...", 
+                     f"Our team: {our_team.upper()} - Moving to {enemy_team.upper()} priest at ({priest_x}, {priest_y})...", 
                      Py4GW.Console.MessageType.Info)
     
     # Move to priest location
     follower = Movement.FollowXY(tolerance=200)
     follower.move_to_waypoint(priest_x, priest_y)
     
-    # Wait until we arrive or timeout (60 seconds)
-    timeout = 60
+    # Wait until we arrive or timeout (90 seconds to account for potential obstacles)
+    timeout = 90
     start_time = time.time()
     while time.time() - start_time < timeout and bot.config.fsm_running:
         follower.update()
@@ -269,25 +269,15 @@ def kill_enemy_priest(bot: Botting, map_id: int) -> Generator:
         yield from Routines.Yield.wait(100)
     
     if follower.has_arrived():
-        Py4GW.Console.Log(BOT_NAME, "Arrived at priest location!", Py4GW.Console.MessageType.Success)
-        
-        # Look for nearby enemies (priest)
-        # Wait a bit for enemies to be in range and engage them
+        Py4GW.Console.Log(BOT_NAME, 
+                         f"Arrived at {enemy_team.upper()} priest location! HeroAI will handle combat.", 
+                         Py4GW.Console.MessageType.Success)
+        # HeroAI will automatically engage enemies in range
+        # Just wait a bit to ensure we stay in the area
         yield from Routines.Yield.wait(2000)
-        
-        # Find and attack nearby enemies
-        nearby_enemy = Agents.GetNearestEnemy(max_distance=1500)
-        if nearby_enemy:
-            Py4GW.Console.Log(BOT_NAME, "Found enemy priest, engaging...", Py4GW.Console.MessageType.Info)
-            GLOBAL_CACHE.Player.ChangeTarget(nearby_enemy)
-            # Attack will be handled by combat routine if enabled
-            # Wait a few seconds for combat to start
-            yield from Routines.Yield.wait(3000)
-        else:
-            Py4GW.Console.Log(BOT_NAME, "No enemies found near priest location", 
-                             Py4GW.Console.MessageType.Warning)
     else:
-        Py4GW.Console.Log(BOT_NAME, "Failed to reach priest location in time", 
+        Py4GW.Console.Log(BOT_NAME, 
+                         f"Failed to reach {enemy_team.upper()} priest location within {timeout} seconds", 
                          Py4GW.Console.MessageType.Warning)
 
 
@@ -354,7 +344,7 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Get current map ID to detect map changes
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
         
-        # Check if we're in Seabed Arena or Deldrimor Arena and kill enemy priest
+        # Check if we're in Seabed Arena or Deldrimor Arena and move to enemy priest
         if current_map_id in PRIEST_COORDINATES:
             arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
             if current_map_id == DELDRIMOR_ARENA_MAP_ID:
@@ -363,9 +353,9 @@ def winning_team_logic(bot: Botting) -> Generator:
                                 "If this doesn't work, please verify the correct map ID.", 
                                 Py4GW.Console.MessageType.Warning)
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Detected {arena_name} (Map ID: {current_map_id}), attempting to kill enemy priest...", 
+                            f"Detected {arena_name} (Map ID: {current_map_id}), moving to enemy priest...", 
                             Py4GW.Console.MessageType.Info)
-            yield from kill_enemy_priest(bot, current_map_id)
+            yield from move_to_enemy_priest(bot, current_map_id)
         
         # Wait in the arena until the map changes (up to 10 minutes)
         Py4GW.Console.Log(BOT_NAME, "Winning team in arena, waiting for map change...", 
