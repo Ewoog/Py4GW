@@ -185,22 +185,33 @@ def enter_queue() -> Generator:
     yield from Routines.Yield.wait(35000)
 
 
-def wait_for_match_start(bot: Botting) -> Generator:
-    """Wait until match starts (map changes to explorable)."""
+def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
+    """Wait until match starts (map changes from outpost) or at least 1 minute."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
-    from Py4GWCoreLib import Map
     from Py4GWCoreLib.Routines import Routines
     
+    min_wait_time = 60  # Minimum 1 minute wait
     timeout = 300  # 5 minute timeout (in seconds)
     start_time = time.time()
+    map_changed = False
     
     while time.time() - start_time < timeout and bot.config.fsm_running:
-        instance_type = GLOBAL_CACHE.Map.GetInstanceType()
-        if instance_type == Map.InstanceType.Explorable:
-            config.in_match = True
+        current_map_id = GLOBAL_CACHE.Map.GetMapID()
+        elapsed = time.time() - start_time
+        
+        # Check if map has changed from outpost
+        if current_map_id != outpost_map_id:
+            map_changed = True
+            if not config.in_match:
+                config.in_match = True
+                Py4GW.Console.Log(BOT_NAME, "Entered the Arena!", Py4GW.Console.MessageType.Success)
+        
+        # Exit when map changed AND at least 1 minute has passed
+        if map_changed and elapsed >= min_wait_time:
             send_sync_signal("MATCH_START")
             Py4GW.Console.Log(BOT_NAME, "Match started!", Py4GW.Console.MessageType.Success)
             return
+        
         yield from Routines.Yield.wait(1000)
     
     # Timeout - match didn't start
@@ -212,7 +223,6 @@ def winning_team_logic(bot: Botting) -> Generator:
     """Logic for the winning team - win matches continuously, staying in map and auto-queued."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
-    from Py4GWCoreLib import Map
     
     # Winning team stays in explorable map after victories and is automatically re-queued
     # Loop through multiple matches without returning to outpost
@@ -232,56 +242,66 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Get strongbox count before match ends
         initial_strongboxes = get_strongbox_count()
         
-        # Wait in match for some time (simulating play)
-        Py4GW.Console.Log(BOT_NAME, "Winning team in match, waiting for completion...", 
-                         Py4GW.Console.MessageType.Info)
-        yield from Routines.Yield.wait(30000)  # 30 seconds initial wait
+        # Get current map ID to detect map changes
+        current_map_id = GLOBAL_CACHE.Map.GetMapID()
         
-        # Wait for match to end (victory) - track when strongbox appears or time passes
-        timeout = 600  # 10 minute timeout for full match (in seconds)
+        # Wait in the arena until the map changes (up to 10 minutes)
+        Py4GW.Console.Log(BOT_NAME, "Winning team in arena, waiting for map change...", 
+                         Py4GW.Console.MessageType.Info)
+        
+        timeout = 600  # 10 minute timeout (in seconds)
         start_time = time.time()
-        victory_detected = False
+        map_changed = False
         
         while time.time() - start_time < timeout and bot.config.fsm_running:
             yield from Routines.Yield.wait(2000)
+            
+            # Check if map has changed
+            new_map_id = GLOBAL_CACHE.Map.GetMapID()
+            if new_map_id != current_map_id:
+                map_changed = True
+                Py4GW.Console.Log(BOT_NAME, "Map changed - match ended!", Py4GW.Console.MessageType.Info)
+                break
             
             # Check for new strongboxes to detect victory
             current_strongboxes = get_strongbox_count()
             new_strongboxes = current_strongboxes - initial_strongboxes
             
-            # If we got a new strongbox or enough time has passed, assume victory
-            if new_strongboxes > 0 or (time.time() - start_time > 90 and not victory_detected):
-                victory_detected = True
-                
-                # Increment consecutive wins
-                config.consecutive_wins += 1
-                
-                # Check if we earned a strongbox (every 5 consecutive wins)
-                if new_strongboxes > 0:
-                    config.strongboxes_earned += new_strongboxes
-                    Py4GW.Console.Log(BOT_NAME, 
-                                    f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes ({config.consecutive_wins} consecutive wins).", 
-                                    Py4GW.Console.MessageType.Success)
-                    # Reset consecutive wins after earning a strongbox
-                    if config.consecutive_wins >= 5:
-                        config.consecutive_wins = 0
-                else:
-                    Py4GW.Console.Log(BOT_NAME, 
-                                    f"Victory! {config.consecutive_wins} consecutive wins (need 5 for strongbox).", 
-                                    Py4GW.Console.MessageType.Success)
-                
-                # Winning team stays in map and is automatically re-queued by the game
-                Py4GW.Console.Log(BOT_NAME, "Victory! Waiting for automatic re-queue and next match...", 
-                                Py4GW.Console.MessageType.Info)
-                config.in_match = False
-                
-                # Log current progress
+            # If we got a new strongbox, record it
+            if new_strongboxes > 0:
+                config.strongboxes_earned += new_strongboxes
                 Py4GW.Console.Log(BOT_NAME, 
-                                f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
-                                Py4GW.Console.MessageType.Info)
-                break
+                                f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes.", 
+                                Py4GW.Console.MessageType.Success)
         
-        if not victory_detected:
+        if map_changed:
+            # Increment consecutive wins
+            config.consecutive_wins += 1
+            
+            # Check for strongbox based on consecutive wins
+            current_strongboxes = get_strongbox_count()
+            new_strongboxes = current_strongboxes - initial_strongboxes
+            
+            # If we earned a strongbox, reset consecutive wins counter
+            if new_strongboxes > 0:
+                if config.consecutive_wins >= 5:
+                    config.consecutive_wins = 0
+            else:
+                # No strongbox yet - log progress toward next one
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Victory! {config.consecutive_wins} consecutive wins (need 5 for strongbox).", 
+                                Py4GW.Console.MessageType.Success)
+            
+            # Winning team stays in map and is automatically re-queued by the game
+            Py4GW.Console.Log(BOT_NAME, "Waiting for automatic re-queue and next match...", 
+                            Py4GW.Console.MessageType.Info)
+            config.in_match = False
+            
+            # Log current progress
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
+                            Py4GW.Console.MessageType.Info)
+        else:
             # Timeout - something went wrong, force return to outpost
             Py4GW.Console.Log(BOT_NAME, "Match timeout, forcing return to outpost...", 
                             Py4GW.Console.MessageType.Warning)
@@ -291,9 +311,12 @@ def winning_team_logic(bot: Botting) -> Generator:
             config.in_match = False
             return
         
+        # Get the current outpost map ID for next match detection
+        outpost_map_id = GLOBAL_CACHE.Map.GetMapID()
+        
         # Wait for next match to start (automatically queued by game)
         Py4GW.Console.Log(BOT_NAME, "Waiting for next match to start...", Py4GW.Console.MessageType.Info)
-        yield from wait_for_match_start(bot)
+        yield from wait_for_match_start(bot, outpost_map_id)
         
         if not config.in_match:
             # Failed to enter next match, return to outpost
@@ -311,24 +334,29 @@ def losing_team_logic(bot: Botting) -> Generator:
     """Logic for the losing team - return to outpost after match."""
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
-    from Py4GWCoreLib import Map, Party
+    from Py4GWCoreLib import Party
     
-    Py4GW.Console.Log(BOT_NAME, "Losing team in match, waiting to return...", 
+    Py4GW.Console.Log(BOT_NAME, "Losing team in arena, waiting for map change...", 
                      Py4GW.Console.MessageType.Info)
     
-    # Wait for match to end (should lose)
+    # Get current map ID to detect map changes
+    current_map_id = GLOBAL_CACHE.Map.GetMapID()
+    
+    # Wait until map changes (up to 10 minutes)
     timeout = 600  # 10 minute timeout (in seconds)
     start_time = time.time()
+    map_changed = False
     
     while time.time() - start_time < timeout and bot.config.fsm_running:
-        instance_type = GLOBAL_CACHE.Map.GetInstanceType()
-        if instance_type == Map.InstanceType.Outpost:
-            # Back in outpost after losing
-            config.in_match = False
-            # Reset consecutive wins on loss (losing team loses, so this doesn't apply to winning team)
-            # The losing team doesn't track consecutive wins
-            Py4GW.Console.Log(BOT_NAME, "Returned to outpost after loss.", 
+        yield from Routines.Yield.wait(2000)
+        
+        # Check if map has changed
+        new_map_id = GLOBAL_CACHE.Map.GetMapID()
+        if new_map_id != current_map_id:
+            map_changed = True
+            Py4GW.Console.Log(BOT_NAME, "Map changed - returned to outpost after loss.", 
                             Py4GW.Console.MessageType.Info)
+            config.in_match = False
             send_sync_signal("MATCH_END")
             return
         
@@ -339,18 +367,18 @@ def losing_team_logic(bot: Botting) -> Generator:
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             
-            # Check if we successfully returned
-            if GLOBAL_CACHE.Map.GetInstanceType() == Map.InstanceType.Outpost:
+            # Check if map changed after return attempt
+            new_map_id = GLOBAL_CACHE.Map.GetMapID()
+            if new_map_id != current_map_id:
+                map_changed = True
                 config.in_match = False
                 Py4GW.Console.Log(BOT_NAME, "Successfully returned to outpost.", 
                                 Py4GW.Console.MessageType.Success)
                 send_sync_signal("MATCH_END")
                 return
-        
-        yield from Routines.Yield.wait(2000)
     
     # Timeout handling
-    if config.in_match:
+    if not map_changed:
         Py4GW.Console.Log(BOT_NAME, "Timeout in losing team logic, forcing return...", 
                         Py4GW.Console.MessageType.Warning)
         config.in_match = False
@@ -360,6 +388,7 @@ def run_codex_match(bot: Botting) -> None:
     """Run a single Codex Arena match cycle."""
     def _run_match():
         from Py4GWCoreLib.Routines import Routines
+        from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
         
         # Check if we should shut down (earned 5 strongboxes)
         if config.strongboxes_earned >= config.target_strongboxes:
@@ -406,6 +435,9 @@ def run_codex_match(bot: Botting) -> None:
         # Brief sync delay to ensure both are ready
         yield from Routines.Yield.wait(1000)
         
+        # Get outpost map ID before entering queue
+        outpost_map_id = GLOBAL_CACHE.Map.GetMapID()
+        
         # Both teams enter queue simultaneously
         Py4GW.Console.Log(BOT_NAME, "Entering queue NOW!", Py4GW.Console.MessageType.Info)
         send_sync_signal("QUEUE_NOW")
@@ -413,7 +445,7 @@ def run_codex_match(bot: Botting) -> None:
         
         # Wait for match to start
         Py4GW.Console.Log(BOT_NAME, "Waiting for match to start...", Py4GW.Console.MessageType.Info)
-        yield from wait_for_match_start(bot)
+        yield from wait_for_match_start(bot, outpost_map_id)
         
         if not config.in_match:
             # Failed to enter match, retry
