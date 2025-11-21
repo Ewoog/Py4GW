@@ -106,7 +106,7 @@ def check_sync_signal() -> str:
     # Check for next message
     msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
     
-    if msg and msg.Command == SYNC_QUEUE_COMMAND.value:
+    if msg and msg.Command == SYNC_QUEUE_COMMAND:
         signal_type = ""
         if msg.Params[0] == 1.0:
             signal_type = "READY_TO_QUEUE"
