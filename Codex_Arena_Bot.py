@@ -45,6 +45,7 @@ class CodexConfig:
         self.bot_started = False
         self.ready_to_queue = False
         self.initial_strongbox_count = 0  # Track starting strongbox count
+        self.first_match_complete = False  # Track if first match has been completed
 
 config = CodexConfig()
 
@@ -207,6 +208,7 @@ def winning_team_logic() -> Generator:
         if instance_type == Map.InstanceType.Outpost:
             # Match ended, we're back in outpost
             config.in_match = False
+            config.first_match_complete = True  # Mark first match as complete
             
             # Check for new strongboxes
             current_strongboxes = get_strongbox_count()
@@ -261,6 +263,7 @@ def losing_team_logic() -> Generator:
         if instance_type == Map.InstanceType.Outpost:
             # Back in outpost after losing
             config.in_match = False
+            config.first_match_complete = True  # Mark first match as complete
             # Reset consecutive wins on loss (losing team loses, so this doesn't apply to winning team)
             # The losing team doesn't track consecutive wins
             Py4GW.Console.Log(BOT_NAME, "Returned to outpost after loss.", 
@@ -278,6 +281,7 @@ def losing_team_logic() -> Generator:
             # Check if we successfully returned
             if GLOBAL_CACHE.Map.GetInstanceType() == Map.InstanceType.Outpost:
                 config.in_match = False
+                config.first_match_complete = True  # Mark first match as complete
                 Py4GW.Console.Log(BOT_NAME, "Successfully returned to outpost.", 
                                 Py4GW.Console.MessageType.Success)
                 send_sync_signal("MATCH_END")
@@ -317,30 +321,36 @@ def run_codex_match(bot: Botting) -> None:
             yield from equip_set(2)
         
         # Synchronization phase: wait for both teams to be ready
-        config.ready_to_queue = True
-        send_sync_signal("READY_TO_QUEUE")
-        
-        Py4GW.Console.Log(BOT_NAME, "Waiting for other team to be ready...", Py4GW.Console.MessageType.Info)
-        
-        # Wait for confirmation from other team OR timeout
-        timeout = 120000  # 2 minute timeout (in milliseconds)
-        start_time = time.time()
-        other_team_ready = False
-        
-        while time.time() - start_time < timeout:
-            signal = check_sync_signal()
-            if signal == "READY_TO_QUEUE":
-                other_team_ready = True
-                Py4GW.Console.Log(BOT_NAME, "Other team is ready!", Py4GW.Console.MessageType.Info)
-                break
-            yield from Routines.Yield.wait(500)
-        
-        if not other_team_ready:
-            Py4GW.Console.Log(BOT_NAME, "Timeout waiting for other team. Proceeding anyway...", 
-                            Py4GW.Console.MessageType.Warning)
-        
-        # Brief sync delay to ensure both are ready
-        yield from Routines.Yield.wait(1000)
+        # Skip synchronization for losing team after first match (they queue immediately)
+        if config.is_winning_team or not config.first_match_complete:
+            config.ready_to_queue = True
+            send_sync_signal("READY_TO_QUEUE")
+            
+            Py4GW.Console.Log(BOT_NAME, "Waiting for other team to be ready...", Py4GW.Console.MessageType.Info)
+            
+            # Wait for confirmation from other team OR timeout
+            timeout = 120000  # 2 minute timeout (in milliseconds)
+            start_time = time.time()
+            other_team_ready = False
+            
+            while time.time() - start_time < timeout:
+                signal = check_sync_signal()
+                if signal == "READY_TO_QUEUE":
+                    other_team_ready = True
+                    Py4GW.Console.Log(BOT_NAME, "Other team is ready!", Py4GW.Console.MessageType.Info)
+                    break
+                yield from Routines.Yield.wait(500)
+            
+            if not other_team_ready:
+                Py4GW.Console.Log(BOT_NAME, "Timeout waiting for other team. Proceeding anyway...", 
+                                Py4GW.Console.MessageType.Warning)
+            
+            # Brief sync delay to ensure both are ready
+            yield from Routines.Yield.wait(1000)
+        else:
+            # Losing team after first match - skip synchronization and queue immediately
+            Py4GW.Console.Log(BOT_NAME, "Losing team skipping synchronization, entering queue immediately...", 
+                            Py4GW.Console.MessageType.Info)
         
         # Both teams enter queue simultaneously
         Py4GW.Console.Log(BOT_NAME, "Entering queue NOW!", Py4GW.Console.MessageType.Info)
