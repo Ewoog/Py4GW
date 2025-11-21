@@ -80,13 +80,21 @@ def get_available_accounts() -> list:
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
-    all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
-    account_emails = []
-    for account in all_accounts:
-        if account.AccountEmail != my_email:
-            account_emails.append(account.AccountEmail)
-    
-    return account_emails
+    try:
+        all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+        if not all_accounts:
+            return []
+        
+        account_emails = []
+        for account in all_accounts:
+            if account.AccountEmail != my_email:
+                account_emails.append(account.AccountEmail)
+        
+        return account_emails
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Failed to get accounts from shared memory: {e}", 
+                         Py4GW.Console.MessageType.Warning)
+        return []
 
 
 def send_sync_signal(signal_type: str):
