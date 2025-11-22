@@ -32,19 +32,31 @@ from typing import Generator, Any
 
 BOT_NAME = "Codex Arena Bot"
 
-# Arena map IDs and priest coordinates
+# Arena map IDs
 SEABED_ARENA_MAP_ID = 829
 DELDRIMOR_ARENA_MAP_ID = 830
+CHURRANU_ISLAND_ARENA_MAP_ID = 825
+SHIVERPEAK_ARENA_MAP_ID = 836
+PETRIFIED_ARENA_MAP_ID = 827
+AMNOON_ARENA_MAP_ID = 824
+FORT_KOGA_MAP_ID = 826
+BRAWLERS_PIT_MAP_ID = 831
+DALESSIO_ARENA_MAP_ID = 823
+ASCALON_ARENA_MAP_ID = 835
+SHING_JEA_ARENA_MAP_ID = 834
+SUNSPEAR_ARENA_MAP_ID = 833
+THE_CRAG_MAP_ID = 832
+HEROES_CRYPT_MAP_ID = 828
 
-# Movement tolerance for priest location (200 units = close enough to engage)
-PRIEST_LOCATION_TOLERANCE = 200
+# Movement tolerance for spawn location (200 units = close enough to engage)
+SPAWN_LOCATION_TOLERANCE = 200
 
-# Movement timeout when traveling to priest location (90 seconds to account for obstacles)
-PRIEST_MOVEMENT_TIMEOUT = 90
+# Movement timeout when traveling to enemy spawn location (90 seconds to account for obstacles)
+SPAWN_MOVEMENT_TIMEOUT = 90
 
-# Priest coordinates for arenas
+# Spawn coordinates for arenas
 # Format: {map_id: {"blue": (x, y), "red": (x, y)}}
-PRIEST_COORDINATES = {
+ARENA_SPAWN_COORDINATES = {
     SEABED_ARENA_MAP_ID: {
         "blue": (9737, 4344),
         "red": (4368, 6953)
@@ -52,8 +64,59 @@ PRIEST_COORDINATES = {
     DELDRIMOR_ARENA_MAP_ID: {
         "blue": (-9259.12, 2708.83),
         "red": (-8994.74, 7384.57)
+    },
+    CHURRANU_ISLAND_ARENA_MAP_ID: {
+        "blue": (4206.08, -119.03),
+        "red": (-886.18, -478.33)
+    },
+    SHIVERPEAK_ARENA_MAP_ID: {
+        "blue": (9344.00, 12417.00),
+        "red": (4409.82, 16214.67)
+    },
+    PETRIFIED_ARENA_MAP_ID: {
+        "blue": (1831.88, 1348.83),
+        "red": (7198.82, -4076.33)
+    },
+    AMNOON_ARENA_MAP_ID: {
+        "blue": (3282.00, 10095.00),
+        "red": (-1923.30, 5129.79)
+    },
+    FORT_KOGA_MAP_ID: {
+        "blue": (6321.00, 181.00),
+        "red": (195.82, -3402.33)
+    },
+    BRAWLERS_PIT_MAP_ID: {
+        "blue": (967.00, 5075.00),
+        "red": (4981.82, 5033.67)
+    },
+    DALESSIO_ARENA_MAP_ID: {
+        "blue": (4945.88, -2424.17),
+        "red": (4627.75, 3853.27)
+    },
+    ASCALON_ARENA_MAP_ID: {
+        "blue": (8181.50, -1940.41),
+        "red": (4800.82, -6545.33)
+    },
+    SHING_JEA_ARENA_MAP_ID: {
+        "blue": (-2375.00, -1583.00),
+        "red": (2308.82, 2879.67)
+    },
+    SUNSPEAR_ARENA_MAP_ID: {
+        "blue": (436.00, 2517.00),
+        "red": (3731.82, -2301.33)
+    },
+    THE_CRAG_MAP_ID: {
+        "blue": (6528.88, 4470.83),
+        "red": (-2394.18, -2403.33)
+    },
+    HEROES_CRYPT_MAP_ID: {
+        "blue": (-110.00, -4322.00),
+        "red": (3299.88, -5084.17)
     }
 }
+
+# Priest arena map IDs (subset of arenas with priests - for backwards compatibility)
+PRIEST_ARENA_MAP_IDS = {SEABED_ARENA_MAP_ID, DELDRIMOR_ARENA_MAP_ID}
 
 # Configuration class for tracking bot state
 class CodexConfig:
@@ -70,6 +133,7 @@ class CodexConfig:
         self.partner_email = ""  # Email of the other team leader to sync with
         self.partner_email_index = 0  # Index for combo box selection
         self.first_match = True  # Track if this is the first match (for losing team immediate requeue)
+        self.aggressive_mode = False  # Toggle: True = rush enemy spawn, False = only for priest maps
 
 config = CodexConfig()
 
@@ -216,12 +280,12 @@ def get_player_team(map_id: int) -> str:
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib.Py4GWcorelib import Utils
     
-    if map_id not in PRIEST_COORDINATES:
+    if map_id not in ARENA_SPAWN_COORDINATES:
         return "unknown"
     
     player_pos = GLOBAL_CACHE.Player.GetXY()
-    blue_spawn = PRIEST_COORDINATES[map_id]["blue"]
-    red_spawn = PRIEST_COORDINATES[map_id]["red"]
+    blue_spawn = ARENA_SPAWN_COORDINATES[map_id]["blue"]
+    red_spawn = ARENA_SPAWN_COORDINATES[map_id]["red"]
     
     dist_to_blue = Utils.Distance(player_pos, blue_spawn)
     dist_to_red = Utils.Distance(player_pos, red_spawn)
@@ -229,40 +293,43 @@ def get_player_team(map_id: int) -> str:
     return "blue" if dist_to_blue < dist_to_red else "red"
 
 
-def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
+def move_to_enemy_spawn(bot: Botting, map_id: int) -> Generator:
     """
-    Move to the enemy priest location.
+    Move to the enemy spawn location.
     HeroAI will handle the actual combat automatically.
-    Only called for winning team in Seabed Arena or Deldrimor Arena.
+    Called for winning team when aggressive mode is enabled or for priest maps.
     """
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.routines_src.Movement import Movement
     
-    if map_id not in PRIEST_COORDINATES:
+    if map_id not in ARENA_SPAWN_COORDINATES:
+        Py4GW.Console.Log(BOT_NAME, 
+                         f"Map ID {map_id} not recognized. Staying in spawn.", 
+                         Py4GW.Console.MessageType.Warning)
         return
     
     # Determine our team
     our_team = get_player_team(map_id)
     if our_team == "unknown":
-        Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping priest movement", 
+        Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping spawn movement", 
                          Py4GW.Console.MessageType.Warning)
         return
     
-    # Get enemy priest location (opposite team)
+    # Get enemy spawn location (opposite team)
     enemy_team = "red" if our_team == "blue" else "blue"
-    priest_x, priest_y = PRIEST_COORDINATES[map_id][enemy_team]
+    spawn_x, spawn_y = ARENA_SPAWN_COORDINATES[map_id][enemy_team]
     
     Py4GW.Console.Log(BOT_NAME, 
-                     f"Our team: {our_team.upper()} - Moving to {enemy_team.upper()} priest at ({priest_x}, {priest_y})...", 
+                     f"Our team: {our_team.upper()} - Moving to {enemy_team.upper()} spawn at ({spawn_x}, {spawn_y})...", 
                      Py4GW.Console.MessageType.Info)
     
-    # Move player to priest location (party members will follow automatically)
-    movement_tracker = Movement.FollowXY(tolerance=PRIEST_LOCATION_TOLERANCE)
-    movement_tracker.move_to_waypoint(priest_x, priest_y)
+    # Move player to enemy spawn location (party members will follow automatically)
+    movement_tracker = Movement.FollowXY(tolerance=SPAWN_LOCATION_TOLERANCE)
+    movement_tracker.move_to_waypoint(spawn_x, spawn_y)
     
     # Wait until we arrive or timeout
-    timeout = PRIEST_MOVEMENT_TIMEOUT
+    timeout = SPAWN_MOVEMENT_TIMEOUT
     start_time = time.time()
     while time.time() - start_time < timeout and bot.config.fsm_running:
         movement_tracker.update()
@@ -272,7 +339,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     
     if movement_tracker.has_arrived():
         Py4GW.Console.Log(BOT_NAME, 
-                         f"Arrived at {enemy_team.upper()} priest location! HeroAI will handle combat.", 
+                         f"Arrived at {enemy_team.upper()} spawn location! HeroAI will handle combat.", 
                          Py4GW.Console.MessageType.Success)
         # HeroAI will automatically engage enemies in range
         # Wait until combat is complete
@@ -281,7 +348,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
         Py4GW.Console.Log(BOT_NAME, "Out of combat, proceeding with match.", Py4GW.Console.MessageType.Success)
     else:
         Py4GW.Console.Log(BOT_NAME, 
-                         f"Failed to reach {enemy_team.upper()} priest location within {timeout} seconds", 
+                         f"Failed to reach {enemy_team.upper()} spawn location within {timeout} seconds", 
                          Py4GW.Console.MessageType.Warning)
 
 
@@ -353,13 +420,29 @@ def winning_team_logic(bot: Botting) -> Generator:
                         Py4GW.Console.MessageType.Info)
         yield from Routines.Yield.wait(30000)
         
-        # Check if we're in Seabed Arena or Deldrimor Arena and move to enemy priest
-        if current_map_id in PRIEST_COORDINATES:
-            arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
-            Py4GW.Console.Log(BOT_NAME, 
-                            f"Detected {arena_name}, moving to enemy priest...", 
-                            Py4GW.Console.MessageType.Info)
-            yield from move_to_enemy_priest(bot, current_map_id)
+        # Check if we should move to enemy spawn
+        should_rush_spawn = False
+        is_priest_map = current_map_id in PRIEST_ARENA_MAP_IDS
+        
+        if config.aggressive_mode:
+            # In aggressive mode, always rush enemy spawn (if map is recognized)
+            should_rush_spawn = current_map_id in ARENA_SPAWN_COORDINATES
+        else:
+            # In non-aggressive mode, only rush for priest maps
+            should_rush_spawn = is_priest_map
+        
+        if should_rush_spawn:
+            if is_priest_map:
+                arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Detected {arena_name}, moving to enemy priest...", 
+                                Py4GW.Console.MessageType.Info)
+            else:
+                map_name = GLOBAL_CACHE.Map.GetMapName(current_map_id)
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Aggressive mode enabled - moving to enemy spawn in {map_name}...", 
+                                Py4GW.Console.MessageType.Info)
+            yield from move_to_enemy_spawn(bot, current_map_id)
         
         # Wait in the arena until the map changes (up to 10 minutes)
         Py4GW.Console.Log(BOT_NAME, "Winning team in arena, waiting for map change...", 
@@ -653,6 +736,18 @@ def _draw_settings():
         Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
                         Py4GW.Console.MessageType.Info)
     
+    # Aggressive mode toggle
+    new_aggressive = PyImGui.checkbox("Aggressive Mode (Rush Enemy Spawn)", config.aggressive_mode)
+    if new_aggressive != config.aggressive_mode:
+        config.aggressive_mode = new_aggressive
+        Py4GW.Console.Log(BOT_NAME, f"Aggressive mode: {'Enabled' if config.aggressive_mode else 'Disabled'}", 
+                        Py4GW.Console.MessageType.Info)
+    
+    if config.aggressive_mode:
+        PyImGui.text_colored("Winning team will rush to enemy spawn on all maps", (1, 1, 0, 1))
+    else:
+        PyImGui.text_colored("Winning team will only rush on priest maps", (0.7, 0.7, 0.7, 1))
+    
     PyImGui.separator()
     PyImGui.text("Progress:")
     PyImGui.text(f"Strongboxes Earned: {config.strongboxes_earned}/{config.target_strongboxes}")
@@ -681,7 +776,7 @@ def _draw_settings():
         Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
     
     PyImGui.separator()
-    PyImGui.text_wrapped("Instructions: Set the Partner Account Email to the email of the other team leader. Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Earn 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Bot stops after earning 5 strongboxes.")
+    PyImGui.text_wrapped("Instructions: Set the Partner Account Email to the email of the other team leader. Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Enable 'Aggressive Mode' to have the winning team rush enemy spawn on all maps. Earn 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Bot stops after earning 5 strongboxes.")
 
 
 # Override the settings tab with custom UI
