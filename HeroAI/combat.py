@@ -1437,17 +1437,25 @@ class CombatClass:
                 followup_skill_name = GLOBAL_CACHE.Skill.GetName(followup_skill_id)
                 Py4GW.Console.Log("EchoFollowup", f"Target skill in skillbar slot {followup_skillbar_slot}: {followup_skill_name} (ID: {followup_skill_id})", Py4GW.Console.MessageType.Info)
                 
-                # Priority check: If Auspicious Incantation is also targeting this spell and is ready, 
+                # Priority check: If Auspicious Incantation is configured to target Arcane Echo and is ready,
                 # skip Arcane Echo to let Auspicious cast first
+                # 
+                # Desired order: Auspicious Incantation > Arcane Echo > Target Spell
+                # - Auspicious reduces next spell energy cost
+                # - Arcane Echo benefits from reduced cost
+                # - Arcane Echo then copies the target spell
                 auspicious_followup_slot = settings.AuspiciousIncantationSkillSlot
+                arcane_echo_skillbar_slot = self.skill_order[self.skill_pointer]  # Skillbar slot where Arcane Echo currently is
+                
                 if 0 <= auspicious_followup_slot < 8:  # Skillbar slots are 0-7
-                    auspicious_followup_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(auspicious_followup_slot + 1)
-                    if (auspicious_followup_id > 0 and
-                        auspicious_followup_id == followup_skill_id and 
-                        Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)):
-                        Py4GW.Console.Log("EchoFollowup", f"Auspicious Incantation is also ready and targeting {followup_skill_name} - giving priority to Auspicious, skipping Arcane Echo", Py4GW.Console.MessageType.Info)
-                        self.AdvanceSkillPointer()
-                        return False
+                    # Check if Auspicious is configured to target Arcane Echo itself
+                    if auspicious_followup_slot == arcane_echo_skillbar_slot:
+                        # Auspicious targets Arcane Echo slot
+                        is_auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
+                        if is_auspicious_ready:
+                            Py4GW.Console.Log("EchoFollowup", f"Auspicious Incantation is ready and targeting Arcane Echo - giving priority to Auspicious, skipping Arcane Echo", Py4GW.Console.MessageType.Info)
+                            self.AdvanceSkillPointer()
+                            return False
                 
                 # Check if the followup skill is ready (not on cooldown)
                 is_ready = Routines.Checks.Skills.IsSkillIDReady(followup_skill_id)
