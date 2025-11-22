@@ -409,6 +409,10 @@ def invite_party_members() -> Generator:
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
     
+    Py4GW.Console.Log(BOT_NAME, "DEBUG: invite_party_members() function executing", 
+                     Py4GW.Console.MessageType.Info)
+    yield  # CRITICAL: Must yield early for generator to start executing
+    
     try:
         if not config.party_members:
             Py4GW.Console.Log(BOT_NAME, "No party members configured", Py4GW.Console.MessageType.Warning)
