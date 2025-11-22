@@ -400,15 +400,38 @@ def winning_team_logic(bot: Botting) -> Generator:
                                 f"Victory! {config.consecutive_wins}/5 consecutive wins.", 
                                 Py4GW.Console.MessageType.Success)
             
-            # Winning team stays in map and is automatically re-queued by the game
-            Py4GW.Console.Log(BOT_NAME, "Waiting for automatic re-queue and next match...", 
-                            Py4GW.Console.MessageType.Info)
-            config.in_match = False
-            
             # Log current progress
             Py4GW.Console.Log(BOT_NAME, 
                             f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins}/5 consecutive wins)", 
                             Py4GW.Console.MessageType.Info)
+            
+            # Check if we transitioned to another arena map (not back to outpost)
+            # Codex Arena outpost is map 796
+            CODEX_ARENA_OUTPOST_ID = 796
+            new_map_id = GLOBAL_CACHE.Map.GetMapID()
+            
+            if new_map_id != CODEX_ARENA_OUTPOST_ID:
+                # We're already in the next match (arena-to-arena transition)
+                # The game automatically re-queues and moves winning team to next arena
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Automatically transitioned to next match (Map ID: {new_map_id})", 
+                                Py4GW.Console.MessageType.Info)
+                config.in_match = True
+                # Continue loop to execute priest rush logic for this new map
+            else:
+                # We're back in the outpost (shouldn't normally happen for winning team)
+                Py4GW.Console.Log(BOT_NAME, "Returned to outpost - waiting for next match...", 
+                                Py4GW.Console.MessageType.Info)
+                config.in_match = False
+                
+                # Wait for next match to start
+                yield from wait_for_match_start(bot, new_map_id)
+                
+                if not config.in_match:
+                    # Failed to enter next match
+                    Py4GW.Console.Log(BOT_NAME, "Failed to enter next match.", 
+                                    Py4GW.Console.MessageType.Warning)
+                    return
         else:
             # Timeout - something went wrong, force return to outpost
             Py4GW.Console.Log(BOT_NAME, "Match timeout, forcing return to outpost...", 
@@ -419,24 +442,6 @@ def winning_team_logic(bot: Botting) -> Generator:
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             config.in_match = False
-            return
-        
-        # Get the current outpost map ID for next match detection
-        outpost_map_id = GLOBAL_CACHE.Map.GetMapID()
-        
-        # Wait for next match to start (automatically queued by game)
-        Py4GW.Console.Log(BOT_NAME, "Waiting for next match to start...", Py4GW.Console.MessageType.Info)
-        yield from wait_for_match_start(bot, outpost_map_id)
-        
-        if not config.in_match:
-            # Failed to enter next match, return to outpost
-            Py4GW.Console.Log(BOT_NAME, "Failed to enter next match, returning to outpost...", 
-                            Py4GW.Console.MessageType.Warning)
-            from Py4GWCoreLib import Party
-            # Disable auto combat when returning to outpost
-            disable_auto_combat()
-            Party.ReturnToOutpost()
-            yield from Routines.Yield.wait(5000)
             return
         
         # Continue loop for next match
