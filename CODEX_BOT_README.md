@@ -81,7 +81,8 @@ The bots use Py4GW's shared memory system to communicate:
 
 **Winning Team:**
 - Enters the match
-- Plays normally (automated combat if configured)
+- **Special Arena Behavior**: In Seabed Arena or Deldrimor Arena, automatically moves to enemy priest location (HeroAI handles combat)
+- Plays normally (HeroAI handles combat automatically)
 - Waits for natural match completion
 - Tracks consecutive wins
 - Checks for strongbox acquisition
@@ -89,9 +90,32 @@ The bots use Py4GW's shared memory system to communicate:
 
 **Losing Team:**
 - Enters the match
+- Does NOT engage in special arena behavior (no priest movement)
 - Attempts to return to outpost after a set time
 - Does not increment win counter (loss expected)
 - **Immediately re-enters queue** after returning to outpost (no synchronization wait on subsequent matches)
+
+### Special Arena Behavior
+
+The bot includes special logic for **Seabed Arena** and **Deldrimor Arena**:
+
+- **Team Detection**: Automatically detects if the player is on the blue or red team based on proximity to spawn points
+- **Priest Targeting**: Winning team moves to the opposite team's priest location
+  - If on blue team → moves to red priest
+  - If on red team → moves to blue priest
+- **HeroAI Combat**: Once at the priest location, HeroAI automatically handles combat
+- **Combat Wait**: Bot waits until out of combat before proceeding
+- **Normal Flow**: After combat completes, continues with normal match waiting logic
+- **Losing Team**: Does nothing special - just returns to outpost as normal
+
+**Arena Map IDs and Priest Locations:**
+- **Seabed Arena (Map ID: 829)**
+  - Blue Priest: (9737, 4344)
+  - Red Priest: (4368, 6953)
+- **Deldrimor Arena (Map ID: 828 - estimated)**
+  - Blue Priest: (-9344, 2803)
+  - Red Priest: (-8999, 7488)
+  - *Note*: The explorable map ID for Deldrimor Arena is estimated as 828. If the bot doesn't work in Deldrimor Arena, the map ID may need to be updated. Check console logs for the actual map ID when entering Deldrimor Arena.
 
 ## Configuration Options
 
