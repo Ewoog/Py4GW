@@ -290,7 +290,7 @@ class SkillBar:
             from PyParty import Hero
             hero_name = Hero(hero_id).GetName()
             print(f"Error: Hero '{hero_name}' (ID: {hero_id}) is not in your party.")
-        except:
+        except Exception:
             print(f"Error: Hero with ID {hero_id} is not in your party.")
         return False
     
@@ -313,7 +313,7 @@ class SkillBar:
         try:
             hero_id = Hero(hero_name).GetID()
             return SkillBar.LoadHeroSkillTemplateByHeroID(hero_id, skill_template)
-        except:
+        except Exception:
             print(f"Error: Could not find hero with name '{hero_name}'")
             return False
 

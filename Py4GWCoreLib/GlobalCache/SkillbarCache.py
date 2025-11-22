@@ -58,7 +58,7 @@ class SkillbarCache:
         try:
             hero_id = Hero(hero_name).GetID()
             self.LoadHeroSkillTemplateByHeroID(hero_id, skill_template)
-        except:
+        except Exception:
             print(f"Error: Could not find hero with name '{hero_name}'")
         
     def GetSkillBySlot(self, slot):
