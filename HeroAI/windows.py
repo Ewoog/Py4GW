@@ -1046,12 +1046,14 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
     # Designated Leader configuration for UW/FoW multibox
     if PyImGui.collapsing_header("Designated Leader (UW/FoW Multibox)", PyImGui.TreeNodeFlags.DefaultOpen):
         # Read from shared memory instead of settings
-        use_designated_leader = ImGui.checkbox("Use Designated Leader", GLOBAL_CACHE.ShMem.GetUseDesignatedLeader())
-        if use_designated_leader != GLOBAL_CACHE.ShMem.GetUseDesignatedLeader():
+        current_use_designated_leader = GLOBAL_CACHE.ShMem.GetUseDesignatedLeader()
+        use_designated_leader = ImGui.checkbox("Use Designated Leader", current_use_designated_leader)
+        if use_designated_leader != current_use_designated_leader:
             GLOBAL_CACHE.ShMem.SetUseDesignatedLeader(use_designated_leader)
+            current_use_designated_leader = use_designated_leader
         ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.\n\nThis setting is shared across all accounts in the party.")
         
-        if GLOBAL_CACHE.ShMem.GetUseDesignatedLeader():
+        if current_use_designated_leader:
             PyImGui.separator()
             ImGui.text("Select Designated Leader:")
             
