@@ -97,10 +97,12 @@ The bots use Py4GW's shared memory system to communicate:
 
 ### Special Arena Behavior
 
-The bot includes special logic for **Seabed Arena** and **Deldrimor Arena**:
+**All Maps:**
+- **Initial Wait**: Winning team waits 30 seconds after entering any arena map before taking action
+
+**Seabed Arena and Deldrimor Arena:**
 
 - **Team Detection**: Automatically detects if the player is on the blue or red team based on proximity to spawn points
-- **Initial Wait**: Winning team waits 30 seconds after entering the map before moving
 - **Priest Targeting**: Winning team moves to the opposite team's priest location
   - If on blue team → moves to red priest
   - If on red team → moves to blue priest

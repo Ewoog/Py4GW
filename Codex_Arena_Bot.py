@@ -369,16 +369,17 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Get current map ID to detect map changes
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
         
+        # Wait 30 seconds after entering any map
+        Py4GW.Console.Log(BOT_NAME, 
+                        f"Entered map (Map ID: {current_map_id}), waiting 30 seconds...", 
+                        Py4GW.Console.MessageType.Info)
+        yield from Routines.Yield.wait(30000)
+        
         # Check if we're in Seabed Arena or Deldrimor Arena and move to enemy priest
         if current_map_id in PRIEST_COORDINATES:
             arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Detected {arena_name} (Map ID: {current_map_id}), waiting 30 seconds before moving...", 
-                            Py4GW.Console.MessageType.Info)
-            # Wait 30 seconds before moving to priest location
-            yield from Routines.Yield.wait(30000)
-            Py4GW.Console.Log(BOT_NAME, 
-                            f"Moving to enemy priest...", 
+                            f"Detected {arena_name}, moving to enemy priest...", 
                             Py4GW.Console.MessageType.Info)
             yield from move_to_enemy_priest(bot, current_map_id)
         
