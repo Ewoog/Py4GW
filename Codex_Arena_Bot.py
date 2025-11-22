@@ -315,6 +315,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     if our_team == "unknown":
         Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping spawn movement", 
                          Py4GW.Console.MessageType.Warning)
+        yield  # Generator yield required before early return to prevent NoneType iteration errors
         return
     
     # Get enemy spawn location (opposite team)
@@ -342,11 +343,6 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
         Py4GW.Console.Log(BOT_NAME, 
                          f"Arrived at {enemy_team.upper()} spawn location! HeroAI will handle combat.", 
                          Py4GW.Console.MessageType.Success)
-        # HeroAI will automatically engage enemies in range
-        # Wait until combat is complete
-        Py4GW.Console.Log(BOT_NAME, "Waiting until out of combat...", Py4GW.Console.MessageType.Info)
-        yield from bot.Wait.UntilOutOfCombat()
-        Py4GW.Console.Log(BOT_NAME, "Out of combat, proceeding with match.", Py4GW.Console.MessageType.Success)
     else:
         Py4GW.Console.Log(BOT_NAME, 
                          f"Failed to reach {enemy_team.upper()} spawn location within {timeout} seconds", 
