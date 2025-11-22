@@ -261,20 +261,20 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
                      f"Our team: {our_team.upper()} - Moving to {enemy_team.upper()} priest at ({priest_x}, {priest_y})...", 
                      Py4GW.Console.MessageType.Info)
     
-    # Move to priest location
-    follower = Movement.FollowXY(tolerance=PRIEST_LOCATION_TOLERANCE)
-    follower.move_to_waypoint(priest_x, priest_y)
+    # Move player to priest location (party members will follow automatically)
+    movement_tracker = Movement.FollowXY(tolerance=PRIEST_LOCATION_TOLERANCE)
+    movement_tracker.move_to_waypoint(priest_x, priest_y)
     
     # Wait until we arrive or timeout
     timeout = PRIEST_MOVEMENT_TIMEOUT
     start_time = time.time()
     while time.time() - start_time < timeout and bot.config.fsm_running:
-        follower.update()
-        if follower.has_arrived():
+        movement_tracker.update()
+        if movement_tracker.has_arrived():
             break
         yield from Routines.Yield.wait(100)
     
-    if follower.has_arrived():
+    if movement_tracker.has_arrived():
         Py4GW.Console.Log(BOT_NAME, 
                          f"Arrived at {enemy_team.upper()} priest location! HeroAI will handle combat.", 
                          Py4GW.Console.MessageType.Success)
