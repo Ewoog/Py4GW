@@ -409,17 +409,36 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena) OR Aggressive Mode is enabled
         is_priest_map = current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID
         if is_priest_map or config.aggressive_mode:
-            # Priest map detected or Aggressive Mode enabled - wait 45 seconds then rush enemy spawn
+            # Determine wait time based on conditions
+            # If Aggressive Mode is on AND we're at 4/5 wins (next win will be 5/5), wait 80 seconds
+            # Otherwise, wait 45 seconds for priest maps and 30 seconds for regular aggressive mode
+            if config.aggressive_mode and config.consecutive_wins == 4:
+                wait_time_ms = 80000
+                wait_time_seconds = 80
+            elif is_priest_map:
+                wait_time_ms = 45000
+                wait_time_seconds = 45
+            else:
+                wait_time_ms = 30000
+                wait_time_seconds = 30
+            
+            # Log appropriate message
             if is_priest_map:
                 arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
                 Py4GW.Console.Log(BOT_NAME, 
-                                f"Entered {arena_name} (Map ID: {current_map_id}), waiting 45 seconds before rushing enemy spawn...", 
+                                f"Entered {arena_name} (Map ID: {current_map_id}), waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
                                 Py4GW.Console.MessageType.Info)
             else:
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Aggressive Mode enabled (Map ID: {current_map_id}), waiting 45 seconds before rushing enemy spawn...", 
-                                Py4GW.Console.MessageType.Info)
-            yield from Routines.Yield.wait(45000)
+                if config.consecutive_wins == 4:
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Aggressive Mode enabled (Map ID: {current_map_id}), at 4/5 wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
+                                    Py4GW.Console.MessageType.Info)
+                else:
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Aggressive Mode enabled (Map ID: {current_map_id}), waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
+                                    Py4GW.Console.MessageType.Info)
+            
+            yield from Routines.Yield.wait(wait_time_ms)
             
             # Rush the enemy spawn location (determine spawn and move to enemy coordinates)
             Py4GW.Console.Log(BOT_NAME, 
