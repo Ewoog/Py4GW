@@ -11,13 +11,15 @@ Features:
 - Winning team plays to win, losing team returns to outpost after match
 - Tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins)
 - Shuts down after earning 5 strongboxes (daily limit)
+- Aggressive mode: Winning team rushes enemy spawn on all arena maps (optional)
 
 Setup:
 1. Run this script on the leader of each team (8 accounts total, 2 instances)
 2. Manually invite team members to each party (4 per team)
 3. Toggle "Is Winning Team" in the GUI appropriately for each instance
-4. Set up Equipment Set 1 for winning builds, Set 2 for losing builds
-5. Start both bots - they will synchronize and queue together
+4. Toggle "Aggressive Mode" to rush enemy spawn on all maps (winning team only)
+5. Set up Equipment Set 1 for winning builds, Set 2 for losing builds
+6. Start both bots - they will synchronize and queue together
 
 Requirements:
 - Both team leaders must be in Codex Arena outpost
