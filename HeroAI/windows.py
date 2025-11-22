@@ -1045,13 +1045,13 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
     
     # Designated Leader configuration for UW/FoW multibox
     if PyImGui.collapsing_header("Designated Leader (UW/FoW Multibox)", PyImGui.TreeNodeFlags.DefaultOpen):
-        use_designated_leader = ImGui.checkbox("Use Designated Leader", settings.UseDesignatedLeader)
-        if use_designated_leader != settings.UseDesignatedLeader:
-            settings.UseDesignatedLeader = use_designated_leader
-            settings.save_settings()
-        ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.")
+        # Read from shared memory instead of settings
+        use_designated_leader = ImGui.checkbox("Use Designated Leader", GLOBAL_CACHE.ShMem.GetUseDesignatedLeader())
+        if use_designated_leader != GLOBAL_CACHE.ShMem.GetUseDesignatedLeader():
+            GLOBAL_CACHE.ShMem.SetUseDesignatedLeader(use_designated_leader)
+        ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.\n\nThis setting is shared across all accounts in the party.")
         
-        if settings.UseDesignatedLeader:
+        if GLOBAL_CACHE.ShMem.GetUseDesignatedLeader():
             PyImGui.separator()
             ImGui.text("Select Designated Leader:")
             
@@ -1065,8 +1065,9 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                 
                 # Find the index of the currently selected leader
                 current_selection = -1
+                designated_leader_email = GLOBAL_CACHE.ShMem.GetDesignatedLeaderEmail()
                 for i, account in enumerate(party_members):
-                    if settings.DesignatedLeaderEmail == account.AccountEmail:
+                    if designated_leader_email == account.AccountEmail:
                         current_selection = i
                         break
                 
@@ -1075,8 +1076,7 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
                     new_selection = PyImGui.radio_button(f"{account.CharacterName}##{account.AccountEmail}", current_selection, i)
                     if new_selection != current_selection:
                         current_selection = new_selection
-                        settings.DesignatedLeaderEmail = account.AccountEmail
-                        settings.save_settings()
+                        GLOBAL_CACHE.ShMem.SetDesignatedLeaderEmail(account.AccountEmail)
             else:
                 ImGui.text("No party members found or not in a party.")
     

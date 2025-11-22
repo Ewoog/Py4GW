@@ -205,12 +205,16 @@ class AllAccounts(Structure):
         ("AccountData", AccountData * SHMEM_MAX_NUM_PLAYERS),
         ("SharedMessage", SharedMessage * SHMEM_MAX_NUM_PLAYERS),  # Messages for each player
         ("HeroAIOptions", HeroAIOptionStruct * SHMEM_MAX_NUM_PLAYERS),  # Game options for HeroAI
+        ("UseDesignatedLeader", c_bool),  # Shared setting for designated leader feature
+        ("DesignatedLeaderEmail", c_wchar * SHMEM_MAX_EMAIL_LEN),  # Email of designated leader
     ]
     
     # Type hints for IntelliSense
     AccountData: list[AccountData]
     SharedMessage: list[SharedMessage]
     HeroAIOptions: list[HeroAIOptionStruct]
+    UseDesignatedLeader: bool
+    DesignatedLeaderEmail: str
     
     
     
@@ -940,6 +944,22 @@ class Py4GWSharedMemoryManager:
                 ConsoleLog(SMM_MODULE_NAME, f"Property {property_name} does not exist in HeroAIOptions.", Py4GW.Console.MessageType.Error)
         else:
             ConsoleLog(SMM_MODULE_NAME, f"Account {account_email} not found.", Py4GW.Console.MessageType.Error)
+    
+    def GetUseDesignatedLeader(self) -> bool:
+        """Get the UseDesignatedLeader flag from shared memory."""
+        return self.GetStruct().UseDesignatedLeader
+    
+    def SetUseDesignatedLeader(self, value: bool):
+        """Set the UseDesignatedLeader flag in shared memory."""
+        self.GetStruct().UseDesignatedLeader = value
+    
+    def GetDesignatedLeaderEmail(self) -> str:
+        """Get the DesignatedLeaderEmail from shared memory."""
+        return self.GetStruct().DesignatedLeaderEmail
+    
+    def SetDesignatedLeaderEmail(self, email: str):
+        """Set the DesignatedLeaderEmail in shared memory."""
+        self.GetStruct().DesignatedLeaderEmail = email
     
     def GetMapsFromPlayers(self):
         """Get a list of unique maps from all active players."""

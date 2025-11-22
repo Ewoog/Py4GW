@@ -11,14 +11,16 @@ def GetEffectiveLeaderID():
     If UseDesignatedLeader is enabled and the designated leader is in the party,
     returns their agent ID. Otherwise, returns the actual party leader's agent ID.
     """
-    settings = Settings()
+    # Get designated leader settings from shared memory (shared across all accounts)
+    use_designated_leader = GLOBAL_CACHE.ShMem.GetUseDesignatedLeader()
+    designated_leader_email = GLOBAL_CACHE.ShMem.GetDesignatedLeaderEmail()
     
     # If designated leader feature is enabled and an email is set
-    if settings.UseDesignatedLeader and settings.DesignatedLeaderEmail:
+    if use_designated_leader and designated_leader_email:
         # Try to find the designated leader in the party
         accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
         for account in accounts:
-            if account.AccountEmail == settings.DesignatedLeaderEmail:
+            if account.AccountEmail == designated_leader_email:
                 # Check if they're in the same party
                 own_account = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(GLOBAL_CACHE.Player.GetAccountEmail())
                 if own_account and account.PartyID == own_account.PartyID:
