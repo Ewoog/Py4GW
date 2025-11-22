@@ -90,7 +90,8 @@ class Settings:
         self.ShowPanelOnlyOnLeaderAccount = False
         self.DisableAutomationOnLeaderAccount = False
         
-        # Designated leader settings for multibox
+        # DEPRECATED: Designated leader settings for multibox (now stored in shared memory)
+        # These are kept for backwards compatibility only
         self.UseDesignatedLeader = False
         self.DesignatedLeaderEmail = ""
         
@@ -207,7 +208,7 @@ class Settings:
         self.ini_handler.write_key("General", "ShowPanelOnlyOnLeaderAccount", str(self.ShowPanelOnlyOnLeaderAccount))
         self.ini_handler.write_key("General", "DisableAutomationOnLeaderAccount", str(self.DisableAutomationOnLeaderAccount))
         
-        # Designated leader settings
+        # Designated leader settings (DEPRECATED - now stored in shared memory, kept for backwards compatibility)
         self.ini_handler.write_key("General", "UseDesignatedLeader", str(self.UseDesignatedLeader))
         self.ini_handler.write_key("General", "DesignatedLeaderEmail", self.DesignatedLeaderEmail)
         
@@ -264,7 +265,7 @@ class Settings:
         self.ShowPanelOnlyOnLeaderAccount = self.ini_handler.read_bool("General", "ShowPanelOnlyOnLeaderAccount", False)
         self.DisableAutomationOnLeaderAccount = self.ini_handler.read_bool("General", "DisableAutomationOnLeaderAccount", False)
         
-        # Designated leader settings
+        # Designated leader settings (DEPRECATED - now stored in shared memory, kept for backwards compatibility)
         self.UseDesignatedLeader = self.ini_handler.read_bool("General", "UseDesignatedLeader", False)
         self.DesignatedLeaderEmail = self.ini_handler.read_string("General", "DesignatedLeaderEmail", "")
         
