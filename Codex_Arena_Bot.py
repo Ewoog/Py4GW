@@ -174,25 +174,13 @@ bot = Botting(
 # Custom synchronization command for queue timing
 SYNC_QUEUE_COMMAND = SharedCommandType.CustomBehaviors  # Use existing custom command type
 
-# Support script commands
-SUPPORT_LEAVE_COMMAND = SharedCommandType.CustomBehaviors
-SUPPORT_RESIGN_COMMAND = SharedCommandType.CustomBehaviors
-SUPPORT_EQUIPMENT_SET_COMMAND = SharedCommandType.CustomBehaviors
-SUPPORT_AUTO_COMBAT_COMMAND = SharedCommandType.CustomBehaviors
-SUPPORT_MAP_VERIFY_COMMAND = SharedCommandType.CustomBehaviors
-
-# Signal type values
+# Signal type values for queue synchronization
 SIGNAL_READY_TO_QUEUE = 1.0
 SIGNAL_QUEUE_NOW = 2.0
 SIGNAL_MATCH_START = 3.0
 SIGNAL_MATCH_END = 4.0
-SIGNAL_LEAVE_PARTY = 5.0
-SIGNAL_RESIGN = 6.0
-SIGNAL_EQUIP_SET_1 = 7.0
-SIGNAL_EQUIP_SET_2 = 8.0
-SIGNAL_AUTO_COMBAT_ON = 9.0
-SIGNAL_AUTO_COMBAT_OFF = 10.0
 SIGNAL_MAP_VERIFY = 11.0
+
 
 # Delay (in milliseconds) to wait after map change
 MAP_CHANGE_DELAY_MS = 2000
@@ -340,34 +328,48 @@ def check_sync_signal() -> tuple[str, int]:
     return ("", 0)
 
 
-def send_message_to_party(signal_type: str, param1: float = 0.0):
-    """Send a message to all party members."""
+def send_message_to_party(command_type: str, param1: float = 0.0):
+    """Send a SharedCommandType message to all party members.
+    Party members should run the Messaging.py widget to receive these commands."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
     my_email = get_my_email()
     
     if not config.party_members:
         return
     
-    signal_value = 0.0
-    if signal_type == "LEAVE":
-        signal_value = SIGNAL_LEAVE_PARTY
-    elif signal_type == "RESIGN":
-        signal_value = SIGNAL_RESIGN
-    elif signal_type == "EQUIP_SET_1":
-        signal_value = SIGNAL_EQUIP_SET_1
-    elif signal_type == "EQUIP_SET_2":
-        signal_value = SIGNAL_EQUIP_SET_2
-    elif signal_type == "AUTO_COMBAT_ON":
-        signal_value = SIGNAL_AUTO_COMBAT_ON
-    elif signal_type == "AUTO_COMBAT_OFF":
-        signal_value = SIGNAL_AUTO_COMBAT_OFF
+    # Map command types to SharedCommandType enums
+    command = None
+    params = (param1, 0.0, 0.0, 0.0)
     
-    params = (signal_value, param1, 0.0, 0.0)
+    if command_type == "LEAVE":
+        command = SharedCommandType.LeaveParty
+    elif command_type == "RESIGN":
+        command = SharedCommandType.Resign
+    elif command_type == "EQUIP_SET_1":
+        # Use PressKey to send F1 for equipment set 1
+        command = SharedCommandType.PressKey
+        params = (0x70, 0.0, 0.0, 0.0)  # F1 key code
+    elif command_type == "EQUIP_SET_2":
+        # Use PressKey to send F2 for equipment set 2
+        command = SharedCommandType.PressKey
+        params = (0x71, 0.0, 0.0, 0.0)  # F2 key code
+    elif command_type == "ENABLE_HEROAI":
+        command = SharedCommandType.EnableHeroAI
+        params = (1.0, 0.0, 0.0, 0.0)  # 1.0 = enable
+    elif command_type == "DISABLE_HEROAI":
+        command = SharedCommandType.DisableHeroAI
+        params = (0.0, 0.0, 0.0, 0.0)
+    
+    if command is None:
+        Py4GW.Console.Log(BOT_NAME, f"Unknown command type: {command_type}", 
+                         Py4GW.Console.MessageType.Warning)
+        return
     
     for member_email in config.party_members:
         if member_email and member_email.strip():
             try:
-                GLOBAL_CACHE.ShMem.SendMessage(my_email, member_email.strip(), SUPPORT_LEAVE_COMMAND, params)
+                GLOBAL_CACHE.ShMem.SendMessage(my_email, member_email.strip(), command, params)
             except Exception as e:
                 Py4GW.Console.Log(BOT_NAME, f"Failed to send message to {member_email}: {e}", 
                                  Py4GW.Console.MessageType.Warning)
@@ -824,7 +826,7 @@ def losing_team_logic(bot: Botting) -> Generator:
                         Py4GW.Console.MessageType.Warning)
         yield from equip_set(1)
         send_message_to_party("EQUIP_SET_1")
-        send_message_to_party("AUTO_COMBAT_ON")
+        send_message_to_party("ENABLE_HEROAI")
         bot.config.upkeep.auto_combat.set_now("active", True)
         # Rush enemy spawn
         yield from Routines.Yield.wait(30000)  # Wait 30 seconds
@@ -966,12 +968,16 @@ def run_codex_match(bot: Botting) -> None:
         if config.is_winning_team:
             # Enable auto combat for winning team to be aggressive
             bot.config.upkeep.auto_combat.set_now("active", True)
-            Py4GW.Console.Log(BOT_NAME, "Playing as winning team (auto combat enabled)...", Py4GW.Console.MessageType.Info)
+            # Enable HeroAI for party members so they are aggressive
+            send_message_to_party("ENABLE_HEROAI")
+            Py4GW.Console.Log(BOT_NAME, "Playing as winning team (HeroAI enabled for party)...", Py4GW.Console.MessageType.Info)
             yield from winning_team_logic(bot)
             # Winning team logic handles multiple matches internally and only returns when done
             # No need to log progress or wait here
         else:
-            Py4GW.Console.Log(BOT_NAME, "Playing as losing team...", Py4GW.Console.MessageType.Info)
+            # Disable HeroAI for losing team so they are passive
+            send_message_to_party("DISABLE_HEROAI")
+            Py4GW.Console.Log(BOT_NAME, "Playing as losing team (HeroAI disabled for party)...", Py4GW.Console.MessageType.Info)
             yield from losing_team_logic(bot)
             
             # Mark that first match is complete (losing team will skip sync on subsequent matches)

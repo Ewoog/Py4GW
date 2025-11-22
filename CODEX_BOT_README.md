@@ -5,19 +5,20 @@ A Guild Wars automation bot for farming Strategist's Zaishen Strongboxes using m
 ## Overview
 
 This bot automates Codex Arena matches with two teams of 4 players each:
-- **Winning Team**: Uses Equipment Set 1, plays to win matches
-- **Losing Team**: Uses Equipment Set 2, designed to lose quickly
+- **Winning Team**: Uses Equipment Set 1, plays to win matches with HeroAI enabled
+- **Losing Team**: Uses Equipment Set 2, designed to lose quickly with HeroAI disabled
 
 The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins) and shuts down after earning 5 strongboxes (daily limit).
 
-## New Features
+## Features
 
-- **Character Name Display**: Partner and party member selection now shows character names alongside emails
+- **Character Name Display**: Partner and party member selection shows character names alongside emails
 - **Party Configuration**: Leaders can configure and auto-invite 3 party members
-- **Support Script**: Non-leader accounts run a support script to receive commands
+- **Messaging Integration**: Uses Messaging.py widget for party commands (no separate support script needed)
+- **HeroAI Control**: Winning team enables HeroAI for aggressive play, losing team disables it
 - **Map Verification**: Two leaders verify they're in the same map to detect desyncs
 - **Desync Detection**: GUI displays when teams are in different maps
-- **Payback Mode**: Losing team goes aggressive with Set 1 when desync detected
+- **Payback Mode**: Losing team equips Set 1 and enables HeroAI when desync detected
 - **Resign Mode**: Winning team returns to outpost with Set 2 when desync detected
 
 ## Requirements
@@ -26,6 +27,7 @@ The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins
 - 8 Guild Wars accounts (4 per team)
 - Multiboxing enabled with shared memory support
 - Both equipment sets configured in-game
+- **Messaging.py widget** running on all non-leader accounts
 
 ## Setup Instructions
 
@@ -36,20 +38,21 @@ Before running the bot, configure your equipment sets in Guild Wars:
 **Equipment Set 1 (Winning Team):**
 - Set up your competitive PvP build
 - Ensure weapons and armor are optimized for winning
+- Bind to F1 key
 
 **Equipment Set 2 (Losing Team):**
 - Can use minimal equipment or default setup
 - This team is designed to lose quickly
+- Bind to F2 key
 
 ### 2. Account Configuration
 
 1. Launch 8 Guild Wars clients
 2. On the 2 team leader accounts:
    - Load `Codex_Arena_Bot.py`
-   - Configure as leader (checkbox is checked by default)
-3. On the 6 support accounts:
-   - Load `Codex_Arena_Support_Script.py`
-   - Select their party leader's email from the dropdown
+3. On the 6 party member accounts:
+   - Load and enable **Messaging.py widget**
+   - This widget handles all party commands automatically
 
 ### 3. Bot Configuration
 
@@ -67,18 +70,21 @@ Before running the bot, configure your equipment sets in Guild Wars:
 - Optional: Enable "Payback Mode" to go aggressive on desync
 - Click "Invite Party Members" button to auto-invite configured members
 
-**Support Accounts:**
-- Select their party leader's email
-- Start the script
-- The support script will automatically:
-  - Respond to leave/resign commands
-  - Switch equipment sets as commanded
-  - Enable/disable auto combat as commanded
+**Party Member Accounts:**
+- Enable **Messaging.py widget**
+- The widget automatically handles:
+  - Party invites (accept automatically)
+  - Leave/Resign commands
+  - Equipment set switching (F1/F2 keys)
+  - HeroAI enable/disable for aggressive mode
 
 ### 4. Starting the Bot
 
 1. Ensure both team leaders are in Codex Arena outpost (Map ID: 796)
-2. Start support scripts on all 6 support accounts
+### 4. Starting the Bot
+
+1. Ensure both team leaders are in Codex Arena outpost (Map ID: 796)
+2. Enable **Messaging.py widget** on all 6 party member accounts
 3. Click "Start Bot" on both team leaders
 4. Leaders will automatically invite their configured party members
 5. The bots will synchronize and begin queueing together
@@ -93,7 +99,8 @@ The bots use Py4GW's shared memory system to communicate:
 2. **Queue Phase**: Once both are ready, they enter the queue simultaneously
 3. **Match Phase**: Leaders track when the match starts and ends
 4. **Map Verification**: Upon entering arena, leaders exchange map IDs to detect desync
-5. **Repeat**: Process continues until strongbox targets are met
+5. **HeroAI Control**: Leaders send commands to party members via Messaging widget
+6. **Repeat**: Process continues until strongbox targets are met
    - **Note**: After the first match, the losing team immediately re-enters the queue without waiting for synchronization, allowing for faster cycling
 
 ### Map Verification and Desync Detection
@@ -103,16 +110,18 @@ When entering an arena map (not the outpost):
 2. Each leader verifies they received the same map ID
 3. If map IDs don't match, a **DESYNC** is detected and displayed in the GUI
 4. Desync triggers special behavior based on configured modes:
-   - **Payback Mode** (Losing Team): Equips Set 1 and rushes enemy spawn
+   - **Payback Mode** (Losing Team): Equips Set 1, enables HeroAI, and rushes enemy spawn
    - **Resign Mode** (Winning Team): Equips Set 2 and returns to outpost
 
-### Support Script Behavior
+### Party Command System
 
-Support accounts listen for commands from their leader:
-- **Leave Party**: Leaves the current party
-- **Resign**: Returns to outpost
-- **Equip Set 1/2**: Switches to the specified equipment set
-- **Auto Combat On/Off**: Enables or disables auto combat
+Leaders send commands to party members via **SharedCommandType** messages (handled by Messaging.py widget):
+- **InviteToParty**: Automatically accept party invites
+- **LeaveParty**: Leave the current party
+- **Resign**: Return to outpost
+- **PressKey**: Switch equipment sets (F1 for Set 1, F2 for Set 2)
+- **EnableHeroAI**: Enable HeroAI for aggressive combat (winning team)
+- **DisableHeroAI**: Disable HeroAI for passive play (losing team)
 
 ### Strongbox Tracking
 
@@ -123,7 +132,7 @@ Support accounts listen for commands from their leader:
 ### Match Logic
 
 **Winning Team:**
-- Enters the match
+- Enters the match with **HeroAI enabled** for party members
 - **Map Verification**: Checks map ID with partner team
 - **Special Arena Behavior**: In Seabed Arena or Deldrimor Arena, automatically moves to enemy priest location (HeroAI handles combat)
 - **Aggressive Mode**: When enabled, rushes enemy spawn on all maps
@@ -134,9 +143,9 @@ Support accounts listen for commands from their leader:
 - Re-queues immediately
 
 **Losing Team:**
-- Enters the match
+- Enters the match with **HeroAI disabled** for party members (passive play)
 - **Map Verification**: Checks map ID with partner team
-- **Desync Handling**: If Payback Mode is active and desync detected, equips Set 1 and goes aggressive
+- **Desync Handling**: If Payback Mode is active and desync detected, equips Set 1, enables HeroAI, and goes aggressive
 - Does NOT engage in special arena behavior normally (no priest movement)
 - Attempts to return to outpost after a set time
 - Does not increment win counter (loss expected)
@@ -211,8 +220,8 @@ Support accounts listen for commands from their leader:
 ### Desync Detected
 
 - This is normal if teams get matched against different opponents
-- Payback Mode (losing team) will make them go aggressive
-- Resign Mode (winning team) will make them return to outpost
+- Payback Mode (losing team) will equip Set 1, enable HeroAI, and go aggressive
+- Resign Mode (winning team) will equip Set 2 and return to outpost
 - If desync happens frequently, check network stability
 
 ### Party Members Not Invited
@@ -220,13 +229,15 @@ Support accounts listen for commands from their leader:
 - Ensure party member emails are configured in Party Configuration tab
 - Verify the accounts are online and in shared memory
 - Check that character names are showing up in the dropdowns
+- Ensure party members are in the same map/district
 - Click "Invite Party Members" button manually if auto-invite fails
 
-### Support Script Not Responding
+### Party Members Not Responding to Commands
 
-- Verify the support account has selected the correct leader email
-- Check that the leader bot is running and sending commands
-- Ensure shared memory is working between accounts
+- Verify **Messaging.py widget** is enabled on party member accounts
+- Check that shared memory is working between accounts
+- Look for error messages in the Messaging widget console
+- Ensure equipment sets are bound to F1 and F2 keys
 
 ### Match Doesn't Start
 
@@ -237,8 +248,8 @@ Support accounts listen for commands from their leader:
 ### Equipment Sets Don't Switch
 
 - Verify equipment sets are configured in-game
-- Check the keybind for "Activate Weapon Set" is set
-- Ensure the bot has proper permissions
+- Check that F1 = Set 1 and F2 = Set 2 in keybinds
+- Ensure Messaging.py widget is processing PressKey commands
 
 ### Bot Gets Stuck
 
