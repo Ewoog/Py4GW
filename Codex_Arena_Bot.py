@@ -86,17 +86,8 @@ bot = Botting(
 # Custom synchronization command for queue timing
 SYNC_QUEUE_COMMAND = SharedCommandType.CustomBehaviors  # Use existing custom command type
 
-# Strategist's Zaishen Strongbox model ID
-STRATEGISTS_STRONGBOX_MODEL_ID = 36668
-
-# Delay (in milliseconds) to wait after map change for strongbox to appear in inventory
-STRONGBOX_DETECTION_DELAY_MS = 2000
-
-
-def get_strongbox_count() -> int:
-    """Get the current count of Strategist's Zaishen Strongboxes in inventory."""
-    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
-    return GLOBAL_CACHE.Inventory.GetModelCount(STRATEGISTS_STRONGBOX_MODEL_ID)
+# Delay (in milliseconds) to wait after map change
+MAP_CHANGE_DELAY_MS = 2000
 
 
 def get_my_email() -> str:
@@ -334,16 +325,6 @@ def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
     config.in_match = False
 
 
-def record_strongbox(new_strongboxes: int) -> None:
-    """Record strongbox earned and reset consecutive wins counter."""
-    if new_strongboxes > 0:
-        config.strongboxes_earned += new_strongboxes
-        config.consecutive_wins = 0
-        Py4GW.Console.Log(BOT_NAME, 
-                        f"Strongbox earned! Now have {config.strongboxes_earned}/5 strongboxes. Consecutive wins reset.", 
-                        Py4GW.Console.MessageType.Success)
-
-
 def winning_team_logic(bot: Botting) -> Generator:
     """Logic for the winning team - win matches continuously, staying in map and auto-queued."""
     from Py4GWCoreLib.Routines import Routines
@@ -365,9 +346,6 @@ def winning_team_logic(bot: Botting) -> Generator:
             config.in_match = False
             bot.Stop()
             return
-        
-        # Get strongbox count before match ends
-        initial_strongboxes = get_strongbox_count()
         
         # Get current map ID to detect map changes
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
@@ -402,35 +380,26 @@ def winning_team_logic(bot: Botting) -> Generator:
                 map_changed = True
                 Py4GW.Console.Log(BOT_NAME, "Map changed - match ended!", Py4GW.Console.MessageType.Info)
                 break
-            
-            # Check for new strongboxes to detect victory
-            current_strongboxes = get_strongbox_count()
-            new_strongboxes = current_strongboxes - initial_strongboxes
-            
-            # If we got a new strongbox, record it and reset consecutive wins
-            if new_strongboxes > 0:
-                record_strongbox(new_strongboxes)
-                # Update initial count so we don't count the same strongbox again
-                initial_strongboxes = current_strongboxes
         
         if map_changed:
-            # Wait a moment for strongbox to appear in inventory after map change
-            yield from Routines.Yield.wait(STRONGBOX_DETECTION_DELAY_MS)
+            # Wait a moment after map change
+            yield from Routines.Yield.wait(MAP_CHANGE_DELAY_MS)
             
-            # Check for strongbox after map change
-            current_strongboxes = get_strongbox_count()
-            new_strongboxes = current_strongboxes - initial_strongboxes
+            # Count this as a win - increment consecutive wins counter
+            config.consecutive_wins += 1
             
-            # If we earned a strongbox, record it and reset consecutive wins counter
-            if new_strongboxes > 0:
-                record_strongbox(new_strongboxes)
-                # Update initial count so we don't count the same strongbox again
-                initial_strongboxes = current_strongboxes
-            else:
-                # No strongbox yet - increment consecutive wins and log progress
-                config.consecutive_wins += 1
+            # Check if we've reached 5 consecutive wins
+            if config.consecutive_wins >= 5:
+                # Increment strongbox counter and reset consecutive wins
+                config.strongboxes_earned += 1
+                config.consecutive_wins = 0
                 Py4GW.Console.Log(BOT_NAME, 
-                                f"Victory! {config.consecutive_wins} consecutive wins (need 5 for strongbox).", 
+                                f"Strongbox earned! Now have {config.strongboxes_earned}/{config.target_strongboxes} strongboxes. Consecutive wins reset.", 
+                                Py4GW.Console.MessageType.Success)
+            else:
+                # Log progress toward next strongbox
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Victory! {config.consecutive_wins}/5 consecutive wins.", 
                                 Py4GW.Console.MessageType.Success)
             
             # Winning team stays in map and is automatically re-queued by the game
@@ -440,7 +409,7 @@ def winning_team_logic(bot: Botting) -> Generator:
             
             # Log current progress
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
+                            f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins}/5 consecutive wins)", 
                             Py4GW.Console.MessageType.Info)
         else:
             # Timeout - something went wrong, force return to outpost
