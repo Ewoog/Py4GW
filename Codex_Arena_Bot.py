@@ -33,6 +33,7 @@ from typing import Generator, Any
 BOT_NAME = "Codex Arena Bot"
 
 # Arena map IDs and priest coordinates
+CODEX_ARENA_OUTPOST_ID = 796
 SEABED_ARENA_MAP_ID = 829
 DELDRIMOR_ARENA_MAP_ID = 830
 
@@ -188,12 +189,9 @@ def travel_to_codex_arena() -> Generator:
     from Py4GWCoreLib import Map
     from Py4GWCoreLib.Routines import Routines
     
-    # Codex Arena map ID
-    CODEX_ARENA_MAP_ID = 796
-    
     current_map = GLOBAL_CACHE.Map.GetMapID()
-    if current_map != CODEX_ARENA_MAP_ID:
-        yield from bot.Map._coro_travel(target_map_id=CODEX_ARENA_MAP_ID)
+    if current_map != CODEX_ARENA_OUTPOST_ID:
+        yield from bot.Map._coro_travel(target_map_id=CODEX_ARENA_OUTPOST_ID)
         yield from Routines.Yield.wait(2000)
 
 
@@ -344,25 +342,31 @@ def winning_team_logic(bot: Botting) -> Generator:
             bot.Stop()
             return
         
-        # Get current map ID to detect map changes
+        # Get current map ID to determine arena type
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
         
-        # Wait 30 seconds after entering any map
-        Py4GW.Console.Log(BOT_NAME, 
-                        f"Entered map (Map ID: {current_map_id}), waiting 30 seconds...", 
-                        Py4GW.Console.MessageType.Info)
-        yield from Routines.Yield.wait(30000)
-        
-        # Check if we're in Seabed Arena or Deldrimor Arena and move to enemy priest
-        if current_map_id in PRIEST_COORDINATES:
+        # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena)
+        if current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID:
+            # Priest map detected - wait 30 seconds then rush priest location
             arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Detected {arena_name}, moving to enemy priest...", 
+                            f"Entered {arena_name} (Map ID: {current_map_id}), waiting 30 seconds before rushing priest...", 
+                            Py4GW.Console.MessageType.Info)
+            yield from Routines.Yield.wait(30000)
+            
+            # Rush the priest location (determine spawn and move to enemy priest coordinates)
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Moving to enemy priest location...", 
                             Py4GW.Console.MessageType.Info)
             yield from move_to_enemy_priest(bot, current_map_id)
+        else:
+            # Not a priest map - just wait in spawn
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Entered arena (Map ID: {current_map_id}), waiting in spawn...", 
+                            Py4GW.Console.MessageType.Info)
         
         # Wait in the arena until the map changes (up to 10 minutes)
-        Py4GW.Console.Log(BOT_NAME, "Winning team in arena, waiting for map change...", 
+        Py4GW.Console.Log(BOT_NAME, "Waiting for map change...", 
                          Py4GW.Console.MessageType.Info)
         
         timeout = 600  # 10 minute timeout (in seconds)
@@ -400,15 +404,38 @@ def winning_team_logic(bot: Botting) -> Generator:
                                 f"Victory! {config.consecutive_wins}/5 consecutive wins.", 
                                 Py4GW.Console.MessageType.Success)
             
-            # Winning team stays in map and is automatically re-queued by the game
-            Py4GW.Console.Log(BOT_NAME, "Waiting for automatic re-queue and next match...", 
-                            Py4GW.Console.MessageType.Info)
-            config.in_match = False
-            
             # Log current progress
             Py4GW.Console.Log(BOT_NAME, 
                             f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins}/5 consecutive wins)", 
                             Py4GW.Console.MessageType.Info)
+            
+            # Check if we transitioned to another arena map (not back to outpost)
+            # In Codex Arena, winning teams only transition between arena maps or back to outpost
+            # There are no other possible map transitions in this game mode
+            new_map_id = GLOBAL_CACHE.Map.GetMapID()
+            
+            if new_map_id != CODEX_ARENA_OUTPOST_ID:
+                # We're already in the next match (arena-to-arena transition)
+                # The game automatically re-queues and moves winning team to next arena
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Automatically transitioned to next match (Map ID: {new_map_id})", 
+                                Py4GW.Console.MessageType.Info)
+                config.in_match = True
+                # Loop will continue to check for target strongboxes and execute priest rush logic
+            else:
+                # We're back in the outpost (shouldn't normally happen for winning team)
+                Py4GW.Console.Log(BOT_NAME, "Returned to outpost - waiting for next match...", 
+                                Py4GW.Console.MessageType.Info)
+                config.in_match = False
+                
+                # Wait for next match to start
+                yield from wait_for_match_start(bot, new_map_id)
+                
+                if not config.in_match:
+                    # Failed to enter next match
+                    Py4GW.Console.Log(BOT_NAME, "Failed to enter next match.", 
+                                    Py4GW.Console.MessageType.Warning)
+                    return
         else:
             # Timeout - something went wrong, force return to outpost
             Py4GW.Console.Log(BOT_NAME, "Match timeout, forcing return to outpost...", 
@@ -419,24 +446,6 @@ def winning_team_logic(bot: Botting) -> Generator:
             Party.ReturnToOutpost()
             yield from Routines.Yield.wait(5000)
             config.in_match = False
-            return
-        
-        # Get the current outpost map ID for next match detection
-        outpost_map_id = GLOBAL_CACHE.Map.GetMapID()
-        
-        # Wait for next match to start (automatically queued by game)
-        Py4GW.Console.Log(BOT_NAME, "Waiting for next match to start...", Py4GW.Console.MessageType.Info)
-        yield from wait_for_match_start(bot, outpost_map_id)
-        
-        if not config.in_match:
-            # Failed to enter next match, return to outpost
-            Py4GW.Console.Log(BOT_NAME, "Failed to enter next match, returning to outpost...", 
-                            Py4GW.Console.MessageType.Warning)
-            from Py4GWCoreLib import Party
-            # Disable auto combat when returning to outpost
-            disable_auto_combat()
-            Party.ReturnToOutpost()
-            yield from Routines.Yield.wait(5000)
             return
         
         # Continue loop for next match
