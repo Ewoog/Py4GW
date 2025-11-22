@@ -1445,7 +1445,7 @@ class CombatClass:
                 # - Arcane Echo benefits from reduced cost
                 # - Arcane Echo then copies the target spell
                 auspicious_followup_slot = settings.AuspiciousIncantationSkillSlot
-                arcane_echo_skillbar_slot = self.skill_order[self.skill_pointer]  # Skillbar slot where Arcane Echo currently is
+                arcane_echo_skillbar_slot = self.skill_order[self.skill_pointer]  # Maps prioritized index to skillbar slot (0-7)
                 
                 if 0 <= auspicious_followup_slot < 8:  # Skillbar slots are 0-7
                     # Check if Auspicious is configured to target Arcane Echo itself
