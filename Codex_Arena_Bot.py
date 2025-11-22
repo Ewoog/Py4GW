@@ -59,6 +59,14 @@ PRIEST_LOCATION_TOLERANCE = 200
 # Movement timeout when traveling to priest location (90 seconds to account for obstacles)
 PRIEST_MOVEMENT_TIMEOUT = 90
 
+# Wait time constants (in seconds)
+WAIT_TIME_AGGRESSIVE_CRITICAL = 80  # When at 4/5 wins in Aggressive Mode (about to earn strongbox)
+WAIT_TIME_PRIEST_MAP = 45  # For Priest Maps (Seabed Arena, Deldrimor Arena)
+WAIT_TIME_AGGRESSIVE_NORMAL = 30  # For regular Aggressive Mode
+
+# Consecutive wins needed before earning a strongbox (5 wins = 1 strongbox)
+WINS_BEFORE_STRONGBOX = 4  # At 4 wins, the next win (5th) earns a strongbox
+
 # Arena spawn coordinates for all Codex Arena maps
 # Format: {map_id: {"blue": (x, y), "red": (x, y)}}
 PRIEST_COORDINATES = {
@@ -410,33 +418,40 @@ def winning_team_logic(bot: Botting) -> Generator:
         is_priest_map = current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID
         if is_priest_map or config.aggressive_mode:
             # Determine wait time based on conditions
-            # If Aggressive Mode is on AND we're at 4/5 wins (next win will be 5/5), wait 80 seconds
-            # Otherwise, wait 45 seconds for priest maps and 30 seconds for regular aggressive mode
-            if config.aggressive_mode and config.consecutive_wins == 4:
-                wait_time_ms = 80000
-                wait_time_seconds = 80
+            # Priority: If Aggressive Mode is on AND at 4/5 wins, wait 80 seconds (applies to all maps including priest maps)
+            # Otherwise: 45 seconds for priest maps, 30 seconds for regular aggressive mode
+            if config.aggressive_mode and config.consecutive_wins == WINS_BEFORE_STRONGBOX:
+                wait_time_seconds = WAIT_TIME_AGGRESSIVE_CRITICAL
             elif is_priest_map:
-                wait_time_ms = 45000
-                wait_time_seconds = 45
+                wait_time_seconds = WAIT_TIME_PRIEST_MAP
             else:
-                wait_time_ms = 30000
-                wait_time_seconds = 30
+                wait_time_seconds = WAIT_TIME_AGGRESSIVE_NORMAL
+            
+            wait_time_ms = wait_time_seconds * 1000
             
             # Log appropriate message
-            if is_priest_map:
+            if config.aggressive_mode and config.consecutive_wins == WINS_BEFORE_STRONGBOX:
+                # At 4/5 wins with Aggressive Mode - special message (applies to priest maps too)
+                if is_priest_map:
+                    arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Entered {arena_name} (Map ID: {current_map_id}), at {WINS_BEFORE_STRONGBOX}/5 wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
+                                    Py4GW.Console.MessageType.Info)
+                else:
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Aggressive Mode enabled (Map ID: {current_map_id}), at {WINS_BEFORE_STRONGBOX}/5 wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
+                                    Py4GW.Console.MessageType.Info)
+            elif is_priest_map:
+                # Priest map without special win condition
                 arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
                 Py4GW.Console.Log(BOT_NAME, 
                                 f"Entered {arena_name} (Map ID: {current_map_id}), waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
                                 Py4GW.Console.MessageType.Info)
             else:
-                if config.consecutive_wins == 4:
-                    Py4GW.Console.Log(BOT_NAME, 
-                                    f"Aggressive Mode enabled (Map ID: {current_map_id}), at 4/5 wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
-                                    Py4GW.Console.MessageType.Info)
-                else:
-                    Py4GW.Console.Log(BOT_NAME, 
-                                    f"Aggressive Mode enabled (Map ID: {current_map_id}), waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
-                                    Py4GW.Console.MessageType.Info)
+                # Regular aggressive mode
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Aggressive Mode enabled (Map ID: {current_map_id}), waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
+                                Py4GW.Console.MessageType.Info)
             
             yield from Routines.Yield.wait(wait_time_ms)
             
