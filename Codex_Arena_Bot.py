@@ -34,10 +34,7 @@ BOT_NAME = "Codex Arena Bot"
 
 # Arena map IDs and priest coordinates
 SEABED_ARENA_MAP_ID = 829
-# Note: Deldrimor Arena explorable map ID is unknown. 
-# Based on the pattern (825, 826, 827, ?, 829, 831), it's likely 828 or 830.
-# Using 828 as a best guess. This may need to be updated once the correct ID is discovered.
-DELDRIMOR_ARENA_MAP_ID = 836  # TODO: Verify this ID - needs to be confirmed in-game
+DELDRIMOR_ARENA_MAP_ID = 830
 
 # Movement tolerance for priest location (200 units = close enough to engage)
 PRIEST_LOCATION_TOLERANCE = 200
@@ -53,8 +50,8 @@ PRIEST_COORDINATES = {
         "red": (4368, 6953)
     },
     DELDRIMOR_ARENA_MAP_ID: {
-        "blue": (-9344, 2803),
-        "red": (-8999, 7488)
+        "blue": (-9259.12, 2708.83),
+        "red": (-8994.74, 7384.57)
     }
 }
 
@@ -372,16 +369,17 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Get current map ID to detect map changes
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
         
+        # Wait 30 seconds after entering any map
+        Py4GW.Console.Log(BOT_NAME, 
+                        f"Entered map (Map ID: {current_map_id}), waiting 30 seconds...", 
+                        Py4GW.Console.MessageType.Info)
+        yield from Routines.Yield.wait(30000)
+        
         # Check if we're in Seabed Arena or Deldrimor Arena and move to enemy priest
         if current_map_id in PRIEST_COORDINATES:
             arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
-            if current_map_id == DELDRIMOR_ARENA_MAP_ID:
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"WARNING: Using estimated map ID ({DELDRIMOR_ARENA_MAP_ID}) for Deldrimor Arena. " +
-                                "If this doesn't work, please verify the correct map ID.", 
-                                Py4GW.Console.MessageType.Warning)
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Detected {arena_name} (Map ID: {current_map_id}), moving to enemy priest...", 
+                            f"Detected {arena_name}, moving to enemy priest...", 
                             Py4GW.Console.MessageType.Info)
             yield from move_to_enemy_priest(bot, current_map_id)
         
