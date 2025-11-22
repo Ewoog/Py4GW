@@ -21,7 +21,8 @@ class PVESkills:
         skill.SkillID = GLOBAL_CACHE.Skill.GetID("Together_as_one")
         skill.SkillType = SkillType.Shout.value
         skill.TargetAllegiance = Skilltarget.Self.value
-        skill.Nature = SkillNature.Interrupt.value
+        skill.Nature = SkillNature.CustomA.value
+        skill.Conditions.IsOutOfCombat = True
         skill_data[skill.SkillID] = skill
 
         skill = CustomSkill()
@@ -896,7 +897,6 @@ class PVESkills:
         skill.Nature = SkillNature.Buff.value
         skill.Conditions.IsOutOfCombat = True
         skill.Conditions.UniqueProperty = True
-        skill.Conditions.IsMoving = True
         skill_data[skill.SkillID] = skill
         
         skill = CustomSkill()
@@ -904,7 +904,8 @@ class PVESkills:
         skill.SkillType = SkillType.Skill.value
         skill.TargetAllegiance = Skilltarget.Self.value
         skill.Nature = SkillNature.Buff.value
-        skill.Conditions.LessLife = 0.6
+        skill.Conditions.LessLife = 0.9
+        skill.Conditions.IsOutOfCombat = True
         skill.Conditions.UniqueProperty = True
         skill_data[skill.SkillID] = skill
         

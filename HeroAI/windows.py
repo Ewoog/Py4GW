@@ -160,13 +160,14 @@ def DrawPrioritizedSkills(cached_data:CacheData):
 
 HeroFlags: list[bool] = [False, False, False, False, False, False, False, False, False]
 AllFlag = False
-CLearFlags = False
+clear_flags = False
 one_time_set_flag = False
+
 def DrawFlags(cached_data:CacheData):
     global capture_flag_all, capture_hero_flag, capture_hero_index
-    global one_time_set_flag, CLearFlags
-
-    if capture_hero_flag:
+    global one_time_set_flag, clear_flags
+    
+    if capture_hero_flag:        
         x, y, _ = Overlay().GetMouseWorldPos()
         if capture_flag_all:
             DrawFlagAll(x, y)
@@ -210,7 +211,7 @@ def DrawFlags(cached_data:CacheData):
         if cached_data.HeroAI_vars.all_player_struct[i].IsFlagged and cached_data.HeroAI_vars.all_player_struct[i].IsActive and not cached_data.HeroAI_vars.all_player_struct[i].IsHero:
             DrawHeroFlag(cached_data.HeroAI_vars.all_player_struct[i].FlagPosX,cached_data.HeroAI_vars.all_player_struct[i].FlagPosY)
 
-    if CLearFlags:
+    if clear_flags:
         for i in range(MAX_NUM_PLAYERS):
             cached_data.HeroAI_vars.shared_memory_handler.set_player_property(i, "IsFlagged", False)
             cached_data.HeroAI_vars.shared_memory_handler.set_player_property(i, "FlagPosX", 0.0)
@@ -218,13 +219,13 @@ def DrawFlags(cached_data:CacheData):
             cached_data.HeroAI_vars.shared_memory_handler.set_player_property(i, "FollowAngle", 0.0)
             GLOBAL_CACHE.Party.Heroes.UnflagHero(i)
         GLOBAL_CACHE.Party.Heroes.UnflagAllHeroes()
-        CLearFlags = False
+        clear_flags = False
             
         
 
 def DrawFlaggingWindow(cached_data:CacheData):
     global HeroFlags, AllFlag, capture_flag_all, capture_hero_flag, capture_hero_index, one_time_set_flag
-    global CLearFlags
+    global clear_flags
     party_size = GLOBAL_CACHE.Party.GetPartySize()
     if party_size == 1:
         PyImGui.text("No Follower or Heroes to Flag.")
@@ -259,7 +260,7 @@ def DrawFlaggingWindow(cached_data:CacheData):
             if party_size >= 8:
                 HeroFlags[6] = ImGui.toggle_button("7", IsHeroFlagged(cached_data,7), 30, 30)
             PyImGui.table_next_column()
-            CLearFlags = ImGui.toggle_button("X", HeroFlags[7],30,30)
+            clear_flags = ImGui.toggle_button("X", HeroFlags[7],30,30)
             PyImGui.end_table()
                 
                 
@@ -547,7 +548,7 @@ ButtonColors = {
     "Resign": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(210,0,20,255)),  
     "PixelStack": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
     "Flag": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
-    "ClearFlags": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
+    "clear_flags": ButtonColor(button_color=Color(90,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(190,0,20,255)),
     "Celerity": ButtonColor(button_color = Color(129, 33, 188, 255), hovered_color = Color(165, 100, 200, 255), active_color = Color(135, 225, 230, 255),texture_path="Textures\\Consumables\\Trimmed\\Essence_of_Celerity.png"),  
     "GrailOfMight": ButtonColor(button_color=Color(70,0,10,255), hovered_color=Color(160,0,15,255), active_color=Color(252,225,115,255), texture_path="Textures\\Consumables\\Trimmed\\Grail_of_Might.png"),
     "ArmorOfSalvation": ButtonColor(button_color = Color(96, 60, 15, 255),hovered_color = Color(187, 149, 38, 255),active_color = Color(225, 150, 0, 255), texture_path="Textures\\Consumables\\Trimmed\\Armor_of_Salvation.png"),
@@ -1032,5 +1033,438 @@ def DrawControlPanelWindow(cached_data:CacheData):
 
         cached_data.HeroAI_windows.control_window.process_window()
     cached_data.HeroAI_windows.control_window.end()
+
+def DrawCustomSkillsWindow(cached_data: CacheData):
+    """Draw the Custom Skills configuration window for Arcane Echo, Auspicious Incantation, Arcane Mimicry, and Buff Targeting"""
+    from HeroAI.settings import Settings
+    settings = Settings()
+    settings.ensure_initialized()  # Ensure settings are loaded for current account
+    
+    PyImGui.text("Configure Custom Skills")
+    PyImGui.separator()
+    
+    # Get current skillbar
+    skill_names = []
+    skill_ids = []
+    for slot in range(8):
+        skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(slot + 1)  # Slots are 1-based
+        if skill_id > 0:
+            skill_name = GLOBAL_CACHE.Skill.GetName(skill_id)
+            skill_names.append(f"Slot {slot + 1}: {skill_name}")
+            skill_ids.append(skill_id)
+        else:
+            skill_names.append(f"Slot {slot + 1}: Empty")
+            skill_ids.append(0)
+    
+    # Arcane Echo configuration
+    if PyImGui.collapsing_header("Arcane Echo", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text("Select which skill to copy with Arcane Echo:")
+        arcane_echo_id = GLOBAL_CACHE.Skill.GetID("Arcane_Echo")
+        has_arcane_echo = arcane_echo_id in skill_ids
+        
+        if has_arcane_echo:
+            # Filter out Arcane Echo itself from the list
+            filtered_skill_names = []
+            filtered_skill_slots = []
+            for i, skill_id in enumerate(skill_ids):
+                if skill_id != arcane_echo_id:
+                    filtered_skill_names.append(skill_names[i])
+                    filtered_skill_slots.append(i)
+            
+            if filtered_skill_names:
+                # Find current selection in filtered list
+                current_selection = 0
+                if settings.ArcaneEchoSkillSlot < len(skill_ids) and skill_ids[settings.ArcaneEchoSkillSlot] != arcane_echo_id:
+                    try:
+                        current_selection = filtered_skill_slots.index(settings.ArcaneEchoSkillSlot)
+                    except ValueError:
+                        current_selection = 0
+                
+                new_selection = ImGui.combo("##ArcaneEchoSkill", current_selection, filtered_skill_names)
+                if new_selection != current_selection:
+                    settings.ArcaneEchoSkillSlot = filtered_skill_slots[new_selection]
+                    settings.save_settings()
+                
+                selected_skill_id = skill_ids[settings.ArcaneEchoSkillSlot]
+                if selected_skill_id > 0:
+                    # Sanity check: Warn if configured skill is a buff but not in the expected slot
+                    buff_skill_ids = [
+                        GLOBAL_CACHE.Skill.GetID("Dark_Aura"),
+                        GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon"),
+                        GLOBAL_CACHE.Skill.GetID("Strength_of_Honor"),
+                        GLOBAL_CACHE.Skill.GetID("Spell_Breaker")
+                    ]
+                    
+                    # Check if the configured skill to copy is a buff skill
+                    is_buff_skill = selected_skill_id in buff_skill_ids
+                    
+                    # Get the actual skill at the configured slot
+                    actual_skill_at_slot = skill_ids[settings.ArcaneEchoSkillSlot] if settings.ArcaneEchoSkillSlot < len(skill_ids) else 0
+                    
+                    if is_buff_skill and actual_skill_at_slot != selected_skill_id:
+                        # Mismatch detected - configured buff skill is not in the expected slot
+                        PyImGui.text_colored(
+                            f"WARNING: Configured buff skill is not at slot {settings.ArcaneEchoSkillSlot + 1}!",
+                            Utils.RGBToNormal(255, 0, 0, 255)
+                        )
+                        PyImGui.text_colored(
+                            f"Please reconfigure Arcane Echo to match your current skillbar.",
+                            Utils.RGBToNormal(255, 165, 0, 255)
+                        )
+                    else:
+                        PyImGui.text_colored(
+                            f"Currently configured to copy: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                            Utils.RGBToNormal(0, 255, 0, 255)
+                        )
+            else:
+                PyImGui.text_colored("No other skills available to copy", Utils.RGBToNormal(255, 165, 0, 255))
+        else:
+            PyImGui.text_colored("Arcane Echo not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    
+    # Auspicious Incantation configuration
+    if PyImGui.collapsing_header("Auspicious Incantation", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text("Select which skill to use after Auspicious Incantation:")
+        auspicious_id = GLOBAL_CACHE.Skill.GetID("Auspicious_Incantation")
+        has_auspicious = auspicious_id in skill_ids
+        
+        if has_auspicious:
+            # Filter out Auspicious Incantation itself from the list
+            filtered_skill_names = []
+            filtered_skill_slots = []
+            for i, skill_id in enumerate(skill_ids):
+                if skill_id != auspicious_id:
+                    filtered_skill_names.append(skill_names[i])
+                    filtered_skill_slots.append(i)
+            
+            if filtered_skill_names:
+                # Find current selection in filtered list
+                current_selection = 0
+                if settings.AuspiciousIncantationSkillSlot < len(skill_ids) and skill_ids[settings.AuspiciousIncantationSkillSlot] != auspicious_id:
+                    try:
+                        current_selection = filtered_skill_slots.index(settings.AuspiciousIncantationSkillSlot)
+                    except ValueError:
+                        current_selection = 0
+                
+                new_selection = ImGui.combo("##AuspiciousSkill", current_selection, filtered_skill_names)
+                if new_selection != current_selection:
+                    settings.AuspiciousIncantationSkillSlot = filtered_skill_slots[new_selection]
+                    settings.save_settings()
+                
+                selected_skill_id = skill_ids[settings.AuspiciousIncantationSkillSlot]
+                if selected_skill_id > 0:
+                    PyImGui.text_colored(
+                        f"Currently configured to cast: {GLOBAL_CACHE.Skill.GetName(selected_skill_id)}",
+                        Utils.RGBToNormal(0, 255, 0, 255)
+                    )
+            else:
+                PyImGui.text_colored("No other skills available to cast", Utils.RGBToNormal(255, 165, 0, 255))
+        else:
+            PyImGui.text_colored("Auspicious Incantation not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    
+    # Arcane Mimicry configuration
+    if PyImGui.collapsing_header("Arcane Mimicry", PyImGui.TreeNodeFlags.DefaultOpen):
+        PyImGui.text("Select which ally to target with Arcane Mimicry:")
+        PyImGui.text_colored(
+            "Arcane Mimicry will copy the elite skill from the selected party member.",
+            Utils.RGBToNormal(180, 180, 180, 255)
+        )
+        mimicry_id = GLOBAL_CACHE.Skill.GetID("Arcane_Mimicry")
+        
+        # Check if player has Arcane Mimicry in skillbar
+        has_mimicry = mimicry_id in skill_ids
+        
+        if has_mimicry:
+            # Get all party members (simple approach using party slots)
+            party_members = []
+            
+            # Add player characters first
+            try:
+                players = GLOBAL_CACHE.Party.GetPlayers()
+                for player in players:
+                    agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                    if agent_id > 0:
+                        char_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                        party_members.append((agent_id, char_name, False))  # (agent_id, name, is_hero)
+            except Exception:
+                pass
+            
+            # Add heroes
+            try:
+                heroes = GLOBAL_CACHE.Party.GetHeroes()
+                for hero in heroes:
+                    if hero.agent_id > 0:
+                        hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else "Hero"
+                        party_members.append((hero.agent_id, hero_name, True))  # (agent_id, name, is_hero)
+            except Exception:
+                pass
+            
+            if party_members:
+                # Build display options
+                ally_options = []
+                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                for idx, (agent_id, name, is_hero) in enumerate(party_members):
+                    # Skip self
+                    if agent_id == my_agent_id:
+                        continue
+                    label = f"Slot {idx}: {name}" + (" (Hero)" if is_hero else "")
+                    ally_options.append(label)
+                
+                if ally_options:
+                    # Find current selection index
+                    current_selection = 0
+                    if settings.ArcaneMimicryTargetPartySlot >= 0:
+                        # Adjust for skipped slots (self)
+                        adjusted_slot = 0
+                        for idx in range(len(party_members)):
+                            if party_members[idx][0] == my_agent_id:
+                                continue
+                            if idx == settings.ArcaneMimicryTargetPartySlot:
+                                current_selection = adjusted_slot
+                                break
+                            adjusted_slot += 1
+                    
+                    new_selection = ImGui.combo("##MimicryAlly", current_selection, ally_options)
+                    if new_selection != current_selection:
+                        # Map selection back to actual party slot
+                        adjusted_slot = 0
+                        actual_slot = -1
+                        for idx in range(len(party_members)):
+                            if party_members[idx][0] == my_agent_id:
+                                continue
+                            if adjusted_slot == new_selection:
+                                actual_slot = idx
+                                break
+                            adjusted_slot += 1
+                        
+                        if actual_slot >= 0:
+                            settings.ArcaneMimicryTargetPartySlot = actual_slot
+                            # Clear deprecated fields
+                            settings.ArcaneMimicryTargetHeroID = 0
+                            settings.ArcaneMimicryTargetEmail = ""
+                            settings.ArcaneMimicryTargetAgentID = 0
+                            settings.save_settings()
+                    
+                    # Display currently configured target
+                    if settings.ArcaneMimicryTargetPartySlot >= 0:
+                        if 0 <= settings.ArcaneMimicryTargetPartySlot < len(party_members):
+                            agent_id, name, is_hero = party_members[settings.ArcaneMimicryTargetPartySlot]
+                            if agent_id != my_agent_id:
+                                label = f"Slot {settings.ArcaneMimicryTargetPartySlot}: {name}" + (" (Hero)" if is_hero else "")
+                                PyImGui.text_colored(
+                                    f"Currently configured to target: {label}",
+                                    Utils.RGBToNormal(0, 255, 0, 255)
+                                )
+                            else:
+                                PyImGui.text_colored(
+                                    f"Configured slot is self (invalid)",
+                                    Utils.RGBToNormal(255, 165, 0, 255)
+                                )
+                        else:
+                            PyImGui.text_colored(
+                                f"Configured slot {settings.ArcaneMimicryTargetPartySlot} not found in current party",
+                                Utils.RGBToNormal(255, 165, 0, 255)
+                            )
+                else:
+                    PyImGui.text_colored("No other party members found", Utils.RGBToNormal(255, 165, 0, 255))
+            else:
+                PyImGui.text_colored("No party members found", Utils.RGBToNormal(255, 165, 0, 255))
+        else:
+            PyImGui.text_colored("Arcane Mimicry not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+    
+    PyImGui.spacing()
+    
+    # Helper function to draw buff targeting configuration for a skill
+    def draw_buff_targeting_config(skill_name: str, skill_display_name: str, has_skill: bool):
+        """Draw buff targeting UI for a specific skill"""
+        if PyImGui.collapsing_header(f"{skill_display_name} - Buff Targeting", PyImGui.TreeNodeFlags.DefaultOpen):
+            if not has_skill:
+                PyImGui.text_colored(f"{skill_display_name} not found in skillbar", Utils.RGBToNormal(255, 0, 0, 255))
+                return
+            
+            import os
+            from Py4GWCoreLib.enums_src.GameData_enums import Profession
+            
+            # Get the py4gw root directory for texture paths
+            script_directory = os.path.dirname(os.path.abspath(__file__))
+            py4gw_root_directory = os.path.abspath(os.path.join(script_directory, os.pardir)) + "\\\\"
+            
+            config = settings.BuffTargetingConfig[skill_name]
+            
+            # Mode selection dropdown
+            PyImGui.text("Targeting mode:")
+            mode_options = ["By Profession", "By Player"]
+            current_mode_index = 0 if config['mode'] == 'profession' else 1
+            new_mode_index = ImGui.combo(f"##TargetMode_{skill_name}", current_mode_index, mode_options)
+            
+            if new_mode_index != current_mode_index:
+                config['mode'] = 'profession' if new_mode_index == 0 else 'player'
+                settings.save_requested = True
+                settings.write_settings()  # Immediately write to persist the change
+            
+            PyImGui.spacing()
+            
+            if config['mode'] == 'profession':
+                # Profession-based targeting
+                PyImGui.text("Select which professions to buff:")
+                PyImGui.text_colored(
+                    "Click profession icons to toggle.",
+                    Utils.RGBToNormal(180, 180, 180, 255)
+                )
+                
+                PyImGui.spacing()
+                PyImGui.bullet_text("Buff configuration:")
+                
+                all_professions = [
+                    Profession.Warrior, Profession.Ranger, Profession.Monk,
+                    Profession.Necromancer, Profession.Mesmer, Profession.Elementalist,
+                    Profession.Assassin, Profession.Ritualist, Profession.Paragon,
+                    Profession.Dervish
+                ]
+                
+                icon_size = 26
+                for profession in all_professions:
+                    profession_id = profession.value
+                    is_enabled = config['professions'].get(profession_id, True)
+                    
+                    texture_path = py4gw_root_directory + f"Textures\\Profession_Icons\\[{profession_id}] - {profession.name}.png"
+                    
+                    if not os.path.exists(texture_path):
+                        if ImGui.toggle_button(f"{profession.name}##{skill_name}_{profession.name}", is_enabled, 80, 26):
+                            config['professions'][profession_id] = not is_enabled
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
+                    else:
+                        if is_enabled:
+                            PyImGui.push_style_var(ImGui.ImGuiStyleVar.FrameBorderSize, 3)
+                            PyImGui.push_style_color(PyImGui.ImGuiCol.Border, Utils.ColorToTuple(Utils.RGBToColor(3, 244, 60, 255)))
+                        
+                        clicked = ImGui.ImageButton(f"{skill_name}_toggle_{profession.name}", texture_path, icon_size, icon_size)
+                        
+                        if is_enabled:
+                            PyImGui.pop_style_var(1)
+                            PyImGui.pop_style_color(1)
+                        
+                        if clicked:
+                            config['professions'][profession_id] = not is_enabled
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
+                        
+                        tooltip_text = f"{'Deactivate' if is_enabled else 'Activate'} buff for {profession.name}"
+                        ImGui.show_tooltip(tooltip_text)
+                    
+                    PyImGui.same_line(0, 5)
+                
+                PyImGui.new_line()
+                PyImGui.spacing()
+                
+                # Show summary
+                enabled_professions = [
+                    Profession(prof_id).name 
+                    for prof_id, enabled in config['professions'].items() 
+                    if enabled
+                ]
+                
+                if enabled_professions:
+                    PyImGui.text_colored(
+                        f"Buffing: {', '.join(enabled_professions)}",
+                        Utils.RGBToNormal(0, 255, 0, 255)
+                    )
+                else:
+                    PyImGui.text_colored(
+                        f"No professions selected ({skill_display_name} will not buff anyone)",
+                        Utils.RGBToNormal(255, 165, 0, 255)
+                    )
+            
+            else:  # player mode
+                # Player-based targeting
+                PyImGui.text("Select which party members to buff:")
+                PyImGui.text_colored(
+                    "Click on player names to toggle.",
+                    Utils.RGBToNormal(180, 180, 180, 255)
+                )
+                
+                PyImGui.spacing()
+                
+                # Get current party members
+                party_members = []
+                
+                # Add current player (self)
+                my_agent_id = GLOBAL_CACHE.Player.GetAgentID()
+                my_name = GLOBAL_CACHE.Player.GetName()
+                party_members.append(('self', my_name, my_name))
+                
+                # Add heroes
+                heroes = GLOBAL_CACHE.Party.GetHeroes()
+                for hero in heroes:
+                    if hero.agent_id != 0:
+                        hero_name = hero.hero_id.GetName() if hasattr(hero, 'hero_id') else f"Hero"
+                        party_members.append(('hero', hero_name, hero_name))
+                
+                # Add other players
+                players = GLOBAL_CACHE.Party.GetPlayers()
+                
+                for player in players:
+                    player_agent_id = GLOBAL_CACHE.Party.Players.GetAgentIDByLoginNumber(player.login_number)
+                    # Skip self (already added above) and invalid agents
+                    if player_agent_id == my_agent_id or player_agent_id == 0:
+                        continue
+                    
+                    player_name = GLOBAL_CACHE.Party.Players.GetPlayerNameByLoginNumber(player.login_number)
+                    party_members.append(('player', player_name, player_name))
+                
+                if party_members:
+                    PyImGui.bullet_text("Party members:")
+                    for member_type, member_id, member_name in party_members:
+                        is_enabled = member_id in config['players']
+                        
+                        # toggle_button returns the new state, not a click indicator
+                        new_state = ImGui.toggle_button(f"{member_name}##{skill_name}_{member_id}", is_enabled, 150, 24)
+                        
+                        # Check if the state changed
+                        if new_state != is_enabled:
+                            # Update the set based on the new state
+                            if new_state:
+                                config['players'].add(member_id)
+                            else:
+                                config['players'].discard(member_id)
+                            settings.save_requested = True
+                            settings.write_settings()  # Immediately write to persist the change
+                        
+                        PyImGui.same_line(0, 5)
+                        PyImGui.text(f"({member_type})")
+                    
+                    PyImGui.spacing()
+                    
+                    # Show summary
+                    if config['players']:
+                        PyImGui.text_colored(
+                            f"Buffing {len(config['players'])} player(s): {', '.join(config['players'])}",
+                            Utils.RGBToNormal(0, 255, 0, 255)
+                        )
+                    else:
+                        PyImGui.text_colored(
+                            f"No players selected ({skill_display_name} will not buff anyone)",
+                            Utils.RGBToNormal(255, 165, 0, 255)
+                        )
+                else:
+                    PyImGui.text_colored("No party members found", Utils.RGBToNormal(255, 165, 0, 255))
+    
+    # Draw buff targeting for each supported skill
+    buff_skills = [
+        ('Dark_Aura', 'Dark Aura', GLOBAL_CACHE.Skill.GetID("Dark_Aura")),
+        ('Great_Dwarf_Weapon', 'Great Dwarf Weapon', GLOBAL_CACHE.Skill.GetID("Great_Dwarf_Weapon")),
+        ('Strength_of_Honor', 'Strength of Honor', GLOBAL_CACHE.Skill.GetID("Strength_of_Honor")),
+        ('Spell_Breaker', 'Spell Breaker', GLOBAL_CACHE.Skill.GetID("Spell_Breaker"))
+    ]
+    
+    for skill_name, skill_display_name, skill_id in buff_skills:
+        has_skill = skill_id in skill_ids
+        draw_buff_targeting_config(skill_name, skill_display_name, has_skill)
+        PyImGui.spacing()
    
+
 
