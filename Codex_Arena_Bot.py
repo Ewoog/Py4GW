@@ -60,7 +60,7 @@ PRIEST_LOCATION_TOLERANCE = 200
 PRIEST_MOVEMENT_TIMEOUT = 90
 
 # Wait time constants (in seconds)
-WAIT_TIME_AGGRESSIVE_CRITICAL = 80  # When at 4/5 wins in Aggressive Mode (about to earn strongbox)
+WAIT_TIME_AGGRESSIVE_CRITICAL = 80  # When at 4/5 wins (about to earn strongbox) - applies to all modes
 WAIT_TIME_PRIEST_MAP = 45  # For Priest Maps (Seabed Arena, Deldrimor Arena)
 WAIT_TIME_AGGRESSIVE_NORMAL = 30  # For regular Aggressive Mode
 
