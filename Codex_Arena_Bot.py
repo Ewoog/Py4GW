@@ -392,7 +392,7 @@ def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
             # This prevents further sync messages from being sent
             if not config.first_queue_completed:
                 config.first_queue_completed = True
-                Py4GW.Console.Log(BOT_NAME, "First queue completed - sync messages disabled for subsequent matches.", 
+                Py4GW.Console.Log(BOT_NAME, "Initial synchronization completed - sync messages disabled for subsequent matches.", 
                                 Py4GW.Console.MessageType.Info)
             Py4GW.Console.Log(BOT_NAME, "Match started!", Py4GW.Console.MessageType.Success)
             return
