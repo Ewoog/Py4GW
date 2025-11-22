@@ -1060,13 +1060,23 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
             own_account = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(GLOBAL_CACHE.Player.GetAccountEmail())
             
             if own_account and accounts:
-                for account in accounts:
-                    # Only show accounts in the same party
-                    if account.PartyID == own_account.PartyID:
-                        is_selected = (settings.DesignatedLeaderEmail == account.AccountEmail)
-                        if PyImGui.radio_button(f"{account.CharacterName}##{account.AccountEmail}", is_selected):
-                            settings.DesignatedLeaderEmail = account.AccountEmail
-                            settings.save_settings()
+                # Build list of party members and find current selection
+                party_members = [acc for acc in accounts if acc.PartyID == own_account.PartyID]
+                
+                # Find the index of the currently selected leader
+                current_selection = -1
+                for i, account in enumerate(party_members):
+                    if settings.DesignatedLeaderEmail == account.AccountEmail:
+                        current_selection = i
+                        break
+                
+                # Draw radio buttons
+                for i, account in enumerate(party_members):
+                    new_selection = PyImGui.radio_button(f"{account.CharacterName}##{account.AccountEmail}", current_selection, i)
+                    if new_selection != current_selection:
+                        current_selection = new_selection
+                        settings.DesignatedLeaderEmail = account.AccountEmail
+                        settings.save_settings()
             else:
                 ImGui.text("No party members found or not in a party.")
     
