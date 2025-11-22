@@ -34,10 +34,24 @@ from typing import Generator, Any
 
 BOT_NAME = "Codex Arena Bot"
 
-# Arena map IDs and priest coordinates
+# Arena map IDs and spawn coordinates
 CODEX_ARENA_OUTPOST_ID = 796
 SEABED_ARENA_MAP_ID = 829
 DELDRIMOR_ARENA_MAP_ID = 830
+
+# Additional Codex Arena map IDs
+DALESSIO_ARENA_MAP_ID = 823
+AMNOON_ARENA_MAP_ID = 824
+CHURRANU_ISLAND_ARENA_MAP_ID = 825
+FORT_KOGA_MAP_ID = 826
+PETRIFIED_ARENA_MAP_ID = 827
+HEROES_CRYPT_MAP_ID = 828
+BRAWLERS_PIT_MAP_ID = 831
+THE_CRAG_MAP_ID = 832
+SUNSPEAR_ARENA_MAP_ID = 833
+SHING_JEA_ARENA_MAP_ID = 834
+ASCALON_ARENA_MAP_ID = 835
+SHIVERPEAK_ARENA_MAP_ID = 836
 
 # Movement tolerance for priest location (200 units = close enough to engage)
 PRIEST_LOCATION_TOLERANCE = 200
@@ -45,16 +59,64 @@ PRIEST_LOCATION_TOLERANCE = 200
 # Movement timeout when traveling to priest location (90 seconds to account for obstacles)
 PRIEST_MOVEMENT_TIMEOUT = 90
 
-# Priest coordinates for arenas
+# Arena spawn coordinates for all Codex Arena maps
 # Format: {map_id: {"blue": (x, y), "red": (x, y)}}
 PRIEST_COORDINATES = {
-    SEABED_ARENA_MAP_ID: {
+    SEABED_ARENA_MAP_ID: {  # [PRIEST] Seabed Arena
         "blue": (9737, 4344),
         "red": (4368, 6953)
     },
-    DELDRIMOR_ARENA_MAP_ID: {
+    DELDRIMOR_ARENA_MAP_ID: {  # [PRIEST] Deldrimor Arena
         "blue": (-9259.12, 2708.83),
         "red": (-8994.74, 7384.57)
+    },
+    DALESSIO_ARENA_MAP_ID: {  # D'Alessio Arena
+        "blue": (4945.88, -2424.17),
+        "red": (4627.75, 3853.27)
+    },
+    AMNOON_ARENA_MAP_ID: {  # Amnoon Arena
+        "blue": (3282.00, 10095.00),
+        "red": (-1923.30, 5129.79)
+    },
+    CHURRANU_ISLAND_ARENA_MAP_ID: {  # Churranu Island Arena
+        "blue": (4206.08, -119.03),
+        "red": (-886.18, -478.33)
+    },
+    FORT_KOGA_MAP_ID: {  # Fort Koga
+        "blue": (6321.00, 181.00),
+        "red": (195.82, -3402.33)
+    },
+    PETRIFIED_ARENA_MAP_ID: {  # Petrified Arena
+        "blue": (1831.88, 1348.83),
+        "red": (7198.82, -4076.33)
+    },
+    HEROES_CRYPT_MAP_ID: {  # Heroes' Crypt
+        "blue": (-110.00, -4322.00),
+        "red": (3299.88, -5084.17)
+    },
+    BRAWLERS_PIT_MAP_ID: {  # Brawler's Pit
+        "blue": (967.00, 5075.00),
+        "red": (4981.82, 5033.67)
+    },
+    THE_CRAG_MAP_ID: {  # The Crag
+        "blue": (6528.88, 4470.83),
+        "red": (-2394.18, -2403.33)
+    },
+    SUNSPEAR_ARENA_MAP_ID: {  # Sunspear Arena
+        "blue": (436.00, 2517.00),
+        "red": (3731.82, -2301.33)
+    },
+    SHING_JEA_ARENA_MAP_ID: {  # Shing Jea Arena
+        "blue": (-2375.00, -1583.00),
+        "red": (2308.82, 2879.67)
+    },
+    ASCALON_ARENA_MAP_ID: {  # Ascalon Arena
+        "blue": (8181.50, -1940.41),
+        "red": (4800.82, -6545.33)
+    },
+    SHIVERPEAK_ARENA_MAP_ID: {  # Shiverpeak Arena
+        "blue": (9344.00, 12417.00),
+        "red": (4409.82, 16214.67)
     }
 }
 
