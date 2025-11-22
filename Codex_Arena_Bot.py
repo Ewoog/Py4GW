@@ -342,25 +342,31 @@ def winning_team_logic(bot: Botting) -> Generator:
             bot.Stop()
             return
         
-        # Get current map ID to detect map changes
+        # Get current map ID to determine arena type
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
         
-        # Wait 30 seconds after entering any map
-        Py4GW.Console.Log(BOT_NAME, 
-                        f"Entered map (Map ID: {current_map_id}), waiting 30 seconds...", 
-                        Py4GW.Console.MessageType.Info)
-        yield from Routines.Yield.wait(30000)
-        
-        # Check if we're in Seabed Arena or Deldrimor Arena and move to enemy priest
-        if current_map_id in PRIEST_COORDINATES:
+        # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena)
+        if current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID:
+            # Priest map detected - wait 30 seconds then rush priest location
             arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Detected {arena_name}, moving to enemy priest...", 
+                            f"Entered {arena_name} (Map ID: {current_map_id}), waiting 30 seconds before rushing priest...", 
+                            Py4GW.Console.MessageType.Info)
+            yield from Routines.Yield.wait(30000)
+            
+            # Rush the priest location (determine spawn and move to enemy priest coordinates)
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Moving to enemy priest location...", 
                             Py4GW.Console.MessageType.Info)
             yield from move_to_enemy_priest(bot, current_map_id)
+        else:
+            # Not a priest map - just wait in spawn
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Entered arena (Map ID: {current_map_id}), waiting in spawn...", 
+                            Py4GW.Console.MessageType.Info)
         
         # Wait in the arena until the map changes (up to 10 minutes)
-        Py4GW.Console.Log(BOT_NAME, "Winning team in arena, waiting for map change...", 
+        Py4GW.Console.Log(BOT_NAME, "Waiting for map change...", 
                          Py4GW.Console.MessageType.Info)
         
         timeout = 600  # 10 minute timeout (in seconds)
