@@ -64,8 +64,9 @@ WAIT_TIME_AGGRESSIVE_CRITICAL = 80  # When at 4/5 wins in Aggressive Mode (about
 WAIT_TIME_PRIEST_MAP = 45  # For Priest Maps (Seabed Arena, Deldrimor Arena)
 WAIT_TIME_AGGRESSIVE_NORMAL = 30  # For regular Aggressive Mode
 
-# Consecutive wins needed before earning a strongbox (5 wins = 1 strongbox)
+# Strongbox win tracking constants
 WINS_BEFORE_STRONGBOX = 4  # At 4 wins, the next win (5th) earns a strongbox
+TOTAL_WINS_FOR_STRONGBOX = 5  # Total consecutive wins needed to earn a strongbox
 
 # Arena spawn coordinates for all Codex Arena maps
 # Format: {map_id: {"blue": (x, y), "red": (x, y)}}
@@ -417,10 +418,14 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena) OR Aggressive Mode is enabled
         is_priest_map = current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID
         if is_priest_map or config.aggressive_mode:
+            # Check if we're at the critical win count (about to earn a strongbox)
+            # This applies regardless of Aggressive Mode or Priest Map status
+            is_critical_win = config.consecutive_wins == WINS_BEFORE_STRONGBOX
+            
             # Determine wait time based on conditions
-            # Priority: If Aggressive Mode is on AND at 4/5 wins, wait 80 seconds (applies to all maps including priest maps)
+            # Priority: If at 4/5 wins (regardless of mode), wait 80 seconds
             # Otherwise: 45 seconds for priest maps, 30 seconds for regular aggressive mode
-            if config.aggressive_mode and config.consecutive_wins == WINS_BEFORE_STRONGBOX:
+            if is_critical_win:
                 wait_time_seconds = WAIT_TIME_AGGRESSIVE_CRITICAL
             elif is_priest_map:
                 wait_time_seconds = WAIT_TIME_PRIEST_MAP
@@ -430,16 +435,16 @@ def winning_team_logic(bot: Botting) -> Generator:
             wait_time_ms = wait_time_seconds * 1000
             
             # Log appropriate message
-            if config.aggressive_mode and config.consecutive_wins == WINS_BEFORE_STRONGBOX:
-                # At 4/5 wins with Aggressive Mode - special message (applies to priest maps too)
+            if is_critical_win:
+                # At 4/5 wins - special message (applies to all modes)
                 if is_priest_map:
                     arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
                     Py4GW.Console.Log(BOT_NAME, 
-                                    f"Entered {arena_name} (Map ID: {current_map_id}), at {WINS_BEFORE_STRONGBOX}/5 wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
+                                    f"Entered {arena_name} (Map ID: {current_map_id}), at {WINS_BEFORE_STRONGBOX}/{TOTAL_WINS_FOR_STRONGBOX} wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
                                     Py4GW.Console.MessageType.Info)
                 else:
                     Py4GW.Console.Log(BOT_NAME, 
-                                    f"Aggressive Mode enabled (Map ID: {current_map_id}), at {WINS_BEFORE_STRONGBOX}/5 wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
+                                    f"Aggressive Mode enabled (Map ID: {current_map_id}), at {WINS_BEFORE_STRONGBOX}/{TOTAL_WINS_FOR_STRONGBOX} wins - waiting {wait_time_seconds} seconds before rushing enemy spawn...", 
                                     Py4GW.Console.MessageType.Info)
             elif is_priest_map:
                 # Priest map without special win condition
@@ -491,8 +496,8 @@ def winning_team_logic(bot: Botting) -> Generator:
             # Count this as a win - increment consecutive wins counter
             config.consecutive_wins += 1
             
-            # Check if we've reached 5 consecutive wins
-            if config.consecutive_wins >= 5:
+            # Check if we've reached the required consecutive wins for a strongbox
+            if config.consecutive_wins >= TOTAL_WINS_FOR_STRONGBOX:
                 # Increment strongbox counter and reset consecutive wins
                 config.strongboxes_earned += 1
                 config.consecutive_wins = 0
@@ -502,12 +507,12 @@ def winning_team_logic(bot: Botting) -> Generator:
             else:
                 # Log progress toward next strongbox
                 Py4GW.Console.Log(BOT_NAME, 
-                                f"Victory! {config.consecutive_wins}/5 consecutive wins.", 
+                                f"Victory! {config.consecutive_wins}/{TOTAL_WINS_FOR_STRONGBOX} consecutive wins.", 
                                 Py4GW.Console.MessageType.Success)
             
             # Log current progress
             Py4GW.Console.Log(BOT_NAME, 
-                            f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins}/5 consecutive wins)", 
+                            f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins}/{TOTAL_WINS_FOR_STRONGBOX} consecutive wins)", 
                             Py4GW.Console.MessageType.Info)
             
             # Check if we transitioned to another arena map (not back to outpost)
@@ -773,7 +778,7 @@ def _draw_settings():
     PyImGui.separator()
     PyImGui.text("Progress:")
     PyImGui.text(f"Strongboxes Earned: {config.strongboxes_earned}/{config.target_strongboxes}")
-    PyImGui.text(f"Consecutive Wins: {config.consecutive_wins}/5")
+    PyImGui.text(f"Consecutive Wins: {config.consecutive_wins}/{TOTAL_WINS_FOR_STRONGBOX}")
     
     # Calculate progress percentage
     progress = config.strongboxes_earned / config.target_strongboxes
