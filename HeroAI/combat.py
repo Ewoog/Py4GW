@@ -1441,9 +1441,12 @@ class CombatClass:
                 # skip Arcane Echo to let Auspicious cast first
                 # 
                 # Desired order: Auspicious Incantation > Arcane Echo > Target Spell
-                # - Auspicious reduces next spell energy cost
-                # - Arcane Echo benefits from reduced cost
+                # - Auspicious reduces next spell energy cost (targets Arcane Echo itself)
+                # - Arcane Echo benefits from reduced cost (targets the spell to copy)
                 # - Arcane Echo then copies the target spell
+                # 
+                # Configuration: AuspiciousIncantationSkillSlot = Arcane Echo's slot
+                #                ArcaneEchoSkillSlot = Target spell's slot
                 auspicious_followup_slot = settings.AuspiciousIncantationSkillSlot
                 arcane_echo_skillbar_slot = self.skill_order[self.skill_pointer]  # Maps prioritized index to skillbar slot (0-7)
                 
