@@ -10,6 +10,16 @@ This bot automates Codex Arena matches with two teams of 4 players each:
 
 The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins) and shuts down after earning 5 strongboxes (daily limit).
 
+## New Features
+
+- **Character Name Display**: Partner and party member selection now shows character names alongside emails
+- **Party Configuration**: Leaders can configure and auto-invite 3 party members
+- **Support Script**: Non-leader accounts run a support script to receive commands
+- **Map Verification**: Two leaders verify they're in the same map to detect desyncs
+- **Desync Detection**: GUI displays when teams are in different maps
+- **Payback Mode**: Losing team goes aggressive with Set 1 when desync detected
+- **Resign Mode**: Winning team returns to outpost with Set 2 when desync detected
+
 ## Requirements
 
 - Py4GW framework installed and configured
@@ -31,33 +41,47 @@ Before running the bot, configure your equipment sets in Guild Wars:
 - Can use minimal equipment or default setup
 - This team is designed to lose quickly
 
-### 2. Party Formation
+### 2. Account Configuration
 
-1. Launch 8 Guild Wars clients (2 will run the bot as leaders)
-2. Manually invite 3 other players to each leader's party
-3. You should have two groups of 4 players each
+1. Launch 8 Guild Wars clients
+2. On the 2 team leader accounts:
+   - Load `Codex_Arena_Bot.py`
+   - Configure as leader (checkbox is checked by default)
+3. On the 6 support accounts:
+   - Load `Codex_Arena_Support_Script.py`
+   - Select their party leader's email from the dropdown
 
 ### 3. Bot Configuration
 
-Run the bot on both team leaders:
+**Winning Team Leader:**
+- Check "Is Winning Team"
+- Select the losing team leader's email as partner
+- Configure 3 party members in the Party Configuration tab
+- Optional: Enable "Resign Mode" to return to outpost on desync
+- Click "Invite Party Members" button to auto-invite configured members
 
-**Instance 1 (Winning Team):**
-```bash
-# Load Codex_Arena_Bot.py on the winning team leader
-# In the bot GUI, check "Is Winning Team"
-```
+**Losing Team Leader:**
+- Uncheck "Is Winning Team"
+- Select the winning team leader's email as partner
+- Configure 3 party members in the Party Configuration tab
+- Optional: Enable "Payback Mode" to go aggressive on desync
+- Click "Invite Party Members" button to auto-invite configured members
 
-**Instance 2 (Losing Team):**
-```bash
-# Load Codex_Arena_Bot.py on the losing team leader  
-# In the bot GUI, uncheck "Is Winning Team"
-```
+**Support Accounts:**
+- Select their party leader's email
+- Start the script
+- The support script will automatically:
+  - Respond to leave/resign commands
+  - Switch equipment sets as commanded
+  - Enable/disable auto combat as commanded
 
 ### 4. Starting the Bot
 
 1. Ensure both team leaders are in Codex Arena outpost (Map ID: 796)
-2. Click "Start Bot" in both instances
-3. The bots will synchronize and begin queueing together
+2. Start support scripts on all 6 support accounts
+3. Click "Start Bot" on both team leaders
+4. Leaders will automatically invite their configured party members
+5. The bots will synchronize and begin queueing together
 
 ## How It Works
 
@@ -65,11 +89,30 @@ Run the bot on both team leaders:
 
 The bots use Py4GW's shared memory system to communicate:
 
-1. **Ready Phase**: Both bots signal when they're ready to queue (first match only)
+1. **Ready Phase**: Both leaders signal when they're ready to queue (first match only)
 2. **Queue Phase**: Once both are ready, they enter the queue simultaneously
-3. **Match Phase**: Bots track when the match starts and ends
-4. **Repeat**: Process continues until strongbox targets are met
+3. **Match Phase**: Leaders track when the match starts and ends
+4. **Map Verification**: Upon entering arena, leaders exchange map IDs to detect desync
+5. **Repeat**: Process continues until strongbox targets are met
    - **Note**: After the first match, the losing team immediately re-enters the queue without waiting for synchronization, allowing for faster cycling
+
+### Map Verification and Desync Detection
+
+When entering an arena map (not the outpost):
+1. Both leaders send their current map ID to their partner
+2. Each leader verifies they received the same map ID
+3. If map IDs don't match, a **DESYNC** is detected and displayed in the GUI
+4. Desync triggers special behavior based on configured modes:
+   - **Payback Mode** (Losing Team): Equips Set 1 and rushes enemy spawn
+   - **Resign Mode** (Winning Team): Equips Set 2 and returns to outpost
+
+### Support Script Behavior
+
+Support accounts listen for commands from their leader:
+- **Leave Party**: Leaves the current party
+- **Resign**: Returns to outpost
+- **Equip Set 1/2**: Switches to the specified equipment set
+- **Auto Combat On/Off**: Enables or disables auto combat
 
 ### Strongbox Tracking
 
@@ -81,8 +124,10 @@ The bots use Py4GW's shared memory system to communicate:
 
 **Winning Team:**
 - Enters the match
+- **Map Verification**: Checks map ID with partner team
 - **Special Arena Behavior**: In Seabed Arena or Deldrimor Arena, automatically moves to enemy priest location (HeroAI handles combat)
-- Plays normally (HeroAI handles combat automatically)
+- **Aggressive Mode**: When enabled, rushes enemy spawn on all maps
+- **Desync Handling**: If Resign Mode is active and desync detected, equips Set 2 and returns to outpost
 - Waits for natural match completion
 - Tracks consecutive wins
 - Checks for strongbox acquisition
@@ -90,7 +135,9 @@ The bots use Py4GW's shared memory system to communicate:
 
 **Losing Team:**
 - Enters the match
-- Does NOT engage in special arena behavior (no priest movement)
+- **Map Verification**: Checks map ID with partner team
+- **Desync Handling**: If Payback Mode is active and desync detected, equips Set 1 and goes aggressive
+- Does NOT engage in special arena behavior normally (no priest movement)
 - Attempts to return to outpost after a set time
 - Does not increment win counter (loss expected)
 - **Immediately re-enters queue** after returning to outpost (no synchronization wait on subsequent matches)
@@ -98,7 +145,7 @@ The bots use Py4GW's shared memory system to communicate:
 ### Special Arena Behavior
 
 **All Maps:**
-- **Initial Wait**: Winning team waits 30 seconds after entering any arena map before taking action
+- **Initial Wait**: Winning team waits 30 seconds after entering any arena map before taking action (80 seconds if at 4/5 wins)
 
 **Seabed Arena and Deldrimor Arena:**
 
@@ -109,7 +156,11 @@ The bots use Py4GW's shared memory system to communicate:
 - **HeroAI Combat**: Once at the priest location, HeroAI automatically handles combat
 - **Combat Wait**: Bot waits until out of combat before proceeding
 - **Normal Flow**: After combat completes, continues with normal match waiting logic
-- **Losing Team**: Does nothing special - just returns to outpost as normal
+- **Losing Team**: Does nothing special normally - just returns to outpost
+
+**Aggressive Mode:**
+- When enabled on winning team, rushes enemy spawn on ALL maps (not just priest maps)
+- Uses 30-second initial wait (80 seconds if at 4/5 wins)
 
 **Arena Map IDs and Priest Locations:**
 - **Seabed Arena (Map ID: 829)**
@@ -121,34 +172,67 @@ The bots use Py4GW's shared memory system to communicate:
 
 ## Configuration Options
 
-### In-Code Settings
+### GUI Settings (Main Bot)
 
-Edit `Codex_Arena_Bot.py` to modify:
-
-```python
-config.target_strongboxes = 5  # Strongboxes needed before role switch (default: 5, max per day)
-```
-
-### GUI Settings
-
+**Leader Settings:**
+- **Partner Account Email**: Select the other team leader (displays character name with email)
+- **Party Configuration**: Configure 3 party members to auto-invite
+- **Is Leader**: Toggle between leader and support mode
 - **Is Winning Team**: Toggle whether this instance is the winning or losing team
+- **Aggressive Mode**: Make winning team rush enemy spawn on all maps
+- **Payback Mode** (Losing Team): Go aggressive when desync detected
+- **Resign Mode** (Winning Team): Return to outpost when desync detected
+
+**Progress Tracking:**
 - **Strongboxes Earned**: View current strongboxes earned
 - **Consecutive Wins**: Track progress toward next strongbox (need 5 consecutive wins)
 - **Progress Bar**: Visual progress toward 5 strongbox goal
+- **Desync Indicator**: Shows when map IDs don't match between leaders
+
+**Actions:**
+- **Invite Party Members**: Manually trigger party member invites
+- **Reset Stats**: Reset strongbox and win counters
+
+### GUI Settings (Support Script)
+
+- **Party Leader Email**: Select your party leader (displays character name with email)
+- **Last Command**: Shows the most recent command received
+- **Auto Combat Status**: Displays current auto combat state
 
 ## Troubleshooting
 
 ### Bots Don't Queue Together
 
-- Ensure both bots are in the same outpost
+- Ensure both leaders are in the same outpost
 - Check that shared memory is working (other multibox features work)
-- Verify both bots show "ready" status in logs
+- Verify both leaders show "ready" status in logs
+- Make sure partner emails are configured correctly
+
+### Desync Detected
+
+- This is normal if teams get matched against different opponents
+- Payback Mode (losing team) will make them go aggressive
+- Resign Mode (winning team) will make them return to outpost
+- If desync happens frequently, check network stability
+
+### Party Members Not Invited
+
+- Ensure party member emails are configured in Party Configuration tab
+- Verify the accounts are online and in shared memory
+- Check that character names are showing up in the dropdowns
+- Click "Invite Party Members" button manually if auto-invite fails
+
+### Support Script Not Responding
+
+- Verify the support account has selected the correct leader email
+- Check that the leader bot is running and sending commands
+- Ensure shared memory is working between accounts
 
 ### Match Doesn't Start
 
 - Codex Arena may have population requirements
 - Try queueing during peak hours
-- Check that you have the minimum party size
+- Check that you have the minimum party size (4 per team)
 
 ### Equipment Sets Don't Switch
 

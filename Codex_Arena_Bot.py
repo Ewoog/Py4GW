@@ -859,6 +859,13 @@ def run_codex_match(bot: Botting) -> None:
         # Travel to Codex Arena if not there
         yield from travel_to_codex_arena()
         
+        # On first match, invite party members if leader
+        if config.is_leader and config.first_match and config.party_members:
+            Py4GW.Console.Log(BOT_NAME, "First match - inviting party members...", 
+                            Py4GW.Console.MessageType.Info)
+            yield from invite_party_members()
+            yield from Routines.Yield.wait(5000)  # Wait for party to form
+        
         # Equip appropriate set
         if config.is_winning_team:
             Py4GW.Console.Log(BOT_NAME, "Equipping Set 1 (Winning Team)", Py4GW.Console.MessageType.Info)
