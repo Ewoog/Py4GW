@@ -404,6 +404,8 @@ def send_map_verify_to_partner(map_id: int):
 def invite_party_members() -> Generator:
     """Invite configured party members to the party.
     Uses HeroAI's mutual invite pattern for reliable party formation."""
+    yield  # CRITICAL: Must yield FIRST for generator to start executing
+    
     from Py4GWCoreLib import Party
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -411,7 +413,6 @@ def invite_party_members() -> Generator:
     
     Py4GW.Console.Log(BOT_NAME, "DEBUG: invite_party_members() function executing", 
                      Py4GW.Console.MessageType.Info)
-    yield  # CRITICAL: Must yield early for generator to start executing
     
     try:
         if not config.party_members:
