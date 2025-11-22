@@ -136,6 +136,7 @@ class CodexConfig:
         self.partner_email_index = 0  # Index for combo box selection
         self.first_match = True  # Track if this is the first match (for losing team immediate requeue)
         self.aggressive_mode = False  # Toggle: When enabled, winning team moves to enemy spawn
+        self.first_queue_completed = False  # Track if initial queue synchronization is complete
 
 config = CodexConfig()
 
@@ -182,12 +183,18 @@ def get_available_accounts() -> list:
 
 
 def send_sync_signal(signal_type: str):
-    """Send synchronization signal to other accounts."""
+    """Send synchronization signal to other accounts.
+    Only sends signals during initial bot startup and first queue entry."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
     # Only send if partner email is configured and not empty/whitespace
     if not config.partner_email or not config.partner_email.strip():
+        return
+    
+    # Only send sync messages if first queue has not been completed
+    # This prevents message stacking after the initial synchronization
+    if config.first_queue_completed:
         return
     
     # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END"
@@ -210,9 +217,14 @@ def send_sync_signal(signal_type: str):
 
 
 def check_sync_signal() -> str:
-    """Check for synchronization signals from other accounts."""
+    """Check for synchronization signals from other accounts.
+    Only processes signals during initial bot startup and first queue entry."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
+    
+    # Only check for sync messages if first queue has not been completed
+    if config.first_queue_completed:
+        return ""
     
     # Check for next message
     msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
@@ -376,6 +388,12 @@ def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
         # Exit when map changed AND at least 1 minute has passed
         if map_changed and elapsed >= min_wait_time:
             send_sync_signal("MATCH_START")
+            # Mark first queue as completed after the first match starts
+            # This prevents further sync messages from being sent
+            if not config.first_queue_completed:
+                config.first_queue_completed = True
+                Py4GW.Console.Log(BOT_NAME, "Initial synchronization completed - sync messages disabled for subsequent matches.", 
+                                Py4GW.Console.MessageType.Info)
             Py4GW.Console.Log(BOT_NAME, "Match started!", Py4GW.Console.MessageType.Success)
             return
         
@@ -766,6 +784,7 @@ def _draw_settings():
     if PyImGui.button("Reset Stats", 150, 25):
         config.strongboxes_earned = 0
         config.consecutive_wins = 0
+        config.first_queue_completed = False
         Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
     
     PyImGui.separator()
