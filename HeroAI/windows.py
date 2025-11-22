@@ -1043,6 +1043,36 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
     PyImGui.text("Configure Custom Skills")
     PyImGui.separator()
     
+    # Designated Leader configuration for UW/FoW multibox
+    if PyImGui.collapsing_header("Designated Leader (UW/FoW Multibox)", PyImGui.TreeNodeFlags.DefaultOpen):
+        use_designated_leader = ImGui.checkbox("Use Designated Leader", settings.UseDesignatedLeader)
+        if use_designated_leader != settings.UseDesignatedLeader:
+            settings.UseDesignatedLeader = use_designated_leader
+            settings.save_settings()
+        if ImGui.is_item_hovered():
+            ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.")
+        
+        if settings.UseDesignatedLeader:
+            PyImGui.separator()
+            ImGui.text("Select Designated Leader:")
+            
+            # Get all accounts in the party
+            accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+            own_account = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(GLOBAL_CACHE.Player.GetAccountEmail())
+            
+            if own_account and accounts:
+                for account in accounts:
+                    # Only show accounts in the same party
+                    if account.PartyID == own_account.PartyID:
+                        is_selected = (settings.DesignatedLeaderEmail == account.AccountEmail)
+                        if PyImGui.radio_button(f"{account.CharacterName}##{account.AccountEmail}", is_selected):
+                            settings.DesignatedLeaderEmail = account.AccountEmail
+                            settings.save_settings()
+            else:
+                ImGui.text("No party members found or not in a party.")
+    
+    PyImGui.spacing()
+    
     # Get current skillbar
     skill_names = []
     skill_ids = []
