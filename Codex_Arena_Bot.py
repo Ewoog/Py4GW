@@ -421,15 +421,8 @@ def winning_team_logic(bot: Botting) -> Generator:
         yield from Routines.Yield.wait(30000)
         
         # Check if we should move to enemy spawn
-        should_rush_spawn = False
         is_priest_map = current_map_id in PRIEST_ARENA_MAP_IDS
-        
-        if config.aggressive_mode:
-            # In aggressive mode, always rush enemy spawn (if map is recognized)
-            should_rush_spawn = current_map_id in ARENA_SPAWN_COORDINATES
-        else:
-            # In non-aggressive mode, only rush for priest maps
-            should_rush_spawn = is_priest_map
+        should_rush_spawn = (config.aggressive_mode and current_map_id in ARENA_SPAWN_COORDINATES) or is_priest_map
         
         if should_rush_spawn:
             if is_priest_map:
