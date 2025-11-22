@@ -8,9 +8,6 @@ from .Overlay import *
 import math
 
 class Map:
-    # Expose InstanceType enum from PyMap
-    InstanceType = PyMap.InstanceType
-    
     @staticmethod
     def map_instance():
         """Return the PyMap instance. """
@@ -35,11 +32,6 @@ class Map:
     def IsMapLoading():
         """Check if the map instance is loading."""
         return Map.map_instance().instance_type.GetName() == "Loading"
-
-    @staticmethod
-    def GetInstanceType():
-        """Get the instance type of the current map."""
-        return Map.map_instance().instance_type.Get()
 
     @staticmethod
     def GetMapName(mapid=None):

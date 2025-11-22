@@ -14,11 +14,6 @@ class PlayerBuff(Structure):
         ("LastUpdated", c_int),
     ]
     
-    # Type hints for IntelliSense
-    PlayerID: int
-    Buff_id: int
-    LastUpdated: int
-    
 
 class PlayerStruct(Structure):
     _fields_ = [
@@ -33,18 +28,6 @@ class PlayerStruct(Structure):
         ("FollowAngle", c_float),
         ("LastUpdated", c_int),
     ]
-    
-    # Type hints for IntelliSense
-    PlayerID: int
-    Energy_Regen: float
-    Energy: float
-    IsActive: bool
-    IsHero: bool
-    IsFlagged: bool
-    FlagPosX: float
-    FlagPosY: float
-    FollowAngle: float
-    LastUpdated: int
 
 
 class CandidateStruct(Structure):
@@ -57,24 +40,12 @@ class CandidateStruct(Structure):
         ("SummonedBy", c_int),
         ("LastUpdated", c_int),
     ]
-    
-    # Type hints for IntelliSense
-    PlayerID: int
-    MapID: int
-    MapRegion: int
-    MapDistrict: int
-    InvitedBy: int 
-    SummonedBy: int
-    LastUpdated: int
 
 
 class MemSkill(Structure):
     _fields_ = [
         ("Active", c_bool),
     ]
-    
-    # Type hints for IntelliSense
-    Active: bool
 
 class GameOptionStruct(Structure):
     _pack_ = 1
@@ -86,16 +57,7 @@ class GameOptionStruct(Structure):
         ("Combat", c_bool),
         ("Skills", MemSkill * NUMBER_OF_SKILLS),
         ("WindowVisible", c_bool),
-    ]
-    
-    # Type hints for IntelliSense
-    Following: bool
-    Avoidance: bool 
-    Looting: bool
-    Targeting: bool
-    Combat: bool
-    Skills: list[MemSkill]
-    WindowVisible: bool
+    ] 
 
 class GameStruct(Structure):
     _fields_ = [
@@ -103,13 +65,7 @@ class GameStruct(Structure):
         ("Candidates", CandidateStruct * MAX_NUM_PLAYERS),
         ("GameOptions", GameOptionStruct * MAX_NUM_PLAYERS),
         ("PlayerBuffs", PlayerBuff * MAX_NUMBER_OF_BUFFS),
-    ]    
-    
-    # Type hints for IntelliSense
-    Players: list[PlayerStruct]
-    Candidates: list[CandidateStruct]
-    GameOptions: list[GameOptionStruct]
-    PlayerBuffs: list[PlayerBuff]
+    ]
 
 
 class Skilltarget (IntEnum):

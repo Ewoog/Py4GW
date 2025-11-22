@@ -124,7 +124,6 @@ class MonkSkills:
         skill.Conditions.HasCondition = True
         skill.Conditions.HasHex = True
         skill.Conditions.UniqueProperty = True
-        skill.Conditions.IsOutOfCombat = True
         skill_data[skill.SkillID] = skill
 
         skill = CustomSkill()

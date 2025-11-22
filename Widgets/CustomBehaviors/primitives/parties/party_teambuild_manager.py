@@ -9,6 +9,7 @@ from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
 from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
 from Py4GWCoreLib.py4gwcorelib_src.Timer import ThrottledTimer
 from Py4GWCoreLib.routines_src.Yield import Yield
+from Py4GWCoreLib import Utils
 from Widgets.CustomBehaviors.primitives import constants
 from Widgets.CustomBehaviors.primitives.parties.custom_behavior_shared_memory import CustomBehaviorWidgetMemoryManager
 from Widgets.CustomBehaviors.primitives.parties.pawned2.Pawned2TeamBuild import Pawned2TeamBuild
@@ -205,7 +206,7 @@ class PartyTeamBuildManager:
         """
         try:
             # Get current skillbar template
-            template = Yield.Skills.GenerateSkillbarTemplate()
+            template = Utils.GenerateSkillbarTemplate()
             if not template:
                 return False
 
@@ -254,7 +255,7 @@ class PartyTeamBuildManager:
 
         # Update In-memory
         account_email = GLOBAL_CACHE.Player.GetAccountEmail()
-        template = Yield.Skills.GenerateSkillbarTemplate()
+        template = Utils.GenerateSkillbarTemplate()
         self.set_template_for_account(account_email, template)
 
         if GLOBAL_CACHE.Party.IsPartyLeader():
@@ -275,13 +276,13 @@ class PartyTeamBuildManager:
         for email, template in all_templates.items():
             # get the skillbar_data from cache, or create if not exists
             if template not in skillbar_datas:
-                skillbar_parsed = SkillbarParsed(*Yield.Skills.ParseSkillbarTemplate(template))
+                skillbar_parsed = SkillbarParsed(*Utils.ParseSkillbarTemplate(template))
                 skillbar_datas[email] = SkillbarData(email, template, skillbar_parsed)
             else:
                 skillbar_data: SkillbarData = skillbar_datas[email]
                 if skillbar_data.skillbar_template != template:
                     skillbar_data.skillbar_template = template
-                    skillbar_parsed = SkillbarParsed(*Yield.Skills.ParseSkillbarTemplate(template))
+                    skillbar_parsed = SkillbarParsed(*Utils.ParseSkillbarTemplate(template))
                     skillbar_data.skillbar_parsed = skillbar_parsed
 
     def apply_skillbar_template(self, template_code: str, account_email: str):
@@ -289,14 +290,11 @@ class PartyTeamBuildManager:
         sender_email = GLOBAL_CACHE.Player.GetAccountEmail()
         if constants.DEBUG: print(f"SendMessage {account_email} to {account_email}")
         extra_data: tuple[str, str, str, str] = self.__build_extra_data(template_code)
-        GLOBAL_CACHE.ShMem.SendMessage(sender_email, account_email, SharedCommandType.ApplySkillbarTemplate, ExtraData = extra_data)
+        GLOBAL_CACHE.ShMem.SendMessage(sender_email, account_email, SharedCommandType.LoadSkillTemplate, ExtraData = extra_data)
 
     def __build_extra_data(self, template_code: str) -> tuple[str, str, str, str]:
-        # Split template into chunks of 19 characters (avoid truncation issues)
-
-        # split template code into 4 chunks of 20 characters each
-        # Split template into chunks of 19 characters (avoid truncation issues)
-        chunk_size = 19  # Reduced from 20 to avoid string truncation
+        # Split template into chunks of X characters (avoid truncation issues)
+        chunk_size = 29
         chunks = []
         if template_code:  # Check if template_code is not empty
             chunks = [template_code[i:i+chunk_size] for i in range(0, len(template_code), chunk_size)]

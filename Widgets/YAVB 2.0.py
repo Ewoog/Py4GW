@@ -11,7 +11,8 @@ from Py4GWCoreLib.Builds import SF_Ass_vaettir
 
 from typing import List, Tuple
 
-bot = Botting("YAVB 2.0", upkeep_birthday_cupcake_restock=1)
+bot = Botting("YAVB 2.0", 
+              upkeep_birthday_cupcake_restock=1)
   
 def create_bot_routine(bot: Botting) -> None:
     TownRoutines(bot)
@@ -37,13 +38,13 @@ def InitializeBot(bot: Botting) -> None:
     
 def TownRoutines(bot: Botting) -> None:
     bot.States.AddHeader("Town Routines")
-    bot.Map.Travel(target_map_name="Longeyes Ledge")
+    bot.Map.Travel(target_map_id=650) #target_map_name="Longeyes Ledge")
     InitializeBot(bot)
     bot.States.AddCustomState(lambda: EquipSkillBar(bot), "Equip SkillBar")
     HandleInventory(bot)
     bot.States.AddHeader("Exit to Bjora Marches")
     bot.Party.SetHardMode(True) #set hard mode on
-    bot.Move.XYAndExitMap(-26375, 16180, target_map_name="Bjora Marches")
+    bot.Move.XYAndExitMap(-26375, 16180, target_map_id=482) # target_map_name="Bjora Marches")
     
 def TraverseBjoraMarches(bot: Botting) -> None:
     bot.States.AddHeader("Traverse Bjora Marches")
@@ -66,7 +67,7 @@ def TraverseBjoraMarches(bot: Botting) -> None:
     (-13944, 341)  ,(-14358, 743)  ,(-14727, 1181) ,(-15109, 1620) ,(-15539, 2010) ,
     (-15963, 2380) ,(-18048, 4223 ), (-19196, 4986),(-20000, 5595) ,(-20300, 5600)
     ]
-    bot.Move.FollowPathAndExitMap(path_points_to_traverse_bjora_marches, target_map_name="Jaga Moraine")
+    bot.Move.FollowPathAndExitMap(path_points_to_traverse_bjora_marches, target_map_id=546) #target_map_name="Jaga Moraine")
     
 def printEach(bot: Botting, seconds: int):
     while True:
@@ -75,32 +76,44 @@ def printEach(bot: Botting, seconds: int):
    
     
 def JagaMoraineFarmRoutine(bot: Botting) -> None:
+    def _follow_and_wait(path_points: List[Tuple[float, float]], wait_state_name: str, cycle_timeout: int = 150):
+        bot.Move.FollowPath(path_points)
+        bot.States.AddCustomState(lambda: WaitForBall(bot, wait_state_name, cycle_timeout), f"Wait for {wait_state_name}")
+
+
     bot.States.AddHeader("Jaga Moraine Farm Routine")
     InitializeBot(bot)
     bot.States.AddCustomState(lambda: AssignBuild(bot), "Assign Build")
     bot.Move.XY(13372.44, -20758.50)
     bot.Dialogs.AtXY(13367, -20771,0x84)
     bot.States.AddManagedCoroutine("HandleStuckJagaMoraine", lambda: HandleStuckJagaMoraine(bot))
-    path_points_to_farming_route1: List[Tuple[float, float]] = [
-    (11375, -22761), (10925, -23466), (10917, -24311), (10280, -24620), (9640, -23175),
-    (7815, -23200), (7765, -22940), (8213, -22829), (8740, -22475), (8880, -21384),
-    (8684, -20833), (8982, -20576),
-    ]
-    bot.Move.FollowPath(path_points_to_farming_route1)
+    path: List[Tuple[float, float]] = [(13367, -20771),
+    (11375, -22761), (10925, -23466), (10917, -24311), (10280, -24620),
+    (10280, -24620),(9640, -23175), (7815, -23200), (6626.51, -23167.24)]
+    _follow_and_wait(path, "Inner Packs", cycle_timeout=75)
+    
+    path: List[Tuple[float, float]] = [(7765, -22940), (8213, -22829), (8740, -22475), (8880, -21384),
+    (8684, -20833), (8982, -20576),]
     bot.States.AddHeader("Wait for Left Aggro Ball")
-    bot.States.AddCustomState(lambda: WaitforLeftAggroBall(bot), "Wait for Left Aggro Ball")
-    path_points_to_farming_route2: List[Tuple[float, float]] = [
-    (10196, -20124), (10123, -19529),(10049, -18933), (9976, -18338), (11316, -18056),
-    (10392, -17512), (10114, -16948),(10729, -16273), (10505, -14750),(10815, -14790),
+    _follow_and_wait(path, "Left Aggro Ball")
+
+    path: List[Tuple[float, float]] = [(10196, -20124), (10123, -19529),(10049, -18933), ]
+    _follow_and_wait(path, "log side packs", cycle_timeout=75)
+    path: List[Tuple[float, float]] = [
+    (9976, -18338), (11316, -18056),
+    (10392, -17512), (10114, -16948),]
+    _follow_and_wait(path, "Big Pack")
+    
+    path =[
+    (10729, -16273), (10505, -14750),(10815, -14790),
     (11090, -15345), (11670, -15457),(12604, -15320), (12450, -14800),(12725, -14850),
     (12476, -16157),]
-    bot.Move.FollowPath(path_points_to_farming_route2)
-    bot.States.AddHeader("Wait for Right Aggro Ball")
-    bot.States.AddCustomState(lambda: WaitforRightAggroBall(bot), "Wait for Right Aggro Ball")
+    _follow_and_wait(path, "Right Aggro Ball")
+    
     bot.Properties.Set("movement_tolerance",value=25)
     path_points_to_killing_spot: List[Tuple[float, float]] = [
         (13070, -16911), (12938, -17081), (12790, -17201), (12747, -17220), (12703, -17239),
-        (12684, -17184),]
+        (12684, -17184), (12485.18, -17260.41)]
     bot.Move.FollowPath(path_points_to_killing_spot)
     bot.Properties.ResetTodefault("movement_tolerance", field= "value")
     bot.States.AddHeader("Kill Enemies")
@@ -109,9 +122,9 @@ def JagaMoraineFarmRoutine(bot: Botting) -> None:
     bot.States.RemoveManagedCoroutine("HandleStuckJagaMoraine")
     bot.States.AddHeader("Loot Items")
     bot.Items.LootItems()
-    # bot.Items.AutoIDAndSalvageItems()
+    bot.Items.AutoIDAndSalvageItems()
     bot.States.AddCustomState(lambda: NeedsInventoryManagement(bot), "Needs Inventory Management")
-    bot.Move.XYAndExitMap(15850,-20550, target_map_name="Bjora Marches")
+    bot.Move.XYAndExitMap(15850,-20550, target_map_id=482) # target_map_name="Bjora Marches")
     
     
 def NeedsInventoryManagement(bot: Botting):
@@ -126,18 +139,14 @@ def NeedsInventoryManagement(bot: Botting):
         or count_of_id_kits == 0
         or count_of_salvage_kits == 0
     ):
-        fsm = bot.config.FSM
-        fsm.pause()
+        GLOBAL_CACHE.Player.SendChatCommand("resign") 
         yield from Routines.Yield.wait(500)
-        fsm.jump_to_state_by_name("[H]Town Routines_1")
-        yield from Routines.Yield.wait(500)
-        fsm.resume()
     yield
     
     
 def ResetFarmLoop(bot: Botting) -> None:
     bot.States.AddHeader("Reset Farm Loop")
-    bot.Move.XYAndExitMap(-20300, 5600 , target_map_name="Jaga Moraine")
+    bot.Move.XYAndExitMap(-20300, 5600 , target_map_id=546) #target_map_name="Jaga Moraine")
     bot.States.JumpToStepName("[H]Jaga Moraine Farm Routine_6")
     
 def KillEnemies(bot: Botting):
@@ -158,16 +167,14 @@ def KillEnemies(bot: Botting):
         delta = current_time - start_time
         if delta > timeout and timeout > 0:
             ConsoleLog("Killing Routine", "Timeout reached, restarting.", Py4GW.Console.MessageType.Error)
-            fsm = bot.config.FSM
-            fsm.jump_to_state_by_name("[H]Town Routines_1") 
+            GLOBAL_CACHE.Player.SendChatCommand("resign") 
+            yield from Routines.Yield.wait(500)
             return
   
         if GLOBAL_CACHE.Agent.IsDead(GLOBAL_CACHE.Player.GetAgentID()):
             ConsoleLog("Killing Routine", "Player is dead, restarting.", Py4GW.Console.MessageType.Warning)
-            fsm = bot.config.FSM
-            fsm.jump_to_state_by_name("[H]Town Routines_1") 
+            yield from Routines.Yield.wait(500)
             return 
-             
         yield from Routines.Yield.wait(1000)
         enemy_array = Routines.Agents.GetFilteredEnemyArray(player_pos[0],player_pos[1],Range.Spellcast.value)
     
@@ -189,7 +196,7 @@ def AssignBuild(bot: Botting):
         case "Mesmer":
             bot.OverrideBuild(SF_Mes_vaettir())  # Placeholder for Mesmer build 
         case _:
-            ConsoleLog("Unsupported Profession", f"The profession '{profession}' is not supported by this bot.", Py4GW.Console.MessageType.Error)
+            ConsoleLog("Unsupported Profession", f"The profession '{profession}' is not supported by this bot.", Py4GW.Console.MessageType.Error, True)
             bot.Stop()
             return
     yield
@@ -201,101 +208,85 @@ def EquipSkillBar(bot: Botting):
 
 def HandleInventory(bot: Botting) -> None:
     bot.States.AddHeader("Inventory Handling")
-    # bot.Items.AutoIDAndSalvageAndDepositItems() #sort bags, auto id, salvage, deposit to bank
+    bot.Items.AutoIDAndSalvageAndDepositItems() #sort bags, auto id, salvage, deposit to bank
     bot.Move.XYAndInteractNPC(-23110, 14942) # Merchant in Longeyes Ledge
-    bot.Wait.ForTime(1500)
-    # bot.Merchant.SellMaterialsToMerchant() # Sell materials to merchant, make space in inventory
-    # bot.Merchant.Restock.IdentifyKits() #restock identify kits
-    # bot.Merchant.Restock.SalvageKits() #restock salvage kits
-    # bot.Items.AutoIDAndSalvageAndDepositItems() #sort bags again to make sure everything is deposited
-    # bot.Merchant.SellMaterialsToMerchant() #Sell remaining materials again to make sure inventory is clear
-    # bot.Merchant.Restock.IdentifyKits() #restock identify kits
-    # bot.Merchant.Restock.SalvageKits() #restock salvage kits
+    bot.Wait.ForTime(500)
+    bot.Merchant.SellMaterialsToMerchant() # Sell materials to merchant, make space in inventory
+    bot.Merchant.Restock.IdentifyKits() #restock identify kits
+    bot.Merchant.Restock.SalvageKits() #restock salvage kits
+    bot.Items.AutoIDAndSalvageAndDepositItems() #sort bags again to make sure everything is deposited
+    bot.Merchant.SellMaterialsToMerchant() #Sell remaining materials again to make sure inventory is clear
+    bot.Merchant.Restock.IdentifyKits() #restock identify kits
+    bot.Merchant.Restock.SalvageKits() #restock salvage kits
     bot.Items.Restock.BirthdayCupcake() #restock birthday cupcake
     
-def WaitforLeftAggroBall(bot : Botting):
+def _wait_for_aggro_ball(bot: Botting, side_label: str, cycle_timeout: int = 150):
+    """
+    Shared logic for waiting until enemies have balled up.
+    side_label is just used for logging ("Left" / "Right").
+    """
     global in_waiting_routine
-    ConsoleLog("Waiting for Left Aggro Ball", "Waiting for enemies to ball up.", Py4GW.Console.MessageType.Info)
-    in_waiting_routine = True
-
-    start_time = 0
-    
-    build = bot.config.build_handler
-
-    while start_time < 150:  # 150 * 100ms = 15 seconds
-        # Wait 100 ms
-        yield from Routines.Yield.wait(100)
-        start_time += 1
-
-        # Get current player position
-        player_pos = GLOBAL_CACHE.Player.GetXY()
-        px, py = player_pos[0], player_pos[1]
-
-        # Get nearby enemies
-        enemies_ids = Routines.Agents.GetFilteredEnemyArray(px, py, Range.Earshot.value)
-
-        # Check if ALL enemies are within Adjacent range
-        all_in_adjacent = True
-        for enemy_id in enemies_ids:
-            enemy = GLOBAL_CACHE.Agent.GetAgent(enemy_id)
-            if enemy is None:
-                continue
-            ex, ey = enemy.x, enemy.y
-            dx, dy = ex - px, ey - py
-            dist_sq = dx * dx + dy * dy
-            if dist_sq > (Range.Adjacent.value ** 2):
-                all_in_adjacent = False
-                break
-
-        if all_in_adjacent:
-            break  # exit early if all enemies are balled up
-
-    in_waiting_routine = False
-
-    # Resume build
-    if isinstance(build, SF_Ass_vaettir) or isinstance(build, SF_Mes_vaettir):
-        yield from build.CastHeartOfShadow()
-
-def WaitforRightAggroBall(bot : Botting):
-    global in_waiting_routine
-    ConsoleLog("Waiting for Right Aggro Ball", "Waiting for enemies to ball up.", Py4GW.Console.MessageType.Info)
+    ConsoleLog(f"Waiting for {side_label} Aggro Ball",
+               "Waiting for enemies to ball up.",
+               Py4GW.Console.MessageType.Info)
 
     in_waiting_routine = True
-
     elapsed = 0
     build = bot.config.build_handler
 
-    while elapsed < 150:  # 150 * 100ms = 15s max
-        yield from Routines.Yield.wait(100)
-        elapsed += 1
+    try:
+        while elapsed < cycle_timeout:  # 150 * 100ms = 15s max
+            yield from Routines.Yield.wait(100)
+            elapsed += 1
 
-        # Get player position
-        px, py = GLOBAL_CACHE.Player.GetXY()
+            # hard exit if player dies
+            if GLOBAL_CACHE.Agent.IsDead(GLOBAL_CACHE.Player.GetAgentID()):
+                ConsoleLog(f"{side_label} Aggro Ball Wait",
+                           "Player is dead, exiting wait.",
+                           Py4GW.Console.MessageType.Warning)
+                yield
+                return
 
-        # Get enemies within earshot
-        enemies_ids = Routines.Agents.GetFilteredEnemyArray(px, py, Range.Earshot.value)
+            # Get player position
+            px, py = GLOBAL_CACHE.Player.GetXY()
 
-        # Check if all enemies are within Adjacent range
-        all_in_adjacent = True
-        for enemy_id in enemies_ids:
-            enemy = GLOBAL_CACHE.Agent.GetAgent(enemy_id)
-            if enemy is None:
-                continue
-            dx, dy = enemy.x - px, enemy.y - py
-            if dx * dx + dy * dy > (Range.Adjacent.value ** 2):
-                all_in_adjacent = False
-                break
+            # Get enemies within earshot
+            enemies_ids = Routines.Agents.GetFilteredEnemyArray(px, py, Range.Earshot.value)
 
-        if all_in_adjacent:
-            break  # Exit early if enemies are balled up
+            # Check if all enemies are within Adjacent range
+            all_in_adjacent = True
+            for enemy_id in enemies_ids:
+                enemy = GLOBAL_CACHE.Agent.GetAgent(enemy_id)
+                if enemy is None:
+                    continue
+                dx, dy = enemy.x - px, enemy.y - py
+                if dx * dx + dy * dy > (Range.Adjacent.value ** 2):
+                    all_in_adjacent = False
+                    break
 
-    in_waiting_routine = False
+            if all_in_adjacent:
+                ConsoleLog(f"{side_label} Aggro Ball Wait",
+                           "Enemies balled up successfully.",
+                           Py4GW.Console.MessageType.Info)
+                break  # exit early
+
+        else:
+            # ← executes only if loop ran full timeout
+            ConsoleLog(f"{side_label} Aggro Ball Wait",
+                       f"Timeout reached {cycle_timeout*100}ms, exiting without ball.",
+                       Py4GW.Console.MessageType.Warning)
+
+    finally:
+        # Always reset, no matter why we exited
+        in_waiting_routine = False
+
+        # Resume build if applicable
+        if isinstance(build, SF_Ass_vaettir) or isinstance(build, SF_Mes_vaettir):
+            yield from build.CastHeartOfShadow()
 
 
-    # Resume build
-    if isinstance(build, SF_Ass_vaettir) or isinstance(build, SF_Mes_vaettir):
-        yield from build.CastHeartOfShadow()
-                
+def WaitForBall(bot: Botting, side_label: str, cycle_timeout: int = 150):
+    yield from _wait_for_aggro_ball(bot, side_label, cycle_timeout)
 
 #region Events
     
@@ -394,7 +385,7 @@ def HandleStuckJagaMoraine(bot: Botting):
         # Jaga Moraine map check
         if GLOBAL_CACHE.Map.GetMapID() == JAGA_MORAINE:
             if stuck_timer.IsExpired():
-                ConsoleLog("HandleStuck", "Issuing scheduled /stuck command.", Py4GW.Console.MessageType.Debug, forced_log)
+                ConsoleLog("HandleStuck", "Issuing scheduled /stuck command.", Py4GW.Console.MessageType.Debug, log_actions)
                 GLOBAL_CACHE.Player.SendChatCommand("stuck")
                 stuck_timer.Reset()
 
@@ -403,7 +394,7 @@ def HandleStuckJagaMoraine(bot: Botting):
                 ConsoleLog("HandleStuck", f"Checking movement. Old pos: {old_player_position}, Current pos: {current_player_pos}", Py4GW.Console.MessageType.Debug, log_actions)
 
                 if old_player_position == current_player_pos:
-                    ConsoleLog("HandleStuck", "Player is stuck, sending /stuck command.", Py4GW.Console.MessageType.Warning, log_actions)
+                    ConsoleLog("HandleStuck", "Player is stuck, sending /stuck command.", Py4GW.Console.MessageType.Warning, forced_log)
                     GLOBAL_CACHE.Player.SendChatCommand("stuck")
                     stuck_counter += 1
                     ConsoleLog("HandleStuck", f"Stuck counter incremented to {stuck_counter}.", Py4GW.Console.MessageType.Debug, log_actions)

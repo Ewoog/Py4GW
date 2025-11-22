@@ -56,12 +56,6 @@ class IniHandler:
         except (configparser.NoOptionError, configparser.NoSectionError):
             return default_value
 
-    def read_string(self, section: str, key: str, default_value: str = "") -> str:
-        """
-        Read a string value from the INI file. Alias for read_key.
-        """
-        return self.read_key(section, key, default_value)
-
     def read_int(self, section: str, key: str, default_value: int = 0) -> int:
         """
         Read an integer value.
@@ -91,12 +85,6 @@ class IniHandler:
             return config.getboolean(section, key)
         except (ValueError, configparser.NoOptionError, configparser.NoSectionError):
             return default_value
-
-    def read_string(self, section: str, key: str, default_value: str = "") -> str:
-        """
-        Read a string value from the INI file. Alias for read_key for compatibility.
-        """
-        return self.read_key(section, key, default_value)
 
     # ----------------------------
     # Write Methods

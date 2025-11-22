@@ -162,31 +162,13 @@ class Agents:
         from ..AgentArray import AgentArray
         from ..Py4GWcorelib import Utils
         """
-        Purpose: filters enemies within the specified range. In PvP maps, also includes hostile players and henchmen.
+        Purpose: filters enemies within the specified range.
         Args:
-            x (float): The x coordinate to search from.
-            y (float): The y coordinate to search from.
-            max_distance (float): The maximum distance to search for enemies.
-            aggressive_only (bool): If True, only return aggressive enemies.
+            range (int): The maximum distance to search for enemies.
         Returns: List of enemy agent IDs
         """
         from ..GlobalCache import GLOBAL_CACHE
         enemy_array = AgentArray.GetEnemyArray()
-        
-        # In PvP maps, also check for hostile players and henchmen (not in our party/alliance)
-        if GLOBAL_CACHE.Map.IsPVP():
-            all_agents = GLOBAL_CACHE.AgentArray.GetAgentArray()
-            # Filter for living agents that are not allies (includes both players and henchmen)
-            hostile_agents = AgentArray.Filter.ByCondition(all_agents, lambda agent_id: GLOBAL_CACHE.Agent.IsLiving(agent_id))
-            hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Agent.IsAlive(agent_id))
-            hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Player.GetAgentID() != agent_id)
-            # Filter out allies, neutrals, and NPCs - only keep enemy players/henchmen
-            hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: GLOBAL_CACHE.Agent.GetAllegiance(agent_id)[0] not in [1, 2, 6])  # 1=Ally, 2=Neutral, 6=NpcMinipet
-            # Filter out party members
-            hostile_agents = AgentArray.Filter.ByCondition(hostile_agents, lambda agent_id: not GLOBAL_CACHE.Party.IsPartyMember(agent_id))
-            # Add hostile agents to enemy array
-            enemy_array = enemy_array + hostile_agents
-        
         enemy_array = AgentArray.Filter.ByCondition(enemy_array, lambda agent_id: Utils.Distance((x,y), GLOBAL_CACHE.Agent.GetXY(agent_id)) <= max_distance)
         enemy_array = AgentArray.Filter.ByCondition(enemy_array, lambda agent_id: GLOBAL_CACHE.Agent.IsAlive(agent_id))
         enemy_array = AgentArray.Filter.ByCondition(enemy_array, lambda agent_id: GLOBAL_CACHE.Player.GetAgentID() != agent_id)
