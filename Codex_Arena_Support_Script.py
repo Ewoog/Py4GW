@@ -91,6 +91,10 @@ def check_leader_commands() -> tuple[str, float]:
         command_type = ""
         param1 = 0.0
         
+        # Check bounds before accessing params
+        if len(msg.Params) == 0:
+            return ("", 0.0)
+        
         if msg.Params[0] == SIGNAL_LEAVE_PARTY:
             command_type = "LEAVE"
         elif msg.Params[0] == SIGNAL_RESIGN:
@@ -105,7 +109,8 @@ def check_leader_commands() -> tuple[str, float]:
             command_type = "AUTO_COMBAT_OFF"
         
         if command_type:
-            param1 = msg.Params[1]
+            if len(msg.Params) > 1:
+                param1 = msg.Params[1]
             GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
             return (command_type, param1)
     

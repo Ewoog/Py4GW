@@ -300,7 +300,8 @@ def check_sync_signal() -> tuple[str, int]:
         msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
         
         if msg and msg.Command == SYNC_QUEUE_COMMAND:
-            if msg.Params[0] == SIGNAL_MAP_VERIFY:
+            # Check bounds before accessing params
+            if len(msg.Params) > 1 and msg.Params[0] == SIGNAL_MAP_VERIFY:
                 map_id = int(msg.Params[1])
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
                 return ("MAP_VERIFY", map_id)
@@ -314,6 +315,10 @@ def check_sync_signal() -> tuple[str, int]:
         signal_type = ""
         map_id = 0
         
+        # Check bounds before accessing params
+        if len(msg.Params) == 0:
+            return ("", 0)
+        
         if msg.Params[0] == SIGNAL_READY_TO_QUEUE:
             signal_type = "READY_TO_QUEUE"
         elif msg.Params[0] == SIGNAL_QUEUE_NOW:
@@ -324,7 +329,8 @@ def check_sync_signal() -> tuple[str, int]:
             signal_type = "MATCH_END"
         elif msg.Params[0] == SIGNAL_MAP_VERIFY:
             signal_type = "MAP_VERIFY"
-            map_id = int(msg.Params[1])
+            if len(msg.Params) > 1:
+                map_id = int(msg.Params[1])
         
         # Mark message as finished
         if signal_type:
@@ -617,7 +623,7 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Handle desync modes if desync was detected
         if config.desync_detected:
             if config.is_winning_team and config.resign_mode:
-                # Resign Mode: Losing team (us as winning team in desync) equips Set 2 and returns to outpost
+                # Resign Mode: Winning team equips Set 2 and returns to outpost
                 Py4GW.Console.Log(BOT_NAME, 
                                 "DESYNC - Resign Mode active! Equipping Set 2 and returning to outpost...", 
                                 Py4GW.Console.MessageType.Warning)
@@ -632,19 +638,6 @@ def winning_team_logic(bot: Botting) -> Generator:
                 config.desync_detected = False
                 # Continue to next iteration - will requeue
                 continue
-            elif not config.is_winning_team and config.payback_mode:
-                # Payback Mode: Losing team equips Set 1 and goes aggressive
-                Py4GW.Console.Log(BOT_NAME, 
-                                "DESYNC - Payback Mode active! Equipping Set 1 and going aggressive...", 
-                                Py4GW.Console.MessageType.Warning)
-                yield from equip_set(1)
-                send_message_to_party("EQUIP_SET_1")
-                send_message_to_party("AUTO_COMBAT_ON")
-                bot.config.upkeep.auto_combat.set_now("active", True)
-                # Rush enemy spawn
-                yield from Routines.Yield.wait(30000)  # Wait 30 seconds
-                yield from move_to_enemy_priest(bot, current_map_id)
-                # Then wait for match to end normally
         
         # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena) OR Aggressive Mode is enabled
         is_priest_map = current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID
@@ -794,11 +787,26 @@ def losing_team_logic(bot: Botting) -> Generator:
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Party
     
-    Py4GW.Console.Log(BOT_NAME, "Losing team in arena, waiting for map change...", 
-                     Py4GW.Console.MessageType.Info)
-    
     # Get current map ID to detect map changes
     current_map_id = GLOBAL_CACHE.Map.GetMapID()
+    
+    # Handle desync modes if desync was detected
+    if config.desync_detected and config.payback_mode:
+        # Payback Mode: Losing team equips Set 1 and goes aggressive
+        Py4GW.Console.Log(BOT_NAME, 
+                        "DESYNC - Payback Mode active! Equipping Set 1 and going aggressive...", 
+                        Py4GW.Console.MessageType.Warning)
+        yield from equip_set(1)
+        send_message_to_party("EQUIP_SET_1")
+        send_message_to_party("AUTO_COMBAT_ON")
+        bot.config.upkeep.auto_combat.set_now("active", True)
+        # Rush enemy spawn
+        yield from Routines.Yield.wait(30000)  # Wait 30 seconds
+        yield from move_to_enemy_priest(bot, current_map_id)
+        # Then wait for match to end normally
+    else:
+        Py4GW.Console.Log(BOT_NAME, "Losing team in arena, waiting for map change...", 
+                         Py4GW.Console.MessageType.Info)
     
     # Wait until map changes (up to 10 minutes)
     timeout = 600  # 10 minute timeout (in seconds)
@@ -815,6 +823,7 @@ def losing_team_logic(bot: Botting) -> Generator:
             Py4GW.Console.Log(BOT_NAME, "Map changed - returned to outpost after loss.", 
                             Py4GW.Console.MessageType.Info)
             config.in_match = False
+            config.desync_detected = False
             send_sync_signal("MATCH_END")
             return
         
@@ -830,6 +839,7 @@ def losing_team_logic(bot: Botting) -> Generator:
             if new_map_id != current_map_id:
                 map_changed = True
                 config.in_match = False
+                config.desync_detected = False
                 Py4GW.Console.Log(BOT_NAME, "Successfully returned to outpost.", 
                                 Py4GW.Console.MessageType.Success)
                 send_sync_signal("MATCH_END")
@@ -840,6 +850,7 @@ def losing_team_logic(bot: Botting) -> Generator:
         Py4GW.Console.Log(BOT_NAME, "Timeout in losing team logic, forcing return...", 
                         Py4GW.Console.MessageType.Warning)
         config.in_match = False
+        config.desync_detected = False
 
 
 def run_codex_match(bot: Botting) -> None:
