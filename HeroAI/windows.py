@@ -5,7 +5,7 @@ from Py4GWCoreLib import UIManager, ModelID, GLOBAL_CACHE
 from .constants import MAX_NUM_PLAYERS, NUMBER_OF_SKILLS
 from .types import SkillType, SkillNature, Skilltarget, GameOptionStruct
 from .globals import capture_mouse_timer, show_area_rings, show_hero_follow_grid, show_distance_on_followers, hero_formation, capture_hero_flag, capture_flag_all, capture_hero_index
-from .utils import IsHeroFlagged, DrawFlagAll, DrawHeroFlag, DistanceFromWaypoint
+from .utils import IsHeroFlagged, DrawFlagAll, DrawHeroFlag, DistanceFromWaypoint, GetEffectiveLeaderID
 
 from .cache_data import CacheData
 
@@ -194,7 +194,7 @@ def DrawFlags(cached_data:CacheData):
                 cached_data.HeroAI_vars.shared_memory_handler.set_player_property(hero_ai_index, "IsFlagged", True)
                 cached_data.HeroAI_vars.shared_memory_handler.set_player_property(hero_ai_index, "FlagPosX", x)
                 cached_data.HeroAI_vars.shared_memory_handler.set_player_property(hero_ai_index, "FlagPosY", y)
-                cached_data.HeroAI_vars.shared_memory_handler.set_player_property(hero_ai_index, "FollowAngle", GLOBAL_CACHE.Agent.GetRotationAngle(GLOBAL_CACHE.Party.GetPartyLeaderID()))
+                cached_data.HeroAI_vars.shared_memory_handler.set_player_property(hero_ai_index, "FollowAngle", GLOBAL_CACHE.Agent.GetRotationAngle(GetEffectiveLeaderID()))
                 
                 one_time_set_flag = True
 
@@ -488,7 +488,7 @@ def DrawFollowDebug(cached_data:CacheData):
     PyImGui.text(f"InAggro: {cached_data.data.in_aggro}")
     PyImGui.text(f"IsMelee: {GLOBAL_CACHE.Agent.IsMelee(GLOBAL_CACHE.Player.GetAgentID())}")
     PyImGui.text(f"stay_alert_timer: {cached_data.stay_alert_timer.GetElapsedTime()}")
-    PyImGui.text(f"Leader Rotation Angle: {GLOBAL_CACHE.Agent.GetRotationAngle(GLOBAL_CACHE.Party.GetPartyLeaderID())}")
+    PyImGui.text(f"Leader Rotation Angle: {GLOBAL_CACHE.Agent.GetRotationAngle(GetEffectiveLeaderID())}")
     PyImGui.text(f"old_leader_rotation_angle: {cached_data.data.old_angle}")
     PyImGui.text(f"Angle_changed: {cached_data.data.angle_changed}")
 
@@ -506,12 +506,12 @@ def DrawFollowDebug(cached_data:CacheData):
         Overlay().DrawPoly3D(player_x, player_y, player_z, Range.Spellcast.value, Utils.RGBToColor(255, 12 , 0 , 128), numsegments=segments, thickness=2.0)
 
     if show_hero_follow_grid:
-        leader_x, leader_y, leader_z = GLOBAL_CACHE.Agent.GetXYZ(GLOBAL_CACHE.Party.GetPartyLeaderID()) #cached_data.data.party_leader_xyz #needs to be live 
+        leader_x, leader_y, leader_z = GLOBAL_CACHE.Agent.GetXYZ(GetEffectiveLeaderID()) #cached_data.data.party_leader_xyz #needs to be live 
 
         for index, angle in enumerate(hero_formation):
             if index == 0:
                 continue
-            angle_on_hero_grid = GLOBAL_CACHE.Agent.GetRotationAngle(GLOBAL_CACHE.Party.GetPartyLeaderID()) + Utils.DegToRad(angle)
+            angle_on_hero_grid = GLOBAL_CACHE.Agent.GetRotationAngle(GetEffectiveLeaderID()) + Utils.DegToRad(angle)
             hero_x = Range.Touch.value * math.cos(angle_on_hero_grid) + leader_x
             hero_y = Range.Touch.value * math.sin(angle_on_hero_grid) + leader_y
             
@@ -825,10 +825,10 @@ def DrawMultiboxTools(cached_data:CacheData):
     cached_data.HeroAI_windows.tools_window.initialize()
 
     if cached_data.HeroAI_windows.tools_window.begin():
-        if GLOBAL_CACHE.Map.IsOutpost() and GLOBAL_CACHE.Player.GetAgentID() == GLOBAL_CACHE.Party.GetPartyLeaderID():
+        if GLOBAL_CACHE.Map.IsOutpost() and GLOBAL_CACHE.Player.GetAgentID() == GetEffectiveLeaderID():
             if PyImGui.collapsing_header("Party Setup",PyImGui.TreeNodeFlags.DefaultOpen):
                 DrawCandidateWindow(cached_data)
-        if GLOBAL_CACHE.Map.IsExplorable() and GLOBAL_CACHE.Player.GetAgentID() == GLOBAL_CACHE.Party.GetPartyLeaderID():
+        if GLOBAL_CACHE.Map.IsExplorable() and GLOBAL_CACHE.Player.GetAgentID() == GetEffectiveLeaderID():
             if PyImGui.collapsing_header("Flagging"):
                 DrawFlaggingWindow(cached_data)
 

@@ -40,6 +40,7 @@ from HeroAI.players import RegisterPlayer
 from HeroAI.players import UpdatePlayers
 from HeroAI.utils import DistanceFromLeader
 from HeroAI.utils import DistanceFromWaypoint
+from HeroAI.utils import GetEffectiveLeaderID
 from HeroAI.windows import CompareAndSubmitGameOptions
 from HeroAI.windows import DrawCandidateWindow
 from HeroAI.windows import DrawControlPanelWindow
@@ -215,7 +216,7 @@ following_flag = False
 def Follow(cached_data: CacheData):
     global FOLLOW_DISTANCE_ON_COMBAT, following_flag
 
-    if GLOBAL_CACHE.Player.GetAgentID() == GLOBAL_CACHE.Party.GetPartyLeaderID():
+    if GLOBAL_CACHE.Player.GetAgentID() == GetEffectiveLeaderID():
         cached_data.follow_throttle_timer.Reset()
         return False
 
@@ -240,8 +241,8 @@ def Follow(cached_data: CacheData):
         following_flag = False
     else:  # follow leader
         following_flag = False
-        follow_x, follow_y = GLOBAL_CACHE.Agent.GetXY(GLOBAL_CACHE.Party.GetPartyLeaderID())
-        follow_angle = GLOBAL_CACHE.Agent.GetRotationAngle(GLOBAL_CACHE.Party.GetPartyLeaderID())
+        follow_x, follow_y = GLOBAL_CACHE.Agent.GetXY(GetEffectiveLeaderID())
+        follow_angle = GLOBAL_CACHE.Agent.GetRotationAngle(GetEffectiveLeaderID())
 
     if following_flag:
         FOLLOW_DISTANCE_ON_COMBAT = FOLLOW_COMBAT_DISTANCE
