@@ -1182,7 +1182,11 @@ def _draw_settings():
         # Button to invite party members
         if PyImGui.button("Invite Party Members", 200, 25):
             if config.is_leader:
-                bot.States.AddCustomState(lambda: invite_party_members(), "Invite Party Members")
+                # Add log before to confirm button was clicked
+                Py4GW.Console.Log(BOT_NAME, "Button clicked - starting invite process", Py4GW.Console.MessageType.Info)
+                # Instead of using AddCustomState, schedule it as a coroutine directly
+                from Py4GWCoreLib import GLOBAL_CACHE
+                GLOBAL_CACHE.Coroutines.append(invite_party_members())
                 Py4GW.Console.Log(BOT_NAME, "Inviting party members...", Py4GW.Console.MessageType.Info)
             else:
                 Py4GW.Console.Log(BOT_NAME, "Only leaders can invite party members!", 
