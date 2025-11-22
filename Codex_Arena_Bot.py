@@ -404,6 +404,8 @@ def winning_team_logic(bot: Botting) -> Generator:
                             Py4GW.Console.MessageType.Info)
             
             # Check if we transitioned to another arena map (not back to outpost)
+            # In Codex Arena, winning teams only transition between arena maps or back to outpost
+            # There are no other possible map transitions in this game mode
             new_map_id = GLOBAL_CACHE.Map.GetMapID()
             
             if new_map_id != CODEX_ARENA_OUTPOST_ID:
@@ -413,7 +415,7 @@ def winning_team_logic(bot: Botting) -> Generator:
                                 f"Automatically transitioned to next match (Map ID: {new_map_id})", 
                                 Py4GW.Console.MessageType.Info)
                 config.in_match = True
-                # Loop will continue at line 332 to execute priest rush logic for this new map
+                # Loop will continue to check for target strongboxes and execute priest rush logic
             else:
                 # We're back in the outpost (shouldn't normally happen for winning team)
                 Py4GW.Console.Log(BOT_NAME, "Returned to outpost - waiting for next match...", 
