@@ -239,6 +239,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     
     if map_id not in PRIEST_COORDINATES:
         return
+        yield  # Make this a generator even when returning early
     
     # Determine our team
     our_team = get_player_team(map_id)
@@ -246,6 +247,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
         Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping priest movement", 
                          Py4GW.Console.MessageType.Warning)
         return
+        yield  # Make this a generator even when returning early
     
     # Get enemy priest location (opposite team)
     enemy_team = "red" if our_team == "blue" else "blue"
