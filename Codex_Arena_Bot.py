@@ -402,8 +402,9 @@ def send_map_verify_to_partner(map_id: int):
 
 
 def invite_party_members() -> Generator:
-    """Invite configured party members to the party."""
-    from Py4GWCoreLib import Party
+    """Invite configured party members to the party.
+    Uses HeroAI's mutual invite pattern for reliable party formation."""
+    from Py4GWCoreLib import Party, Player
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
@@ -432,6 +433,9 @@ def invite_party_members() -> Generator:
                          Py4GW.Console.MessageType.Warning)
         yield  # Must yield at least once in a generator
         return
+    
+    # Get sender agent ID for invite acceptance (HeroAI pattern)
+    sender_id = GLOBAL_CACHE.Player.GetAgentID()
     
     Py4GW.Console.Log(BOT_NAME, f"Leader: Map {my_data.MapID}, Region {my_data.MapRegion}, District {my_data.MapDistrict}, Party {my_data.PartyID}", 
                      Py4GW.Console.MessageType.Info)
@@ -469,16 +473,17 @@ def invite_party_members() -> Generator:
         
         Py4GW.Console.Log(BOT_NAME, f"Inviting {char_name}...", Py4GW.Console.MessageType.Info)
         
-        # Send invite command to game
-        Party.Players.InvitePlayer(char_name)
+        # Send invite command to game using HeroAI pattern
+        # Use chat command for better compatibility
+        Player.SendChatCommand("invite " + char_name)
         
-        # Send shared memory message so Messaging widget can accept
-        # Match CustomBehaviors: use (0,0,0,0) not PlayerID
+        # Send shared memory message with sender_id for mutual invite pattern
+        # Messaging widget will send invite back, creating mutual invite that auto-accepts
         result = GLOBAL_CACHE.ShMem.SendMessage(
             my_email, 
             member_email.strip(), 
             SharedCommandType.InviteToParty, 
-            (0, 0, 0, 0)
+            (sender_id, 0, 0, 0)
         )
         
         if result == -1:
@@ -489,7 +494,7 @@ def invite_party_members() -> Generator:
                              Py4GW.Console.MessageType.Success)
             invited_count += 1
         
-        yield from Routines.Yield.wait(500)  # Wait between invites
+        yield from Routines.Yield.wait(250)  # Wait between invites (HeroAI uses 250ms)
     
     Py4GW.Console.Log(BOT_NAME, f"Finished inviting {invited_count} party members", Py4GW.Console.MessageType.Info)
     yield  # Final yield to ensure generator completes properly
