@@ -217,6 +217,10 @@ def _draw_settings():
             config.leader_email_index = account_emails.index(config.leader_email) + 1
         elif not config.leader_email:
             config.leader_email_index = 0
+        else:
+            # Leader email is set but not in list - reset to None
+            config.leader_email_index = 0
+            config.leader_email = ""
         
         # Draw combo box
         new_index = PyImGui.combo("##leader_email_combo", config.leader_email_index, account_display)

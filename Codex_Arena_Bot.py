@@ -992,6 +992,10 @@ def _draw_settings():
             config.partner_email_index = account_emails.index(config.partner_email) + 1
         elif not config.partner_email:
             config.partner_email_index = 0
+        else:
+            # Partner email is set but not in list - reset to None
+            config.partner_email_index = 0
+            config.partner_email = ""
         
         # Draw combo box
         new_index = PyImGui.combo("##partner_email_combo", config.partner_email_index, account_display)
@@ -1033,6 +1037,10 @@ def _draw_settings():
                     config.party_member_indices[i] = member_emails.index(config.party_members[i]) + 1
                 elif not config.party_members[i]:
                     config.party_member_indices[i] = 0
+                else:
+                    # Member email is set but not in list - reset to None
+                    config.party_member_indices[i] = 0
+                    config.party_members[i] = ""
                 
                 new_index = PyImGui.combo(f"##party_member_{i}", config.party_member_indices[i], member_display)
                 
