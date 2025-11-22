@@ -1493,7 +1493,7 @@ class CombatClass:
                         is_auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
                         if is_auspicious_ready:
                             Py4GW.Console.Log("EchoFollowup", f"Auspicious Incantation is ready and targeting Arcane Echo - giving priority to Auspicious, skipping Arcane Echo", Py4GW.Console.MessageType.Info)
-                            self.AdvanceSkillPointer()
+                            self.ResetSkillPointer()  # Reset to start so Auspicious gets a chance to cast
                             return False
                 
                 # Check if the followup skill is ready (not on cooldown)
