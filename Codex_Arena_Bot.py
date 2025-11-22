@@ -146,6 +146,21 @@ class CodexConfig:
         self.first_match = True  # Track if this is the first match (for losing team immediate requeue)
         self.aggressive_mode = False  # Toggle: When enabled, winning team moves to enemy spawn
         self.first_queue_completed = False  # Track if initial queue synchronization is complete
+        
+        # Party configuration
+        self.party_members = []  # List of account emails for party members
+        self.party_member_indices = []  # List of indices for combo box selections
+        
+        # Map synchronization
+        self.desync_detected = False  # Flag for map desync detection
+        self.last_partner_map_id = 0  # Last known partner map ID
+        
+        # Payback and Resign modes
+        self.payback_mode = False  # Toggle: Losing team goes aggressive on desync
+        self.resign_mode = False  # Toggle: Winning team resigns on desync
+        
+        # Leader/Support mode
+        self.is_leader = True  # Toggle: True = leader (main bot), False = support script
 
 config = CodexConfig()
 
@@ -158,6 +173,14 @@ bot = Botting(
 
 # Custom synchronization command for queue timing
 SYNC_QUEUE_COMMAND = SharedCommandType.CustomBehaviors  # Use existing custom command type
+
+# Signal type values for queue synchronization
+SIGNAL_READY_TO_QUEUE = 1.0
+SIGNAL_QUEUE_NOW = 2.0
+SIGNAL_MATCH_START = 3.0
+SIGNAL_MATCH_END = 4.0
+SIGNAL_MAP_VERIFY = 11.0
+
 
 # Delay (in milliseconds) to wait after map change
 MAP_CHANGE_DELAY_MS = 2000
@@ -191,6 +214,30 @@ def get_available_accounts() -> list:
         return []
 
 
+def get_available_accounts_with_names() -> list:
+    """Get list of all account emails with character names from shared memory."""
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    my_email = get_my_email()
+    
+    try:
+        all_accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+        if not all_accounts:
+            return []
+        
+        account_data = []
+        for account in all_accounts:
+            if account.AccountEmail != my_email:
+                char_name = account.CharacterName if account.CharacterName else "Unknown"
+                display_name = f"{char_name} ({account.AccountEmail})"
+                account_data.append((account.AccountEmail, display_name))
+        
+        return account_data
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Failed to get accounts from shared memory: {e}", 
+                         Py4GW.Console.MessageType.Warning)
+        return []
+
+
 def send_sync_signal(signal_type: str):
     """Send synchronization signal to other accounts.
     Only sends signals during initial bot startup and first queue entry."""
@@ -203,20 +250,23 @@ def send_sync_signal(signal_type: str):
     
     # Only send sync messages if first queue has not been completed
     # This prevents message stacking after the initial synchronization
-    if config.first_queue_completed:
+    if config.first_queue_completed and signal_type not in ["MAP_VERIFY"]:
         return
     
-    # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END"
+    # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END", "MAP_VERIFY"
+    signal_value = 0.0
     if signal_type == "READY_TO_QUEUE":
-        params = (1.0, 0.0, 0.0, 0.0)
+        signal_value = SIGNAL_READY_TO_QUEUE
     elif signal_type == "QUEUE_NOW":
-        params = (2.0, 0.0, 0.0, 0.0)
+        signal_value = SIGNAL_QUEUE_NOW
     elif signal_type == "MATCH_START":
-        params = (3.0, 0.0, 0.0, 0.0)
+        signal_value = SIGNAL_MATCH_START
     elif signal_type == "MATCH_END":
-        params = (4.0, 0.0, 0.0, 0.0)
-    else:
-        params = (0.0, 0.0, 0.0, 0.0)
+        signal_value = SIGNAL_MATCH_END
+    elif signal_type == "MAP_VERIFY":
+        signal_value = SIGNAL_MAP_VERIFY
+    
+    params = (signal_value, 0.0, 0.0, 0.0)
     
     # Send only to the configured partner account
     try:
@@ -225,36 +275,224 @@ def send_sync_signal(signal_type: str):
         Py4GW.Console.Log(BOT_NAME, f"Failed to send sync signal: {e}", Py4GW.Console.MessageType.Warning)
 
 
-def check_sync_signal() -> str:
+def check_sync_signal() -> tuple[str, int]:
     """Check for synchronization signals from other accounts.
-    Only processes signals during initial bot startup and first queue entry."""
+    Only processes signals during initial bot startup and first queue entry.
+    Returns tuple of (signal_type, map_id)."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
     # Only check for sync messages if first queue has not been completed
     if config.first_queue_completed:
-        return ""
+        # Still check for MAP_VERIFY messages
+        msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
+        
+        if msg and msg.Command == SYNC_QUEUE_COMMAND:
+            # Check bounds before accessing params
+            if len(msg.Params) > 1 and msg.Params[0] == SIGNAL_MAP_VERIFY:
+                map_id = int(msg.Params[1])
+                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
+                return ("MAP_VERIFY", map_id)
+        
+        return ("", 0)
     
     # Check for next message
     msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
     
     if msg and msg.Command == SYNC_QUEUE_COMMAND:
         signal_type = ""
-        if msg.Params[0] == 1.0:
+        map_id = 0
+        
+        # Check bounds before accessing params
+        if len(msg.Params) == 0:
+            return ("", 0)
+        
+        if msg.Params[0] == SIGNAL_READY_TO_QUEUE:
             signal_type = "READY_TO_QUEUE"
-        elif msg.Params[0] == 2.0:
+        elif msg.Params[0] == SIGNAL_QUEUE_NOW:
             signal_type = "QUEUE_NOW"
-        elif msg.Params[0] == 3.0:
+        elif msg.Params[0] == SIGNAL_MATCH_START:
             signal_type = "MATCH_START"
-        elif msg.Params[0] == 4.0:
+        elif msg.Params[0] == SIGNAL_MATCH_END:
             signal_type = "MATCH_END"
+        elif msg.Params[0] == SIGNAL_MAP_VERIFY:
+            signal_type = "MAP_VERIFY"
+            if len(msg.Params) > 1:
+                map_id = int(msg.Params[1])
         
         # Mark message as finished
         if signal_type:
             GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-            return signal_type
+            return (signal_type, map_id)
     
-    return ""
+    return ("", 0)
+
+
+def send_message_to_party(command_type: str, param1: float = 0.0):
+    """Send a SharedCommandType message to all party members.
+    Party members should run the Messaging.py widget to receive these commands."""
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
+    my_email = get_my_email()
+    
+    if not config.party_members:
+        return
+    
+    # Map command types to SharedCommandType enums
+    command = None
+    params = (param1, 0.0, 0.0, 0.0)
+    
+    if command_type == "LEAVE":
+        command = SharedCommandType.LeaveParty
+    elif command_type == "RESIGN":
+        command = SharedCommandType.Resign
+    elif command_type == "EQUIP_SET_1":
+        # Use PressKey to send F1 for equipment set 1
+        command = SharedCommandType.PressKey
+        params = (0x70, 0.0, 0.0, 0.0)  # F1 key code
+    elif command_type == "EQUIP_SET_2":
+        # Use PressKey to send F2 for equipment set 2
+        command = SharedCommandType.PressKey
+        params = (0x71, 0.0, 0.0, 0.0)  # F2 key code
+    elif command_type == "ENABLE_HEROAI":
+        command = SharedCommandType.EnableHeroAI
+        params = (1.0, 0.0, 0.0, 0.0)  # 1.0 = enable
+    elif command_type == "DISABLE_HEROAI":
+        command = SharedCommandType.DisableHeroAI
+        params = (0.0, 0.0, 0.0, 0.0)
+    
+    if command is None:
+        Py4GW.Console.Log(BOT_NAME, f"Unknown command type: {command_type}", 
+                         Py4GW.Console.MessageType.Warning)
+        return
+    
+    Py4GW.Console.Log(BOT_NAME, f"Sending {command_type} to {len(config.party_members)} party members", 
+                     Py4GW.Console.MessageType.Info)
+    
+    for member_email in config.party_members:
+        if member_email and member_email.strip():
+            try:
+                result = GLOBAL_CACHE.ShMem.SendMessage(my_email, member_email.strip(), command, params)
+                if result == -1:
+                    Py4GW.Console.Log(BOT_NAME, f"Failed to send {command_type} to {member_email}", 
+                                     Py4GW.Console.MessageType.Warning)
+                else:
+                    Py4GW.Console.Log(BOT_NAME, f"Sent {command_type} to {member_email} (msg index: {result})", 
+                                     Py4GW.Console.MessageType.Info)
+            except Exception as e:
+                Py4GW.Console.Log(BOT_NAME, f"Exception sending message to {member_email}: {e}", 
+                                 Py4GW.Console.MessageType.Warning)
+
+
+def send_map_verify_to_partner(map_id: int):
+    """Send map verification to partner account."""
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    my_email = get_my_email()
+    
+    if not config.partner_email or not config.partner_email.strip():
+        return
+    
+    params = (SIGNAL_MAP_VERIFY, float(map_id), 0.0, 0.0)
+    
+    try:
+        GLOBAL_CACHE.ShMem.SendMessage(my_email, config.partner_email.strip(), SYNC_QUEUE_COMMAND, params)
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Failed to send map verify to partner: {e}", 
+                         Py4GW.Console.MessageType.Warning)
+
+
+def invite_party_members() -> Generator:
+    """Invite configured party members to the party."""
+    from Py4GWCoreLib import Party
+    from Py4GWCoreLib.Routines import Routines
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
+    
+    if not config.party_members:
+        Py4GW.Console.Log(BOT_NAME, "No party members configured", Py4GW.Console.MessageType.Warning)
+        yield  # Must yield at least once in a generator
+        return
+    
+    # Filter out empty strings
+    valid_members = [m for m in config.party_members if m and m.strip()]
+    
+    if not valid_members:
+        Py4GW.Console.Log(BOT_NAME, "No valid party members configured (all empty)", Py4GW.Console.MessageType.Warning)
+        yield  # Must yield at least once in a generator
+        return
+    
+    Py4GW.Console.Log(BOT_NAME, f"Inviting party members... ({len(valid_members)} configured)", 
+                     Py4GW.Console.MessageType.Info)
+    
+    my_email = get_my_email()
+    my_data = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(my_email)
+    
+    if not my_data:
+        Py4GW.Console.Log(BOT_NAME, "Failed to get own account data from shared memory", 
+                         Py4GW.Console.MessageType.Warning)
+        yield  # Must yield at least once in a generator
+        return
+    
+    Py4GW.Console.Log(BOT_NAME, f"Leader: Map {my_data.MapID}, Region {my_data.MapRegion}, District {my_data.MapDistrict}, Party {my_data.PartyID}", 
+                     Py4GW.Console.MessageType.Info)
+    
+    invited_count = 0
+    
+    for member_email in valid_members:
+        # Get character name from shared memory
+        account_data = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(member_email.strip())
+        if not account_data:
+            Py4GW.Console.Log(BOT_NAME, f"Could not get account data for {member_email}", 
+                             Py4GW.Console.MessageType.Warning)
+            continue
+        
+        if not account_data.CharacterName:
+            Py4GW.Console.Log(BOT_NAME, f"No character name for {member_email}", 
+                             Py4GW.Console.MessageType.Warning)
+            continue
+        
+        char_name = account_data.CharacterName
+        
+        # Check if member is in same map and not in same party
+        if not (my_data.MapID == account_data.MapID and
+                my_data.MapRegion == account_data.MapRegion and
+                my_data.MapDistrict == account_data.MapDistrict):
+            Py4GW.Console.Log(BOT_NAME, 
+                             f"Skipping {char_name} - different map/region/district (they are in {account_data.MapID}/{account_data.MapRegion}/{account_data.MapDistrict})", 
+                             Py4GW.Console.MessageType.Info)
+            continue
+        
+        if my_data.PartyID == account_data.PartyID:
+            Py4GW.Console.Log(BOT_NAME, f"Skipping {char_name} - already in same party ({my_data.PartyID})", 
+                             Py4GW.Console.MessageType.Info)
+            continue
+        
+        Py4GW.Console.Log(BOT_NAME, f"Inviting {char_name}...", Py4GW.Console.MessageType.Info)
+        
+        # Send invite command to game
+        Party.Players.InvitePlayer(char_name)
+        
+        # Send shared memory message so Messaging widget can accept
+        # Match CustomBehaviors: use (0,0,0,0) not PlayerID
+        result = GLOBAL_CACHE.ShMem.SendMessage(
+            my_email, 
+            member_email.strip(), 
+            SharedCommandType.InviteToParty, 
+            (0, 0, 0, 0)
+        )
+        
+        if result == -1:
+            Py4GW.Console.Log(BOT_NAME, f"Failed to send invite message to {char_name}", 
+                             Py4GW.Console.MessageType.Warning)
+        else:
+            Py4GW.Console.Log(BOT_NAME, f"Sent invite message to {char_name} (msg index: {result})", 
+                             Py4GW.Console.MessageType.Success)
+            invited_count += 1
+        
+        yield from Routines.Yield.wait(500)  # Wait between invites
+    
+    Py4GW.Console.Log(BOT_NAME, f"Finished inviting {invited_count} party members", Py4GW.Console.MessageType.Info)
+    yield  # Final yield to ensure generator completes properly
 
 
 def equip_set(set_number: int) -> Generator:
@@ -392,6 +630,38 @@ def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
             
             # Match started as soon as map changed
             send_sync_signal("MATCH_START")
+            
+            # Send map ID to partner for verification
+            send_map_verify_to_partner(current_map_id)
+            
+            # Wait for partner's map ID and verify
+            verify_timeout = 10  # 10 seconds to verify
+            verify_start = time.time()
+            partner_map_verified = False
+            
+            while time.time() - verify_start < verify_timeout and bot.config.fsm_running:
+                signal, partner_map_id = check_sync_signal()
+                if signal == "MAP_VERIFY":
+                    config.last_partner_map_id = partner_map_id
+                    if partner_map_id == current_map_id:
+                        Py4GW.Console.Log(BOT_NAME, "Map IDs match! Teams are synchronized.", 
+                                        Py4GW.Console.MessageType.Success)
+                        config.desync_detected = False
+                        partner_map_verified = True
+                    else:
+                        Py4GW.Console.Log(BOT_NAME, 
+                                        f"DESYNC DETECTED! Our Map: {current_map_id}, Partner Map: {partner_map_id}", 
+                                        Py4GW.Console.MessageType.Warning)
+                        config.desync_detected = True
+                        partner_map_verified = True
+                    break
+                yield from Routines.Yield.wait(500)
+            
+            if not partner_map_verified:
+                Py4GW.Console.Log(BOT_NAME, "Map verification timeout - assuming no desync", 
+                                Py4GW.Console.MessageType.Warning)
+                config.desync_detected = False
+            
             # Mark first queue as completed after the first match starts
             # This prevents further sync messages from being sent
             if not config.first_queue_completed:
@@ -432,6 +702,25 @@ def winning_team_logic(bot: Botting) -> Generator:
         
         # Get current map ID to determine arena type
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
+        
+        # Handle desync modes if desync was detected
+        if config.desync_detected:
+            if config.is_winning_team and config.resign_mode:
+                # Resign Mode: Winning team equips Set 2 and returns to outpost
+                Py4GW.Console.Log(BOT_NAME, 
+                                "DESYNC - Resign Mode active! Equipping Set 2 and returning to outpost...", 
+                                Py4GW.Console.MessageType.Warning)
+                yield from equip_set(2)
+                send_message_to_party("EQUIP_SET_2")
+                yield from Routines.Yield.wait(5000)
+                from Py4GWCoreLib import Party
+                disable_auto_combat()
+                Party.ReturnToOutpost()
+                yield from Routines.Yield.wait(5000)
+                config.in_match = False
+                config.desync_detected = False
+                # Continue to next iteration - will requeue
+                continue
         
         # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena) OR Aggressive Mode is enabled
         is_priest_map = current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID
@@ -581,11 +870,26 @@ def losing_team_logic(bot: Botting) -> Generator:
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Party
     
-    Py4GW.Console.Log(BOT_NAME, "Losing team in arena, waiting for map change...", 
-                     Py4GW.Console.MessageType.Info)
-    
     # Get current map ID to detect map changes
     current_map_id = GLOBAL_CACHE.Map.GetMapID()
+    
+    # Handle desync modes if desync was detected
+    if config.desync_detected and config.payback_mode:
+        # Payback Mode: Losing team equips Set 1 and goes aggressive
+        Py4GW.Console.Log(BOT_NAME, 
+                        "DESYNC - Payback Mode active! Equipping Set 1 and going aggressive...", 
+                        Py4GW.Console.MessageType.Warning)
+        yield from equip_set(1)
+        send_message_to_party("EQUIP_SET_1")
+        send_message_to_party("ENABLE_HEROAI")
+        bot.config.upkeep.auto_combat.set_now("active", True)
+        # Rush enemy spawn
+        yield from Routines.Yield.wait(30000)  # Wait 30 seconds
+        yield from move_to_enemy_priest(bot, current_map_id)
+        # Then wait for match to end normally
+    else:
+        Py4GW.Console.Log(BOT_NAME, "Losing team in arena, waiting for map change...", 
+                         Py4GW.Console.MessageType.Info)
     
     # Wait until map changes (up to 10 minutes)
     timeout = 600  # 10 minute timeout (in seconds)
@@ -602,6 +906,7 @@ def losing_team_logic(bot: Botting) -> Generator:
             Py4GW.Console.Log(BOT_NAME, "Map changed - returned to outpost after loss.", 
                             Py4GW.Console.MessageType.Info)
             config.in_match = False
+            config.desync_detected = False
             send_sync_signal("MATCH_END")
             return
         
@@ -617,6 +922,7 @@ def losing_team_logic(bot: Botting) -> Generator:
             if new_map_id != current_map_id:
                 map_changed = True
                 config.in_match = False
+                config.desync_detected = False
                 Py4GW.Console.Log(BOT_NAME, "Successfully returned to outpost.", 
                                 Py4GW.Console.MessageType.Success)
                 send_sync_signal("MATCH_END")
@@ -627,6 +933,7 @@ def losing_team_logic(bot: Botting) -> Generator:
         Py4GW.Console.Log(BOT_NAME, "Timeout in losing team logic, forcing return...", 
                         Py4GW.Console.MessageType.Warning)
         config.in_match = False
+        config.desync_detected = False
 
 
 def run_codex_match(bot: Botting) -> None:
@@ -645,6 +952,13 @@ def run_codex_match(bot: Botting) -> None:
         
         # Travel to Codex Arena if not there
         yield from travel_to_codex_arena()
+        
+        # On first match, invite party members if leader
+        if config.is_leader and config.first_match and config.party_members:
+            Py4GW.Console.Log(BOT_NAME, "First match - inviting party members...", 
+                            Py4GW.Console.MessageType.Info)
+            yield from invite_party_members()
+            yield from Routines.Yield.wait(5000)  # Wait for party to form
         
         # Equip appropriate set
         if config.is_winning_team:
@@ -670,7 +984,7 @@ def run_codex_match(bot: Botting) -> None:
             other_team_ready = False
             
             while time.time() - start_time < timeout:
-                signal = check_sync_signal()
+                signal, _ = check_sync_signal()
                 if signal == "READY_TO_QUEUE":
                     other_team_ready = True
                     Py4GW.Console.Log(BOT_NAME, "Other team is ready!", Py4GW.Console.MessageType.Info)
@@ -709,12 +1023,16 @@ def run_codex_match(bot: Botting) -> None:
         if config.is_winning_team:
             # Enable auto combat for winning team to be aggressive
             bot.config.upkeep.auto_combat.set_now("active", True)
-            Py4GW.Console.Log(BOT_NAME, "Playing as winning team (auto combat enabled)...", Py4GW.Console.MessageType.Info)
+            # Enable HeroAI for party members so they are aggressive
+            send_message_to_party("ENABLE_HEROAI")
+            Py4GW.Console.Log(BOT_NAME, "Playing as winning team (HeroAI enabled for party)...", Py4GW.Console.MessageType.Info)
             yield from winning_team_logic(bot)
             # Winning team logic handles multiple matches internally and only returns when done
             # No need to log progress or wait here
         else:
-            Py4GW.Console.Log(BOT_NAME, "Playing as losing team...", Py4GW.Console.MessageType.Info)
+            # Disable HeroAI for losing team so they are passive
+            send_message_to_party("DISABLE_HEROAI")
+            Py4GW.Console.Log(BOT_NAME, "Playing as losing team (HeroAI disabled for party)...", Py4GW.Console.MessageType.Info)
             yield from losing_team_logic(bot)
             
             # Mark that first match is complete (losing team will skip sync on subsequent matches)
@@ -747,22 +1065,27 @@ def _draw_settings():
     PyImGui.text("Codex Arena Bot Configuration")
     PyImGui.separator()
     
-    # Partner email selection
+    # Partner email selection with character names
     PyImGui.text("Partner Account Email:")
-    available_accounts = get_available_accounts()
+    available_accounts_data = get_available_accounts_with_names()
     
-    if available_accounts:
+    if available_accounts_data:
         # Add empty option at the beginning
-        account_options = ["(None)"] + available_accounts
+        account_display = ["(None)"] + [display for _, display in available_accounts_data]
+        account_emails = [email for email, _ in available_accounts_data]
         
         # Update index if current partner email is in the list
-        if config.partner_email and config.partner_email in available_accounts:
-            config.partner_email_index = available_accounts.index(config.partner_email) + 1
+        if config.partner_email and config.partner_email in account_emails:
+            config.partner_email_index = account_emails.index(config.partner_email) + 1
         elif not config.partner_email:
             config.partner_email_index = 0
+        else:
+            # Partner email is set but not in list - reset to None
+            config.partner_email_index = 0
+            config.partner_email = ""
         
         # Draw combo box
-        new_index = PyImGui.combo("##partner_email_combo", config.partner_email_index, account_options)
+        new_index = PyImGui.combo("##partner_email_combo", config.partner_email_index, account_display)
         
         if new_index != config.partner_email_index:
             config.partner_email_index = new_index
@@ -771,7 +1094,7 @@ def _draw_settings():
                 Py4GW.Console.Log(BOT_NAME, "Partner email cleared.", 
                                 Py4GW.Console.MessageType.Info)
             else:
-                config.partner_email = available_accounts[new_index - 1]
+                config.partner_email = account_emails[new_index - 1]
                 Py4GW.Console.Log(BOT_NAME, f"Partner email set to: {config.partner_email}", 
                                 Py4GW.Console.MessageType.Info)
     else:
@@ -779,31 +1102,113 @@ def _draw_settings():
     
     PyImGui.separator()
     
-    # Team role toggle
-    new_value = PyImGui.checkbox("Is Winning Team", config.is_winning_team)
-    if new_value != config.is_winning_team:
-        config.is_winning_team = new_value
-        Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
-                        Py4GW.Console.MessageType.Info)
-    
-    # Aggressive Mode toggle
-    new_aggressive = PyImGui.checkbox("Aggressive Mode", config.aggressive_mode)
-    if new_aggressive != config.aggressive_mode:
-        config.aggressive_mode = new_aggressive
-        Py4GW.Console.Log(BOT_NAME, f"Aggressive Mode {'enabled' if config.aggressive_mode else 'disabled'}", 
-                        Py4GW.Console.MessageType.Info)
+    # Party Configuration Tab
+    if PyImGui.collapsing_header("Party Configuration", True):
+        PyImGui.text("Party Members (select 3 accounts to invite):")
+        
+        # Ensure party_members list has 3 slots
+        while len(config.party_members) < 3:
+            config.party_members.append("")
+        while len(config.party_member_indices) < 3:
+            config.party_member_indices.append(0)
+        
+        for i in range(3):
+            PyImGui.text(f"Member {i+1}:")
+            
+            if available_accounts_data:
+                member_display = ["(None)"] + [display for _, display in available_accounts_data]
+                member_emails = [email for email, _ in available_accounts_data]
+                
+                # Update index if current member email is in the list
+                if config.party_members[i] and config.party_members[i] in member_emails:
+                    config.party_member_indices[i] = member_emails.index(config.party_members[i]) + 1
+                elif not config.party_members[i]:
+                    config.party_member_indices[i] = 0
+                else:
+                    # Member email is set but not in list - reset to None
+                    config.party_member_indices[i] = 0
+                    config.party_members[i] = ""
+                
+                new_index = PyImGui.combo(f"##party_member_{i}", config.party_member_indices[i], member_display)
+                
+                if new_index != config.party_member_indices[i]:
+                    config.party_member_indices[i] = new_index
+                    if new_index == 0:
+                        config.party_members[i] = ""
+                    else:
+                        config.party_members[i] = member_emails[new_index - 1]
+                        Py4GW.Console.Log(BOT_NAME, f"Party member {i+1} set to: {config.party_members[i]}", 
+                                        Py4GW.Console.MessageType.Info)
+        
+        # Button to invite party members
+        if PyImGui.button("Invite Party Members", 200, 25):
+            if config.is_leader:
+                bot.States.AddCustomState(lambda: invite_party_members(), "Invite Party Members")
+                Py4GW.Console.Log(BOT_NAME, "Inviting party members...", Py4GW.Console.MessageType.Info)
+            else:
+                Py4GW.Console.Log(BOT_NAME, "Only leaders can invite party members!", 
+                                Py4GW.Console.MessageType.Warning)
     
     PyImGui.separator()
-    PyImGui.text("Progress:")
-    PyImGui.text(f"Strongboxes Earned: {config.strongboxes_earned}/{config.target_strongboxes}")
-    PyImGui.text(f"Consecutive Wins: {config.consecutive_wins}/{TOTAL_WINS_FOR_STRONGBOX}")
     
-    # Calculate progress percentage
-    progress = config.strongboxes_earned / config.target_strongboxes
-    PyImGui.progress_bar(progress, 200, 20, f"{config.strongboxes_earned}/{config.target_strongboxes}")
+    # Leader/Support mode toggle
+    new_leader = PyImGui.checkbox("Is Leader (uncheck for Support script)", config.is_leader)
+    if new_leader != config.is_leader:
+        config.is_leader = new_leader
+        Py4GW.Console.Log(BOT_NAME, f"Mode changed to: {'Leader' if config.is_leader else 'Support'}", 
+                        Py4GW.Console.MessageType.Info)
+    
+    # Team role toggle (only for leaders)
+    if config.is_leader:
+        new_value = PyImGui.checkbox("Is Winning Team", config.is_winning_team)
+        if new_value != config.is_winning_team:
+            config.is_winning_team = new_value
+            Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
+                            Py4GW.Console.MessageType.Info)
+        
+        # Aggressive Mode toggle
+        new_aggressive = PyImGui.checkbox("Aggressive Mode", config.aggressive_mode)
+        if new_aggressive != config.aggressive_mode:
+            config.aggressive_mode = new_aggressive
+            Py4GW.Console.Log(BOT_NAME, f"Aggressive Mode {'enabled' if config.aggressive_mode else 'disabled'}", 
+                            Py4GW.Console.MessageType.Info)
+        
+        # Payback Mode toggle (for losing team)
+        if not config.is_winning_team:
+            new_payback = PyImGui.checkbox("Payback Mode (go aggressive on desync)", config.payback_mode)
+            if new_payback != config.payback_mode:
+                config.payback_mode = new_payback
+                Py4GW.Console.Log(BOT_NAME, f"Payback Mode {'enabled' if config.payback_mode else 'disabled'}", 
+                                Py4GW.Console.MessageType.Info)
+        
+        # Resign Mode toggle (for winning team)
+        if config.is_winning_team:
+            new_resign = PyImGui.checkbox("Resign Mode (return on desync)", config.resign_mode)
+            if new_resign != config.resign_mode:
+                config.resign_mode = new_resign
+                Py4GW.Console.Log(BOT_NAME, f"Resign Mode {'enabled' if config.resign_mode else 'disabled'}", 
+                                Py4GW.Console.MessageType.Info)
     
     PyImGui.separator()
+    
+    # Status display
+    if config.is_leader:
+        PyImGui.text("Progress:")
+        PyImGui.text(f"Strongboxes Earned: {config.strongboxes_earned}/{config.target_strongboxes}")
+        PyImGui.text(f"Consecutive Wins: {config.consecutive_wins}/{TOTAL_WINS_FOR_STRONGBOX}")
+        
+        # Calculate progress percentage
+        progress = config.strongboxes_earned / config.target_strongboxes
+        PyImGui.progress_bar(progress, 200, 20, f"{config.strongboxes_earned}/{config.target_strongboxes}")
+        
+        PyImGui.separator()
+    
     PyImGui.text("Status:")
+    
+    # Desync indicator
+    if config.desync_detected:
+        PyImGui.text_colored("DESYNC DETECTED!", (1, 0, 0, 1))
+        PyImGui.text(f"Partner Map ID: {config.last_partner_map_id}")
     
     if config.in_match:
         PyImGui.text_colored("IN MATCH", (0, 1, 0, 1))
@@ -814,15 +1219,17 @@ def _draw_settings():
     
     PyImGui.separator()
     
-    # Reset button
-    if PyImGui.button("Reset Stats", 150, 25):
-        config.strongboxes_earned = 0
-        config.consecutive_wins = 0
-        config.first_queue_completed = False
-        Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
+    # Reset button (only for leaders)
+    if config.is_leader:
+        if PyImGui.button("Reset Stats", 150, 25):
+            config.strongboxes_earned = 0
+            config.consecutive_wins = 0
+            config.first_queue_completed = False
+            config.desync_detected = False
+            Py4GW.Console.Log(BOT_NAME, "Stats reset.", Py4GW.Console.MessageType.Info)
     
     PyImGui.separator()
-    PyImGui.text_wrapped("Instructions: Set the Partner Account Email to the email of the other team leader. Set up two teams of 4. Run one instance with 'Is Winning Team' checked, another with it unchecked. Enable 'Aggressive Mode' to make the winning team rush to the enemy spawn on all maps (not just priest maps). Earn 1 Strategist's Zaishen Strongbox per 5 consecutive wins (max 5/day). Bot stops after earning 5 strongboxes.")
+    PyImGui.text_wrapped("Instructions: Leaders run the main bot with team configuration. Support scripts run on non-leader accounts to receive commands. Enable Payback Mode (losing team) to go aggressive on desync. Enable Resign Mode (winning team) to return to outpost on desync.")
 
 
 # Override the settings tab with custom UI
