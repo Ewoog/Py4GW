@@ -434,7 +434,7 @@ def invite_party_members() -> Generator:
         yield  # Must yield at least once in a generator
         return
     
-    Py4GW.Console.Log(BOT_NAME, f"Leader: Map {my_data.MapID}, Region {my_data.MapRegion}, District {my_data.MapDistrict}, Party {my_data.PartyID}", 
+    Py4GW.Console.Log(BOT_NAME, f"Leader: Email={my_email}, PlayerID={my_data.PlayerID}, Map={my_data.MapID}, Region={my_data.MapRegion}, District={my_data.MapDistrict}, Party={my_data.PartyID}", 
                      Py4GW.Console.MessageType.Info)
     
     invited_count = 0
@@ -454,6 +454,9 @@ def invite_party_members() -> Generator:
         
         char_name = account_data.CharacterName
         
+        Py4GW.Console.Log(BOT_NAME, f"Checking {char_name} (Email={member_email}, PlayerID={account_data.PlayerID}, Map={account_data.MapID}, Region={account_data.MapRegion}, District={account_data.MapDistrict}, Party={account_data.PartyID})", 
+                         Py4GW.Console.MessageType.Info)
+        
         # Check if member is in same map and not in same party
         if not (my_data.MapID == account_data.MapID and
                 my_data.MapRegion == account_data.MapRegion and
@@ -472,9 +475,13 @@ def invite_party_members() -> Generator:
         
         # Send invite command to game (HeroAI pattern from windows.py:319-320)
         Party.Players.InvitePlayer(char_name)
+        Py4GW.Console.Log(BOT_NAME, f"Called Party.Players.InvitePlayer({char_name})", 
+                         Py4GW.Console.MessageType.Info)
         
         # Send shared memory message with sender's PlayerID for mutual invite pattern
         # Messaging widget will send invite back, creating mutual invite that auto-accepts
+        Py4GW.Console.Log(BOT_NAME, f"Sending SharedMessage: from={my_email}, to={member_email.strip()}, command=InviteToParty, params=({my_data.PlayerID}, 0, 0, 0)", 
+                         Py4GW.Console.MessageType.Info)
         result = GLOBAL_CACHE.ShMem.SendMessage(
             my_email, 
             member_email.strip(), 
