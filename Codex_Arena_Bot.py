@@ -238,6 +238,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     from Py4GWCoreLib.routines_src.Movement import Movement
     
     if map_id not in PRIEST_COORDINATES:
+        yield  # Generator yield required before early return to prevent NoneType iteration errors
         return
     
     # Determine our team
@@ -245,6 +246,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     if our_team == "unknown":
         Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping priest movement", 
                          Py4GW.Console.MessageType.Warning)
+        yield  # Generator yield required before early return to prevent NoneType iteration errors
         return
     
     # Get enemy priest location (opposite team)
@@ -270,13 +272,8 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     
     if movement_tracker.has_arrived():
         Py4GW.Console.Log(BOT_NAME, 
-                         f"Arrived at {enemy_team.upper()} priest location! HeroAI will handle combat.", 
+                         f"Arrived at {enemy_team.upper()} priest location! Waiting for map change...", 
                          Py4GW.Console.MessageType.Success)
-        # HeroAI will automatically engage enemies in range
-        # Wait until combat is complete
-        Py4GW.Console.Log(BOT_NAME, "Waiting until out of combat...", Py4GW.Console.MessageType.Info)
-        yield from bot.Wait.UntilOutOfCombat()
-        Py4GW.Console.Log(BOT_NAME, "Out of combat, proceeding with match.", Py4GW.Console.MessageType.Success)
     else:
         Py4GW.Console.Log(BOT_NAME, 
                          f"Failed to reach {enemy_team.upper()} priest location within {timeout} seconds", 
