@@ -1387,6 +1387,42 @@ class CombatClass:
             
             GLOBAL_CACHE.SkillBar.UseSkill(self.skill_order[slot]+1, target_agent_id)
             
+            # Check if the follow-up skill we just cast is Arcane Echo or Auspicious Incantation
+            # If so, it also needs to set up its own follow-up skill
+            if skill_id == self.arcane_echo or skill_id == self.auspicious_incantation:
+                echo_spell_name = GLOBAL_CACHE.Skill.GetName(skill_id)
+                Py4GW.Console.Log("EchoFollowup", f"Follow-up was {echo_spell_name}, setting up its follow-up...", Py4GW.Console.MessageType.Info)
+                
+                from HeroAI.settings import Settings
+                settings = Settings()
+                
+                if skill_id == self.arcane_echo:
+                    nested_followup_skillbar_slot = settings.ArcaneEchoSkillSlot
+                else:  # auspicious_incantation
+                    nested_followup_skillbar_slot = settings.AuspiciousIncantationSkillSlot
+                
+                # Get the skill ID from the skillbar slot
+                nested_followup_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(nested_followup_skillbar_slot + 1)
+                
+                if nested_followup_skill_id > 0 and nested_followup_skill_id != skill_id:
+                    nested_followup_skill_name = GLOBAL_CACHE.Skill.GetName(nested_followup_skill_id)
+                    
+                    # Find the prioritized slot index for this skill ID
+                    nested_followup_prioritized_slot = -1
+                    for i in range(len(self.skills)):
+                        if self.skills[i].skill_id == nested_followup_skill_id:
+                            nested_followup_prioritized_slot = i
+                            break
+                    
+                    if nested_followup_prioritized_slot >= 0:
+                        Py4GW.Console.Log("EchoFollowup", f"Setting up nested follow-up: {nested_followup_skill_name} at prioritized slot {nested_followup_prioritized_slot}", Py4GW.Console.MessageType.Info)
+                        self.pending_followup_skill_slot = nested_followup_prioritized_slot
+                        self.followup_skill_timer.Reset()
+                        self.followup_skill_timer.Start()
+                        # Don't clear pending or reset pointer here - let the nested follow-up cast next
+                        Py4GW.Console.Log("EchoFollowup", "Follow-up cast complete, nested follow-up pending", Py4GW.Console.MessageType.Success)
+                        return True
+            
             # Clear the pending follow-up
             self.pending_followup_skill_slot = -1
             self.ResetSkillPointer()
