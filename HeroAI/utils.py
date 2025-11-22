@@ -2,6 +2,7 @@ from Py4GWCoreLib import GLOBAL_CACHE, Allegiance, Overlay, Weapon
 from .constants import MAX_NUM_PLAYERS
 from .targeting import *
 from .cache_data import CacheData
+from .settings import Settings
 
 
 def GetEffectiveLeaderID():
@@ -10,7 +11,6 @@ def GetEffectiveLeaderID():
     If UseDesignatedLeader is enabled and the designated leader is in the party,
     returns their agent ID. Otherwise, returns the actual party leader's agent ID.
     """
-    from HeroAI.settings import Settings
     settings = Settings()
     
     # If designated leader feature is enabled and an email is set

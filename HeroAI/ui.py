@@ -2046,7 +2046,8 @@ def draw_configure_window():
                     if use_designated_leader != settings.UseDesignatedLeader:
                         settings.UseDesignatedLeader = use_designated_leader
                         settings.save_settings()
-                    ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.")
+                    if ImGui.is_item_hovered():
+                        ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.")
                     
                     if settings.UseDesignatedLeader:
                         PyImGui.separator()
