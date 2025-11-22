@@ -1440,14 +1440,21 @@ class CombatClass:
                 # Priority check: If Auspicious Incantation is also targeting this spell and is ready, 
                 # skip Arcane Echo to let Auspicious cast first
                 auspicious_followup_slot = settings.AuspiciousIncantationSkillSlot
+                Py4GW.Console.Log("EchoFollowup", f"Priority check: Auspicious slot={auspicious_followup_slot}", Py4GW.Console.MessageType.Info)
                 if 0 <= auspicious_followup_slot < 8:  # Skillbar slots are 0-7
                     auspicious_followup_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(auspicious_followup_slot + 1)
+                    auspicious_skill_name = GLOBAL_CACHE.Skill.GetName(auspicious_followup_id) if auspicious_followup_id > 0 else "None"
+                    Py4GW.Console.Log("EchoFollowup", f"Priority check: Auspicious targets {auspicious_skill_name} (ID:{auspicious_followup_id}), Arcane targets {followup_skill_name} (ID:{followup_skill_id})", Py4GW.Console.MessageType.Info)
+                    is_auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
+                    Py4GW.Console.Log("EchoFollowup", f"Priority check: Same spell? {auspicious_followup_id == followup_skill_id}, Auspicious ready? {is_auspicious_ready}", Py4GW.Console.MessageType.Info)
                     if (auspicious_followup_id > 0 and
                         auspicious_followup_id == followup_skill_id and 
-                        Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)):
-                        Py4GW.Console.Log("EchoFollowup", f"Auspicious Incantation is also ready and targeting {followup_skill_name} - giving priority to Auspicious, skipping Arcane Echo", Py4GW.Console.MessageType.Info)
+                        is_auspicious_ready):
+                        Py4GW.Console.Log("EchoFollowup", f"Auspicious Incantation is also ready and targeting {followup_skill_name} - giving priority to Auspicious, skipping Arcane Echo", Py4GW.Console.MessageType.Success)
                         self.AdvanceSkillPointer()
                         return False
+                else:
+                    Py4GW.Console.Log("EchoFollowup", f"Priority check: Auspicious slot {auspicious_followup_slot} is out of bounds", Py4GW.Console.MessageType.Warning)
                 
                 # Check if the followup skill is ready (not on cooldown)
                 is_ready = Routines.Checks.Skills.IsSkillIDReady(followup_skill_id)
