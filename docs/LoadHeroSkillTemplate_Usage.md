@@ -3,64 +3,101 @@
 ## Overview
 The `LoadHeroSkillTemplate` function allows you to load a skill build (template code) onto a hero in your party.
 
-## Important Note
-The function expects a **Hero ID**, not a party position. Hero IDs are unique identifiers for each hero (e.g., Koss = 6, Norgu = 1, etc.).
+## IMPORTANT: Party Position vs Hero ID
+
+The function expects a **1-based party position** (1 = first hero, 2 = second hero, etc.), **NOT** a Hero ID (like Koss=6).
+
+### What is Party Position?
+- **Party Position 1** = The first hero in your party (could be any hero)
+- **Party Position 2** = The second hero in your party
+- **Party Position 3** = The third hero in your party
+- etc.
+
+### What is Hero ID?
+- **Hero ID** is a unique identifier for each specific hero:
+  - Norgu = 1
+  - Koss = 6
+  - Tahlkora = 3
+  - etc. (see PyParty.HeroType)
 
 ## Usage Methods
 
-### Method 1: Using Hero ID directly (with HeroType enum)
+### Method 1: Using Party Position (Default)
+Use this when you want to load a template on "the first hero" or "the second hero" in your party, regardless of which specific hero it is.
+
+```python
+from Py4GWCoreLib import SkillBar
+
+# Load a template on the first hero in your party
+result = SkillBar.LoadHeroSkillTemplate(1, "OQATEjpUjIACVAAAAAAAAAA")
+
+# Load a template on the second hero in your party
+result = SkillBar.LoadHeroSkillTemplate(2, "OQASEDqEC1vcNABWAAAA")
+```
+
+### Method 2: Using Hero ID (Recommended for specific heroes)
+Use this when you want to load a template on a **specific hero** (e.g., always load on Koss).
+
 ```python
 from Py4GWCoreLib import SkillBar
 from PyParty import HeroType
 
-# Load a template on Koss
-result = SkillBar.LoadHeroSkillTemplate(HeroType.Koss, "OQATEjpUjIACVAAAAAAAAAA")
-if result:
-    print("Template loaded successfully!")
-else:
-    print("Failed to load template")
+# Load a template on Koss (wherever Koss is in your party)
+result = SkillBar.LoadHeroSkillTemplateByHeroID(HeroType.Koss, "OQATEjpUjIACVAAAAAAAAAA")
+
+# Load a template on Tahlkora
+result = SkillBar.LoadHeroSkillTemplateByHeroID(HeroType.Tahlkora, "OQASEDqEC1vcNABWAAAA")
 ```
 
-### Method 2: Using Hero Name
+### Method 3: Using Hero Name (Most User-Friendly)
+Use this when you want to specify the hero by name.
+
 ```python
 from Py4GWCoreLib import SkillBar
 
 # Load a template on Koss by name
 result = SkillBar.LoadHeroSkillTemplateByName("Koss", "OQATEjpUjIACVAAAAAAAAAA")
+
+# Load a template on Tahlkora by name
+result = SkillBar.LoadHeroSkillTemplateByName("Tahlkora", "OQASEDqEC1vcNABWAAAA")
 ```
 
-### Method 3: Getting Hero ID from Party Position
+## Common Mistakes
+
+### ❌ WRONG: Using Hero ID with LoadHeroSkillTemplate
 ```python
-from Py4GWCoreLib import Party, SkillBar
+from PyParty import HeroType
 
-# Get the hero ID of the first hero in your party (position 0)
-hero_id = Party.Heroes.GetHeroIDByPartyPosition(0)
-
-# Load template on that hero
-result = SkillBar.LoadHeroSkillTemplate(hero_id, "OQATEjpUjIACVAAAAAAAAAA")
+# This will try to load the template on the 6th hero in your party, NOT on Koss!
+# (Koss has hero_id=6, but that's not the same as party position 6)
+SkillBar.LoadHeroSkillTemplate(HeroType.Koss, "template")  # WRONG!
 ```
 
-### Method 4: Using in a loop for all heroes
+### ✅ CORRECT: Use the right method for your intent
 ```python
-from Py4GWCoreLib import Party, SkillBar
+from PyParty import HeroType
 
-# Get all heroes in party
-heroes = Party.GetHeroes()
+# If you want to load on Koss specifically:
+SkillBar.LoadHeroSkillTemplateByHeroID(HeroType.Koss, "template")  # CORRECT
 
-# Load templates on each hero
-for hero in heroes:
-    hero_id = hero.hero_id.GetID()
-    hero_name = Party.Heroes.GetHeroNameById(hero_id)
-    
-    # Load different templates based on hero
-    if hero_name == "Koss":
-        SkillBar.LoadHeroSkillTemplate(hero_id, "OQATEjpUjIACVAAAAAAAAAA")
-    elif hero_name == "Tahlkora":
-        SkillBar.LoadHeroSkillTemplate(hero_id, "OQASEDqEC1vcNABWAAAA")
+# OR
+SkillBar.LoadHeroSkillTemplateByName("Koss", "template")  # CORRECT
+
+# If you want to load on "the first hero" (whoever that is):
+SkillBar.LoadHeroSkillTemplate(1, "template")  # CORRECT
+```
+
+## Return Values
+All methods return `True` if successful, `False` otherwise:
+
+```python
+result = SkillBar.LoadHeroSkillTemplateByName("Koss", "OQATEjpUjIACVAAAAAAAAAA")
+if not result:
+    print("Failed - Koss might not be in your party or template is invalid")
 ```
 
 ## Hero ID Reference
-You can find hero IDs in the `PyParty.HeroType` enum:
+Common Hero IDs from PyParty.HeroType:
 - Norgu = 1
 - Goren = 2  
 - Tahlkora = 3
@@ -77,44 +114,33 @@ You can find hero IDs in the `PyParty.HeroType` enum:
 - Olias = 14
 - Razah = 15
 - MOX = 16
-- And more... (see PyParty.pyi for complete list)
-
-## Common Mistakes
-
-### ❌ Wrong: Confusing hero ID with party position
-```python
-# This will load the template on hero with ID=1 (Norgu), NOT the first hero in your party!
-# Only use this if you actually want to load it on Norgu specifically.
-SkillBar.LoadHeroSkillTemplate(1, "OQATEjpUjIACVAAAAAAAAAA")
-```
-
-**Why this is usually wrong**: If you have Koss as your first hero, this won't load the template on Koss (ID=6). It will try to load it on Norgu (ID=1), who might not even be in your party, causing it to fail.
-
-### ✅ Correct: Use HeroType enum or get the actual hero ID
-```python
-# Method A: If you want to load on a specific hero (e.g., Koss), use the enum
-from PyParty import HeroType
-SkillBar.LoadHeroSkillTemplate(HeroType.Koss, "OQATEjpUjIACVAAAAAAAAAA")
-
-# Method B: Get ID from party position
-hero_id = Party.Heroes.GetHeroIDByPartyPosition(0)  # First hero in party
-SkillBar.LoadHeroSkillTemplate(hero_id, "OQATEjpUjIACVAAAAAAAAAA")
-
-# Method C: Use the helper function with name
-SkillBar.LoadHeroSkillTemplateByName("Koss", "OQATEjpUjIACVAAAAAAAAAA")
-```
-
-## Return Value
-The function returns `True` if successful, `False` otherwise. Always check the return value:
-```python
-result = SkillBar.LoadHeroSkillTemplate(HeroType.Koss, "OQATEjpUjIACVAAAAAAAAAA")
-if not result:
-    print("Failed - ensure Koss is in your party and the template is valid")
-```
+- Keiran Thackeray = 17
+- Jora = 18
+- Pyre Fierceshot = 19
+- Anton = 20
+- Livia = 21
+- Hayda = 22
+- Kahmu = 23
+- Gwen = 24
+- Xandra = 25
+- Vekk = 26
+- Ogden = 27
+- Mercenary Heroes = 28-35
+- Miku = 36
+- Zei Ri = 37
 
 ## Troubleshooting
-If the function returns `False`, check:
-1. The hero is actually in your party
-2. The template code is valid
-3. The hero ID is correct (not confusing it with party position)
-4. You have the skills unlocked for that template
+
+**Error: "Failed to load skill template on hero at party position X"**
+- The hero doesn't exist at that party position (you might only have 2 heroes but tried position 3)
+- The template code is invalid
+
+**Error: "Hero 'Koss' (ID: 6) is not in your party"**
+- The specified hero is not in your current party
+- Add the hero to your party first
+
+**Why is my template not loading?**
+1. Make sure you're using the correct method for your intent (party position vs hero ID)
+2. Verify the hero is in your party
+3. Check that the template code is valid
+4. Ensure you have the skills unlocked
