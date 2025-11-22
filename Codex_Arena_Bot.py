@@ -33,6 +33,7 @@ from typing import Generator, Any
 BOT_NAME = "Codex Arena Bot"
 
 # Arena map IDs and priest coordinates
+CODEX_ARENA_OUTPOST_ID = 796
 SEABED_ARENA_MAP_ID = 829
 DELDRIMOR_ARENA_MAP_ID = 830
 
@@ -188,12 +189,9 @@ def travel_to_codex_arena() -> Generator:
     from Py4GWCoreLib import Map
     from Py4GWCoreLib.Routines import Routines
     
-    # Codex Arena map ID
-    CODEX_ARENA_MAP_ID = 796
-    
     current_map = GLOBAL_CACHE.Map.GetMapID()
-    if current_map != CODEX_ARENA_MAP_ID:
-        yield from bot.Map._coro_travel(target_map_id=CODEX_ARENA_MAP_ID)
+    if current_map != CODEX_ARENA_OUTPOST_ID:
+        yield from bot.Map._coro_travel(target_map_id=CODEX_ARENA_OUTPOST_ID)
         yield from Routines.Yield.wait(2000)
 
 
@@ -406,8 +404,6 @@ def winning_team_logic(bot: Botting) -> Generator:
                             Py4GW.Console.MessageType.Info)
             
             # Check if we transitioned to another arena map (not back to outpost)
-            # Codex Arena outpost is map 796
-            CODEX_ARENA_OUTPOST_ID = 796
             new_map_id = GLOBAL_CACHE.Map.GetMapID()
             
             if new_map_id != CODEX_ARENA_OUTPOST_ID:
@@ -417,7 +413,7 @@ def winning_team_logic(bot: Botting) -> Generator:
                                 f"Automatically transitioned to next match (Map ID: {new_map_id})", 
                                 Py4GW.Console.MessageType.Info)
                 config.in_match = True
-                # Continue loop to execute priest rush logic for this new map
+                # Loop will continue at line 332 to execute priest rush logic for this new map
             else:
                 # We're back in the outpost (shouldn't normally happen for winning team)
                 Py4GW.Console.Log(BOT_NAME, "Returned to outpost - waiting for next match...", 
