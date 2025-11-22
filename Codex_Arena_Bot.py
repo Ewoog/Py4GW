@@ -350,31 +350,26 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
 
 
 def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
-    """Wait until match starts (map changes from outpost) or at least 1 minute."""
+    """Wait until match starts (map changes from outpost)."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib.Routines import Routines
     
-    min_wait_time = 60  # Minimum 1 minute wait
     timeout = 300  # 5 minute timeout (in seconds)
     start_time = time.time()
-    map_changed = False
     
     while time.time() - start_time < timeout and bot.config.fsm_running:
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
-        elapsed = time.time() - start_time
         
         # Check if map has changed from outpost
         if current_map_id != outpost_map_id:
-            map_changed = True
             if not config.in_match:
                 config.in_match = True
                 map_name = GLOBAL_CACHE.Map.GetMapName(current_map_id)
                 Py4GW.Console.Log(BOT_NAME, 
                                 f"Entered the Arena! Map ID: {current_map_id}, Map Name: {map_name}", 
                                 Py4GW.Console.MessageType.Success)
-        
-        # Exit when map changed AND at least 1 minute has passed
-        if map_changed and elapsed >= min_wait_time:
+            
+            # Match started as soon as map changed
             send_sync_signal("MATCH_START")
             Py4GW.Console.Log(BOT_NAME, "Match started!", Py4GW.Console.MessageType.Success)
             return
@@ -414,17 +409,17 @@ def winning_team_logic(bot: Botting) -> Generator:
         # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena) OR Aggressive Mode is enabled
         is_priest_map = current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID
         if is_priest_map or config.aggressive_mode:
-            # Priest map detected or Aggressive Mode enabled - wait 30 seconds then rush enemy spawn
+            # Priest map detected or Aggressive Mode enabled - wait 45 seconds then rush enemy spawn
             if is_priest_map:
                 arena_name = "Seabed Arena" if current_map_id == SEABED_ARENA_MAP_ID else "Deldrimor Arena"
                 Py4GW.Console.Log(BOT_NAME, 
-                                f"Entered {arena_name} (Map ID: {current_map_id}), waiting 30 seconds before rushing enemy spawn...", 
+                                f"Entered {arena_name} (Map ID: {current_map_id}), waiting 45 seconds before rushing enemy spawn...", 
                                 Py4GW.Console.MessageType.Info)
             else:
                 Py4GW.Console.Log(BOT_NAME, 
-                                f"Aggressive Mode enabled (Map ID: {current_map_id}), waiting 30 seconds before rushing enemy spawn...", 
+                                f"Aggressive Mode enabled (Map ID: {current_map_id}), waiting 45 seconds before rushing enemy spawn...", 
                                 Py4GW.Console.MessageType.Info)
-            yield from Routines.Yield.wait(30000)
+            yield from Routines.Yield.wait(45000)
             
             # Rush the enemy spawn location (determine spawn and move to enemy coordinates)
             Py4GW.Console.Log(BOT_NAME, 
