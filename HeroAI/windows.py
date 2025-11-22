@@ -1049,8 +1049,7 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
         if use_designated_leader != settings.UseDesignatedLeader:
             settings.UseDesignatedLeader = use_designated_leader
             settings.save_settings()
-        if ImGui.is_item_hovered():
-            ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.")
+        ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.")
         
         if settings.UseDesignatedLeader:
             PyImGui.separator()
