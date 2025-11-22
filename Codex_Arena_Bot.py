@@ -37,7 +37,7 @@ SEABED_ARENA_MAP_ID = 829
 # Note: Deldrimor Arena explorable map ID is unknown. 
 # Based on the pattern (825, 826, 827, ?, 829, 831), it's likely 828 or 830.
 # Using 828 as a best guess. This may need to be updated once the correct ID is discovered.
-DELDRIMOR_ARENA_MAP_ID = 828  # TODO: Verify this ID - needs to be confirmed in-game
+DELDRIMOR_ARENA_MAP_ID = 836  # TODO: Verify this ID - needs to be confirmed in-game
 
 # Movement tolerance for priest location (200 units = close enough to engage)
 PRIEST_LOCATION_TOLERANCE = 200
