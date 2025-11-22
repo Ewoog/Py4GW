@@ -1440,7 +1440,7 @@ class CombatClass:
                 # Priority check: If Auspicious Incantation is also targeting this spell and is ready, 
                 # skip Arcane Echo to let Auspicious cast first
                 auspicious_followup_slot = settings.AuspiciousIncantationSkillSlot
-                if 0 <= auspicious_followup_slot < MAX_SKILLS:
+                if 0 <= auspicious_followup_slot < 8:  # Skillbar slots are 0-7
                     auspicious_followup_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(auspicious_followup_slot + 1)
                     if (auspicious_followup_id > 0 and
                         auspicious_followup_id == followup_skill_id and 
