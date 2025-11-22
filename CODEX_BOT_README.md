@@ -116,7 +116,11 @@ When entering an arena map (not the outpost):
 ### Party Command System
 
 Leaders send commands to party members via **SharedCommandType** messages (handled by Messaging.py widget):
-- **InviteToParty**: Automatically accept party invites
+- **InviteToParty**: Uses mutual invite pattern for automatic party formation
+  - Leader sends chat invite to member
+  - Leader sends SharedMessage with sender's agent ID
+  - Messaging widget receives message and sends invite back to leader
+  - Guild Wars sees mutual invites and automatically forms the party
 - **LeaveParty**: Leave the current party
 - **Resign**: Return to outpost
 - **PressKey**: Switch equipment sets (F1 for Set 1, F2 for Set 2)
