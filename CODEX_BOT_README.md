@@ -100,6 +100,7 @@ The bots use Py4GW's shared memory system to communicate:
 The bot includes special logic for **Seabed Arena** and **Deldrimor Arena**:
 
 - **Team Detection**: Automatically detects if the player is on the blue or red team based on proximity to spawn points
+- **Initial Wait**: Winning team waits 30 seconds after entering the map before moving
 - **Priest Targeting**: Winning team moves to the opposite team's priest location
   - If on blue team → moves to red priest
   - If on red team → moves to blue priest
@@ -112,10 +113,9 @@ The bot includes special logic for **Seabed Arena** and **Deldrimor Arena**:
 - **Seabed Arena (Map ID: 829)**
   - Blue Priest: (9737, 4344)
   - Red Priest: (4368, 6953)
-- **Deldrimor Arena (Map ID: 828 - estimated)**
-  - Blue Priest: (-9344, 2803)
-  - Red Priest: (-8999, 7488)
-  - *Note*: The explorable map ID for Deldrimor Arena is estimated as 828. If the bot doesn't work in Deldrimor Arena, the map ID may need to be updated. Check console logs for the actual map ID when entering Deldrimor Arena.
+- **Deldrimor Arena (Map ID: 830)**
+  - Blue Priest: (-9259.12, 2708.83)
+  - Red Priest: (-8994.74, 7384.57)
 
 ## Configuration Options
 
