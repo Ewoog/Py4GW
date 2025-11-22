@@ -410,29 +410,35 @@ def invite_party_members() -> Generator:
     
     if not config.party_members:
         Py4GW.Console.Log(BOT_NAME, "No party members configured", Py4GW.Console.MessageType.Warning)
+        yield  # Must yield at least once in a generator
         return
     
     # Filter out empty strings
     valid_members = [m for m in config.party_members if m and m.strip()]
+    
+    if not valid_members:
+        Py4GW.Console.Log(BOT_NAME, "No valid party members configured (all empty)", Py4GW.Console.MessageType.Warning)
+        yield  # Must yield at least once in a generator
+        return
+    
     Py4GW.Console.Log(BOT_NAME, f"Inviting party members... ({len(valid_members)} configured)", 
                      Py4GW.Console.MessageType.Info)
     
     my_email = get_my_email()
-    Py4GW.Console.Log(BOT_NAME, f"My email: {my_email}", Py4GW.Console.MessageType.Info)
-    
     my_data = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(my_email)
     
     if not my_data:
         Py4GW.Console.Log(BOT_NAME, "Failed to get own account data from shared memory", 
                          Py4GW.Console.MessageType.Warning)
+        yield  # Must yield at least once in a generator
         return
     
-    Py4GW.Console.Log(BOT_NAME, f"My Map: {my_data.MapID}, Region: {my_data.MapRegion}, District: {my_data.MapDistrict}, Party: {my_data.PartyID}", 
+    Py4GW.Console.Log(BOT_NAME, f"Leader: Map {my_data.MapID}, Region {my_data.MapRegion}, District {my_data.MapDistrict}, Party {my_data.PartyID}", 
                      Py4GW.Console.MessageType.Info)
     
+    invited_count = 0
+    
     for member_email in valid_members:
-        Py4GW.Console.Log(BOT_NAME, f"Processing member: {member_email}", Py4GW.Console.MessageType.Info)
-        
         # Get character name from shared memory
         account_data = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(member_email.strip())
         if not account_data:
@@ -446,28 +452,17 @@ def invite_party_members() -> Generator:
             continue
         
         char_name = account_data.CharacterName
-        Py4GW.Console.Log(BOT_NAME, f"Found {char_name} - Map: {account_data.MapID}, Region: {account_data.MapRegion}, District: {account_data.MapDistrict}, Party: {account_data.PartyID}", 
-                         Py4GW.Console.MessageType.Info)
         
         # Check if member is in same map and not in same party
-        same_map = my_data.MapID == account_data.MapID
-        same_region = my_data.MapRegion == account_data.MapRegion
-        same_district = my_data.MapDistrict == account_data.MapDistrict
-        different_party = my_data.PartyID != account_data.PartyID
+        if not (my_data.MapID == account_data.MapID and
+                my_data.MapRegion == account_data.MapRegion and
+                my_data.MapDistrict == account_data.MapDistrict):
+            Py4GW.Console.Log(BOT_NAME, 
+                             f"Skipping {char_name} - different map/region/district (they are in {account_data.MapID}/{account_data.MapRegion}/{account_data.MapDistrict})", 
+                             Py4GW.Console.MessageType.Info)
+            continue
         
-        if not same_map:
-            Py4GW.Console.Log(BOT_NAME, f"Skipping {char_name} - different map ({my_data.MapID} vs {account_data.MapID})", 
-                             Py4GW.Console.MessageType.Info)
-            continue
-        if not same_region:
-            Py4GW.Console.Log(BOT_NAME, f"Skipping {char_name} - different region ({my_data.MapRegion} vs {account_data.MapRegion})", 
-                             Py4GW.Console.MessageType.Info)
-            continue
-        if not same_district:
-            Py4GW.Console.Log(BOT_NAME, f"Skipping {char_name} - different district ({my_data.MapDistrict} vs {account_data.MapDistrict})", 
-                             Py4GW.Console.MessageType.Info)
-            continue
-        if not different_party:
+        if my_data.PartyID == account_data.PartyID:
             Py4GW.Console.Log(BOT_NAME, f"Skipping {char_name} - already in same party ({my_data.PartyID})", 
                              Py4GW.Console.MessageType.Info)
             continue
@@ -478,24 +473,26 @@ def invite_party_members() -> Generator:
         Party.Players.InvitePlayer(char_name)
         
         # Send shared memory message so Messaging widget can accept
-        # Using PlayerID in first param like HeroAI does
+        # Match CustomBehaviors: use (0,0,0,0) not PlayerID
         result = GLOBAL_CACHE.ShMem.SendMessage(
             my_email, 
             member_email.strip(), 
             SharedCommandType.InviteToParty, 
-            (account_data.PlayerID, 0, 0, 0)
+            (0, 0, 0, 0)
         )
         
         if result == -1:
-            Py4GW.Console.Log(BOT_NAME, f"Failed to send invite message to {char_name} (SendMessage returned -1)", 
+            Py4GW.Console.Log(BOT_NAME, f"Failed to send invite message to {char_name}", 
                              Py4GW.Console.MessageType.Warning)
         else:
             Py4GW.Console.Log(BOT_NAME, f"Sent invite message to {char_name} (msg index: {result})", 
                              Py4GW.Console.MessageType.Success)
+            invited_count += 1
         
-        yield from Routines.Yield.wait(2000)  # Wait between invites
+        yield from Routines.Yield.wait(500)  # Wait between invites
     
-    Py4GW.Console.Log(BOT_NAME, "Finished processing party member invites", Py4GW.Console.MessageType.Info)
+    Py4GW.Console.Log(BOT_NAME, f"Finished inviting {invited_count} party members", Py4GW.Console.MessageType.Info)
+    yield  # Final yield to ensure generator completes properly
 
 
 def equip_set(set_number: int) -> Generator:
