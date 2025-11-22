@@ -366,12 +366,21 @@ def send_message_to_party(command_type: str, param1: float = 0.0):
                          Py4GW.Console.MessageType.Warning)
         return
     
+    Py4GW.Console.Log(BOT_NAME, f"Sending {command_type} to {len(config.party_members)} party members", 
+                     Py4GW.Console.MessageType.Info)
+    
     for member_email in config.party_members:
         if member_email and member_email.strip():
             try:
-                GLOBAL_CACHE.ShMem.SendMessage(my_email, member_email.strip(), command, params)
+                result = GLOBAL_CACHE.ShMem.SendMessage(my_email, member_email.strip(), command, params)
+                if result == -1:
+                    Py4GW.Console.Log(BOT_NAME, f"Failed to send {command_type} to {member_email}", 
+                                     Py4GW.Console.MessageType.Warning)
+                else:
+                    Py4GW.Console.Log(BOT_NAME, f"Sent {command_type} to {member_email} (msg index: {result})", 
+                                     Py4GW.Console.MessageType.Info)
             except Exception as e:
-                Py4GW.Console.Log(BOT_NAME, f"Failed to send message to {member_email}: {e}", 
+                Py4GW.Console.Log(BOT_NAME, f"Exception sending message to {member_email}: {e}", 
                                  Py4GW.Console.MessageType.Warning)
 
 
@@ -429,15 +438,32 @@ def invite_party_members() -> Generator:
                     # Send invite command to game
                     Party.Players.InvitePlayer(char_name)
                     
-                    # Send shared memory message so support script can accept
-                    GLOBAL_CACHE.ShMem.SendMessage(my_email, member_email.strip(), 
-                                                   SharedCommandType.InviteToParty, (0, 0, 0, 0))
+                    # Send shared memory message so Messaging widget can accept
+                    # Using PlayerID in first param like HeroAI does
+                    result = GLOBAL_CACHE.ShMem.SendMessage(
+                        my_email, 
+                        member_email.strip(), 
+                        SharedCommandType.InviteToParty, 
+                        (account_data.PlayerID, 0, 0, 0)
+                    )
+                    
+                    if result == -1:
+                        Py4GW.Console.Log(BOT_NAME, f"Failed to send invite message to {char_name}", 
+                                         Py4GW.Console.MessageType.Warning)
+                    else:
+                        Py4GW.Console.Log(BOT_NAME, f"Sent invite message to {char_name} (msg index: {result})", 
+                                         Py4GW.Console.MessageType.Info)
                     
                     yield from Routines.Yield.wait(2000)  # Wait between invites
                 else:
-                    Py4GW.Console.Log(BOT_NAME, 
-                                     f"Skipping {account_data.CharacterName} - not in same map or already in party", 
-                                     Py4GW.Console.MessageType.Info)
+                    if account_data.CharacterName:
+                        Py4GW.Console.Log(BOT_NAME, 
+                                         f"Skipping {account_data.CharacterName} - not in same map/district or already in party", 
+                                         Py4GW.Console.MessageType.Info)
+            else:
+                Py4GW.Console.Log(BOT_NAME, 
+                                 f"Could not get account data for {member_email}", 
+                                 Py4GW.Console.MessageType.Warning)
 
 
 def equip_set(set_number: int) -> Generator:
