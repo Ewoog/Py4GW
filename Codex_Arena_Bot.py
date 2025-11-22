@@ -238,7 +238,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     from Py4GWCoreLib.routines_src.Movement import Movement
     
     if map_id not in PRIEST_COORDINATES:
-        yield  # Ensure this is a generator
+        yield  # Generator yield required before early return to prevent NoneType iteration errors
         return
     
     # Determine our team
@@ -246,7 +246,7 @@ def move_to_enemy_priest(bot: Botting, map_id: int) -> Generator:
     if our_team == "unknown":
         Py4GW.Console.Log(BOT_NAME, "Could not determine team, skipping priest movement", 
                          Py4GW.Console.MessageType.Warning)
-        yield  # Ensure this is a generator
+        yield  # Generator yield required before early return to prevent NoneType iteration errors
         return
     
     # Get enemy priest location (opposite team)
