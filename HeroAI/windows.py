@@ -1043,6 +1043,45 @@ def DrawCustomSkillsWindow(cached_data: CacheData):
     PyImGui.text("Configure Custom Skills")
     PyImGui.separator()
     
+    # Designated Leader configuration for UW/FoW multibox
+    if PyImGui.collapsing_header("Designated Leader (UW/FoW Multibox)", PyImGui.TreeNodeFlags.DefaultOpen):
+        use_designated_leader = ImGui.checkbox("Use Designated Leader", settings.UseDesignatedLeader)
+        if use_designated_leader != settings.UseDesignatedLeader:
+            settings.UseDesignatedLeader = use_designated_leader
+            settings.save_settings()
+        ImGui.show_tooltip("When enabled, followers will follow the designated leader instead of the party leader.\nUseful for UW/FoW where party leader changes randomly.")
+        
+        if settings.UseDesignatedLeader:
+            PyImGui.separator()
+            ImGui.text("Select Designated Leader:")
+            
+            # Get all accounts in the party
+            accounts = GLOBAL_CACHE.ShMem.GetAllAccountData()
+            own_account = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(GLOBAL_CACHE.Player.GetAccountEmail())
+            
+            if own_account and accounts:
+                # Build list of party members and find current selection
+                party_members = [acc for acc in accounts if acc.PartyID == own_account.PartyID]
+                
+                # Find the index of the currently selected leader
+                current_selection = -1
+                for i, account in enumerate(party_members):
+                    if settings.DesignatedLeaderEmail == account.AccountEmail:
+                        current_selection = i
+                        break
+                
+                # Draw radio buttons
+                for i, account in enumerate(party_members):
+                    new_selection = PyImGui.radio_button(f"{account.CharacterName}##{account.AccountEmail}", current_selection, i)
+                    if new_selection != current_selection:
+                        current_selection = new_selection
+                        settings.DesignatedLeaderEmail = account.AccountEmail
+                        settings.save_settings()
+            else:
+                ImGui.text("No party members found or not in a party.")
+    
+    PyImGui.spacing()
+    
     # Get current skillbar
     skill_names = []
     skill_ids = []
