@@ -394,22 +394,48 @@ def invite_party_members() -> Generator:
     """Invite configured party members to the party."""
     from Py4GWCoreLib import Party
     from Py4GWCoreLib.Routines import Routines
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
     
     if not config.party_members:
         return
     
     Py4GW.Console.Log(BOT_NAME, "Inviting party members...", Py4GW.Console.MessageType.Info)
     
+    my_email = get_my_email()
+    my_data = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(my_email)
+    
+    if not my_data:
+        Py4GW.Console.Log(BOT_NAME, "Failed to get own account data from shared memory", 
+                         Py4GW.Console.MessageType.Warning)
+        return
+    
     for member_email in config.party_members:
         if member_email and member_email.strip():
             # Get character name from shared memory
-            from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
             account_data = GLOBAL_CACHE.ShMem.GetAccountDataFromEmail(member_email.strip())
             if account_data and account_data.CharacterName:
-                char_name = account_data.CharacterName
-                Py4GW.Console.Log(BOT_NAME, f"Inviting {char_name}...", Py4GW.Console.MessageType.Info)
-                Party.Players.InvitePlayer(char_name)
-                yield from Routines.Yield.wait(2000)  # Wait between invites
+                # Check if member is in same map and not in same party
+                if (my_data.MapID == account_data.MapID and
+                    my_data.MapRegion == account_data.MapRegion and
+                    my_data.MapDistrict == account_data.MapDistrict and
+                    my_data.PartyID != account_data.PartyID):
+                    
+                    char_name = account_data.CharacterName
+                    Py4GW.Console.Log(BOT_NAME, f"Inviting {char_name}...", Py4GW.Console.MessageType.Info)
+                    
+                    # Send invite command to game
+                    Party.Players.InvitePlayer(char_name)
+                    
+                    # Send shared memory message so support script can accept
+                    GLOBAL_CACHE.ShMem.SendMessage(my_email, member_email.strip(), 
+                                                   SharedCommandType.InviteToParty, (0, 0, 0, 0))
+                    
+                    yield from Routines.Yield.wait(2000)  # Wait between invites
+                else:
+                    Py4GW.Console.Log(BOT_NAME, 
+                                     f"Skipping {account_data.CharacterName} - not in same map or already in party", 
+                                     Py4GW.Console.MessageType.Info)
 
 
 def equip_set(set_number: int) -> Generator:

@@ -82,37 +82,45 @@ def check_leader_commands() -> tuple[str, float]:
     """Check for commands from the leader.
     Returns tuple of (command_type, param1)."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
     my_email = get_my_email()
     
     # Check for next message
     msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
     
-    if msg and msg.Command == SUPPORT_COMMAND:
+    if msg:
         command_type = ""
         param1 = 0.0
         
-        # Check bounds before accessing params
-        if len(msg.Params) == 0:
-            return ("", 0.0)
-        
-        if msg.Params[0] == SIGNAL_LEAVE_PARTY:
-            command_type = "LEAVE"
-        elif msg.Params[0] == SIGNAL_RESIGN:
-            command_type = "RESIGN"
-        elif msg.Params[0] == SIGNAL_EQUIP_SET_1:
-            command_type = "EQUIP_SET_1"
-        elif msg.Params[0] == SIGNAL_EQUIP_SET_2:
-            command_type = "EQUIP_SET_2"
-        elif msg.Params[0] == SIGNAL_AUTO_COMBAT_ON:
-            command_type = "AUTO_COMBAT_ON"
-        elif msg.Params[0] == SIGNAL_AUTO_COMBAT_OFF:
-            command_type = "AUTO_COMBAT_OFF"
-        
-        if command_type:
-            if len(msg.Params) > 1:
-                param1 = msg.Params[1]
+        # Handle InviteToParty command
+        if msg.Command == SharedCommandType.InviteToParty:
             GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-            return (command_type, param1)
+            return ("ACCEPT_INVITE", 0.0)
+        
+        # Handle other support commands
+        if msg.Command == SUPPORT_COMMAND:
+            # Check bounds before accessing params
+            if len(msg.Params) == 0:
+                return ("", 0.0)
+            
+            if msg.Params[0] == SIGNAL_LEAVE_PARTY:
+                command_type = "LEAVE"
+            elif msg.Params[0] == SIGNAL_RESIGN:
+                command_type = "RESIGN"
+            elif msg.Params[0] == SIGNAL_EQUIP_SET_1:
+                command_type = "EQUIP_SET_1"
+            elif msg.Params[0] == SIGNAL_EQUIP_SET_2:
+                command_type = "EQUIP_SET_2"
+            elif msg.Params[0] == SIGNAL_AUTO_COMBAT_ON:
+                command_type = "AUTO_COMBAT_ON"
+            elif msg.Params[0] == SIGNAL_AUTO_COMBAT_OFF:
+                command_type = "AUTO_COMBAT_OFF"
+            
+            if command_type:
+                if len(msg.Params) > 1:
+                    param1 = msg.Params[1]
+                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
+                return (command_type, param1)
     
     return ("", 0.0)
 
@@ -146,6 +154,18 @@ def handle_resign() -> Generator:
     yield from Routines.Yield.wait(5000)
 
 
+def handle_accept_invite() -> Generator:
+    """Accept party invite."""
+    from Py4GWCoreLib import Party
+    from Py4GWCoreLib.Routines import Routines
+    
+    Py4GW.Console.Log(BOT_NAME, "Received INVITE command - accepting party invite...", 
+                     Py4GW.Console.MessageType.Info)
+    # Accept the party invite
+    Party.SearchPartyReply(accept=True)
+    yield from Routines.Yield.wait(1000)
+
+
 def support_main_loop(bot: Botting) -> None:
     """Main loop for the support script - listens for commands from leader."""
     def _support_loop():
@@ -158,7 +178,9 @@ def support_main_loop(bot: Botting) -> None:
             if command:
                 config.last_command = command
                 
-                if command == "LEAVE":
+                if command == "ACCEPT_INVITE":
+                    yield from handle_accept_invite()
+                elif command == "LEAVE":
                     yield from handle_leave_party()
                 elif command == "RESIGN":
                     yield from handle_resign()
