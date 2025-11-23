@@ -350,13 +350,13 @@ def send_message_to_party(command_type: str, param1: float = 0.0):
     elif command_type == "RESIGN":
         command = SharedCommandType.Resign
     elif command_type == "EQUIP_SET_1":
-        # Use PressKey to send F1 for equipment set 1
+        # Use PressKey to send ControlAction for equipment set 1
         command = SharedCommandType.PressKey
-        params = (0x70, 0.0, 0.0, 0.0)  # F1 key code
+        params = (0x81, 0.0, 0.0, 0.0)  # ControlAction_ActivateWeaponSet1
     elif command_type == "EQUIP_SET_2":
-        # Use PressKey to send F2 for equipment set 2
+        # Use PressKey to send ControlAction for equipment set 2
         command = SharedCommandType.PressKey
-        params = (0x71, 0.0, 0.0, 0.0)  # F2 key code
+        params = (0x82, 0.0, 0.0, 0.0)  # ControlAction_ActivateWeaponSet2
     elif command_type == "ENABLE_HEROAI":
         command = SharedCommandType.EnableHeroAI
         params = (1.0, 0.0, 0.0, 0.0)  # 1.0 = enable

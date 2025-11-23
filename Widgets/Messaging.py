@@ -578,9 +578,21 @@ def PressKey(index, message):
     repetition = int(message.Params[1]) if len(message.Params) > 1 else 1
 
     if key_id:
+        # Check if this is a ControlAction code (0x80-0xFF range for Guild Wars control actions)
+        # Use UIManager for control actions, Keystroke for regular keys
+        is_control_action = key_id >= 0x80
+        
         for _ in range(repetition):
-            Keystroke.PressAndRelease(key_id)
-            yield from Routines.Yield.wait(100)
+            if is_control_action:
+                # Use UIManager for Guild Wars control actions (e.g., weapon sets)
+                UIManager.Keydown(key_id, 0)
+                yield from Routines.Yield.wait(125)
+                UIManager.Keyup(key_id, 0)
+                yield from Routines.Yield.wait(125)
+            else:
+                # Use Keystroke for regular Windows virtual key codes
+                Keystroke.PressAndRelease(key_id)
+                yield from Routines.Yield.wait(100)
 
     GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
     ConsoleLog(MODULE_NAME, "PressKey message processed and finished.", Console.MessageType.Info, False)
