@@ -37,6 +37,8 @@ def Underworld(bot: Botting) -> None:
     bot.Templates.Multibox_Aggressive()
     #bot.States.AddManagedCoroutine("Upkeep Multibox Consumables", lambda: _upkeep_multibox_consumables(bot))
     bot.Move.XYAndDialog(281.00, 7229.00, 0x806501)
+    bot.Move.XY(-2289, 5647)
+    bot.Move.XY(1092, 11424)
     bot.Move.FollowAutoPath(UNDERWORLD_PATH, "Kill Route")
     bot.Wait.UntilOutOfCombat()
     #bot.States.RemoveManagedCoroutine("Upkeep Multibox Consumables")
