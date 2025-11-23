@@ -178,7 +178,8 @@ def simulate_losing_leader():
                 print(f"[Leader2] Partner has {partner_wins} consecutive wins!")
                 break
     
-    time.sleep(2)
+    # Wait a bit longer before disconnecting to ensure Leader1 completes all operations
+    time.sleep(4)
     print("[Leader2] Disconnecting...")
     client.disconnect()
     print("[Leader2] Test complete!")
