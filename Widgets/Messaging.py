@@ -571,33 +571,44 @@ def UsePcon(index, message):
 
 # region PressKey
 def PressKey(index, message):
-    ConsoleLog(MODULE_NAME, f"Processing PressKey message: {message}", Console.MessageType.Info, True)
-    GLOBAL_CACHE.ShMem.MarkMessageAsRunning(message.ReceiverEmail, index)
+    try:
+        ConsoleLog(MODULE_NAME, f"Processing PressKey message: {message}", Console.MessageType.Info, True)
+        GLOBAL_CACHE.ShMem.MarkMessageAsRunning(message.ReceiverEmail, index)
 
-    key_id = int(message.Params[0])
-    repetition = int(message.Params[1]) if len(message.Params) > 1 else 1
-
-    if key_id:
-        # Check if this is a ControlAction code (0x80-0xFF range for Guild Wars control actions)
-        # Use UIManager for control actions, Keystroke for regular keys
-        is_control_action = key_id >= 0x80
+        ConsoleLog(MODULE_NAME, f"PressKey: Params={message.Params}", Console.MessageType.Info, True)
         
-        ConsoleLog(MODULE_NAME, f"PressKey: key_id=0x{key_id:02X}, is_control_action={is_control_action}, repetition={repetition}", Console.MessageType.Info, True)
-        
-        for _ in range(repetition):
-            if is_control_action:
-                # Use UIManager for Guild Wars control actions (e.g., weapon sets)
-                UIManager.Keydown(key_id, 0)
-                yield from Routines.Yield.wait(125)
-                UIManager.Keyup(key_id, 0)
-                yield from Routines.Yield.wait(125)
-            else:
-                # Use Keystroke for regular Windows virtual key codes
-                Keystroke.PressAndRelease(key_id)
-                yield from Routines.Yield.wait(100)
+        key_id = int(message.Params[0])
+        repetition = int(message.Params[1]) if len(message.Params) > 1 else 1
 
-    GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
-    ConsoleLog(MODULE_NAME, "PressKey message processed and finished.", Console.MessageType.Info, True)
+        ConsoleLog(MODULE_NAME, f"PressKey: key_id={key_id} (0x{key_id:02X}), repetition={repetition}", Console.MessageType.Info, True)
+
+        if key_id:
+            # Check if this is a ControlAction code (0x80-0xFF range for Guild Wars control actions)
+            # Use UIManager for control actions, Keystroke for regular keys
+            is_control_action = key_id >= 0x80
+            
+            ConsoleLog(MODULE_NAME, f"PressKey: is_control_action={is_control_action}", Console.MessageType.Info, True)
+            
+            for _ in range(repetition):
+                if is_control_action:
+                    # Use UIManager for Guild Wars control actions (e.g., weapon sets)
+                    ConsoleLog(MODULE_NAME, f"PressKey: Calling UIManager.Keydown({key_id}, 0)", Console.MessageType.Info, True)
+                    UIManager.Keydown(key_id, 0)
+                    yield from Routines.Yield.wait(125)
+                    ConsoleLog(MODULE_NAME, f"PressKey: Calling UIManager.Keyup({key_id}, 0)", Console.MessageType.Info, True)
+                    UIManager.Keyup(key_id, 0)
+                    yield from Routines.Yield.wait(125)
+                else:
+                    # Use Keystroke for regular Windows virtual key codes
+                    ConsoleLog(MODULE_NAME, f"PressKey: Calling Keystroke.PressAndRelease({key_id})", Console.MessageType.Info, True)
+                    Keystroke.PressAndRelease(key_id)
+                    yield from Routines.Yield.wait(100)
+
+        GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
+        ConsoleLog(MODULE_NAME, "PressKey message processed and finished.", Console.MessageType.Info, True)
+    except Exception as e:
+        ConsoleLog(MODULE_NAME, f"PressKey ERROR: {e}", Console.MessageType.Warning, True)
+        GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
 
 
 # endregion
