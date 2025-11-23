@@ -245,6 +245,7 @@ class CommandCenter:
             elif msg_type == 'MAP_VERIFY':
                 # Leader sends their map ID for verification
                 map_id = int(message.get('param1', 0))
+                self.logger.info(f"Received MAP_VERIFY from {sender_id} with map_id={map_id}")
                 self.handle_map_verify(sender_id, map_id)
                 
             elif msg_type in ['MATCH_START', 'MATCH_END', 'WIN_COUNT']:
