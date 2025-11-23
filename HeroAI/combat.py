@@ -1522,13 +1522,17 @@ class CombatClass:
         from HeroAI.settings import Settings
         settings = Settings()
         
+        # Get the skill IDs from the configured skillbar slots
+        auspicious_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(settings.AuspiciousIncantationSkillSlot + 1)
+        arcane_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(settings.ArcaneEchoSkillSlot + 1)
+        
         # Check if current skill is the target for Auspicious OR Arcane Echo
-        is_auspicious_target = (settings.AuspiciousIncantationSkillSlot < len(self.skills) and 
-                                skill_id == self.skills[settings.AuspiciousIncantationSkillSlot].skill_id and
+        is_auspicious_target = (auspicious_target_skill_id > 0 and 
+                                skill_id == auspicious_target_skill_id and
                                 skill_id != self.auspicious_incantation)
         
-        is_arcane_target = (settings.ArcaneEchoSkillSlot < len(self.skills) and 
-                           skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
+        is_arcane_target = (arcane_target_skill_id > 0 and 
+                           skill_id == arcane_target_skill_id and
                            skill_id != self.arcane_echo)
         
         # Skip if the corresponding echo spell is ready (let it cast first)
