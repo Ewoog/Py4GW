@@ -1137,9 +1137,11 @@ def run_codex_match(bot: Botting) -> None:
         if config.is_winning_team:
             Py4GW.Console.Log(BOT_NAME, "Equipping Set 1 (Winning Team)", Py4GW.Console.MessageType.Info)
             yield from equip_set(1)
+            send_message_to_party("EQUIP_SET_1")
         else:
             Py4GW.Console.Log(BOT_NAME, "Equipping Set 2 (Losing Team)", Py4GW.Console.MessageType.Info)
             yield from equip_set(2)
+            send_message_to_party("EQUIP_SET_2")
         
         # Synchronization phase: wait for both teams to be ready
         # Losing team skips synchronization after first match for immediate requeue
