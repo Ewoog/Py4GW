@@ -188,15 +188,28 @@ class CommandCenter:
                     'message': 'Registration successful'
                 })
                 
-                # Now handle regular messages
+                # Now handle regular messages - use a buffer for newline-delimited messages
+                buffer = b''
                 while self.running:
                     data = client_socket.recv(self.buffer_size)
                     if not data:
                         self.logger.info(f"{client_id} disconnected")
                         break
-                        
-                    message = json.loads(data.decode())
-                    self.process_message(client_id, message)
+                    
+                    # Add received data to buffer
+                    buffer += data
+                    
+                    # Process all complete messages (delimited by newline)
+                    while b'\n' in buffer:
+                        message_data, buffer = buffer.split(b'\n', 1)
+                        if message_data:  # Skip empty lines
+                            try:
+                                message = json.loads(message_data.decode())
+                                self.process_message(client_id, message)
+                            except json.JSONDecodeError as e:
+                                self.logger.error(f"Invalid JSON from {client_id}: {e}")
+                                self.logger.error(f"Data: {message_data}")
+                    
                     
         except json.JSONDecodeError as e:
             self.logger.error(f"Invalid JSON from {address}: {e}")
@@ -414,7 +427,7 @@ class CommandCenter:
             client_socket, _, _ = self.clients[client_id]
             
         try:
-            data = json.dumps(message).encode()
+            data = json.dumps(message).encode() + b'\n'  # Add newline delimiter
             client_socket.sendall(data)
         except Exception as e:
             self.logger.error(f"Error sending to {client_id}: {e}")
@@ -428,8 +441,10 @@ class CommandCenter:
         client_socket, _, _ = self.clients[client_id]
         
         try:
-            data = json.dumps(message).encode()
+            data = json.dumps(message).encode() + b'\n'  # Add newline delimiter
             client_socket.sendall(data)
+        except Exception as e:
+            self.logger.error(f"Error sending to {client_id}: {e}")
         except Exception as e:
             self.logger.error(f"Error sending to {client_id}: {e}")
             

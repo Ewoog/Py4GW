@@ -125,7 +125,7 @@ class SocketClient:
             return False
             
         try:
-            data = json.dumps(message).encode()
+            data = json.dumps(message).encode() + b'\n'  # Add newline delimiter
             self.socket.sendall(data)
             return True
         except Exception as e:
@@ -166,6 +166,7 @@ class SocketClient:
             
     def _receive_loop(self):
         """Continuously receive messages from the Command Center."""
+        buffer = b''
         while self.running and self.connected:
             try:
                 data = self.socket.recv(4096)
@@ -173,22 +174,31 @@ class SocketClient:
                     self.logger.warning("Connection closed by server")
                     self.disconnect()
                     break
-                    
-                message = json.loads(data.decode())
                 
-                # Put message in queue
-                self.message_queue.put(message)
+                # Add received data to buffer
+                buffer += data
                 
-                # Call registered callback if exists
-                msg_type = message.get('type')
-                if msg_type in self.callbacks:
-                    try:
-                        self.callbacks[msg_type](message)
-                    except Exception as e:
-                        self.logger.error(f"Error in callback for {msg_type}: {e}")
+                # Process all complete messages (delimited by newline)
+                while b'\n' in buffer:
+                    message_data, buffer = buffer.split(b'\n', 1)
+                    if message_data:  # Skip empty lines
+                        try:
+                            message = json.loads(message_data.decode())
+                            
+                            # Put message in queue
+                            self.message_queue.put(message)
+                            
+                            # Call registered callback if exists
+                            msg_type = message.get('type')
+                            if msg_type in self.callbacks:
+                                try:
+                                    self.callbacks[msg_type](message)
+                                except Exception as e:
+                                    self.logger.error(f"Error in callback for {msg_type}: {e}")
+                        except json.JSONDecodeError as e:
+                            self.logger.error(f"Invalid JSON received: {e}")
+                            self.logger.error(f"Data: {message_data}")
                         
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Invalid JSON received: {e}")
             except Exception as e:
                 if self.running:
                     self.logger.error(f"Error in receive loop: {e}")
