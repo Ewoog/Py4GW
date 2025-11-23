@@ -309,6 +309,8 @@ def check_sync_signal() -> tuple[str, int]:
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
             else:
                 # Not a MAP_VERIFY message, stop processing
+                # Leave non-MAP_VERIFY SYNC_QUEUE_COMMAND messages in the queue
+                # as they may be processed elsewhere
                 break
         
         if found_map_verify:
