@@ -291,6 +291,7 @@ def check_sync_signal() -> tuple[str, int]:
         # and only return the most recent one to prevent message stacking
         latest_map_id = 0
         found_map_verify = False
+        messages_cleared = 0
         
         # Process all pending MAP_VERIFY messages
         while True:
@@ -303,12 +304,17 @@ def check_sync_signal() -> tuple[str, int]:
             if len(msg.Params) > 1 and msg.Params[0] == SIGNAL_MAP_VERIFY:
                 latest_map_id = int(msg.Params[1])
                 found_map_verify = True
+                messages_cleared += 1
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
             else:
                 # Not a MAP_VERIFY message, stop processing
                 break
         
         if found_map_verify:
+            if messages_cleared > 1:
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Cleared {messages_cleared} stacked MAP_VERIFY messages, using latest map ID: {latest_map_id}", 
+                                Py4GW.Console.MessageType.Info)
             return ("MAP_VERIFY", latest_map_id)
         
         return ("", 0)
