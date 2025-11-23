@@ -159,6 +159,9 @@ class CodexConfig:
         self.payback_mode = False  # Toggle: Losing team goes aggressive on desync
         self.resign_mode = False  # Toggle: Winning team resigns on desync
         
+        # Resigning routine mode
+        self.both_teams_resign_mode = False  # Toggle: Both teams resign instead of playing
+        
         # Leader/Support mode
         self.is_leader = True  # Toggle: True = leader (main bot), False = support script
 
@@ -975,6 +978,122 @@ def losing_team_logic(bot: Botting) -> Generator:
         config.desync_detected = False
 
 
+def resigning_routine_logic(bot: Botting) -> Generator:
+    """
+    Resigning routine for both teams.
+    
+    Process:
+    1. Check if map is The Crag - if yes, act normally and wait until next map
+    2. Otherwise:
+       - Disable Aggressive Mode
+       - Losing team switches to Equipment Set 1
+       - Bot waits for 5 minutes 45 seconds
+       - All players execute resign command
+       - Both teams wait until back at Codex Arena outpost
+    """
+    from Py4GWCoreLib.Routines import Routines
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib import Party
+    
+    # Get current map ID
+    current_map_id = GLOBAL_CACHE.Map.GetMapID()
+    
+    # Check if map is The Crag
+    if current_map_id == THE_CRAG_MAP_ID:
+        Py4GW.Console.Log(BOT_NAME, 
+                        "Map is The Crag - acting normally, waiting for next map...", 
+                        Py4GW.Console.MessageType.Info)
+        
+        # Wait for map change (up to 10 minutes)
+        timeout = 600  # 10 minute timeout (in seconds)
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout and bot.config.fsm_running:
+            yield from Routines.Yield.wait(2000)
+            
+            # Check if map has changed
+            new_map_id = GLOBAL_CACHE.Map.GetMapID()
+            if new_map_id != current_map_id:
+                Py4GW.Console.Log(BOT_NAME, "Map changed from The Crag!", 
+                                Py4GW.Console.MessageType.Info)
+                config.in_match = False
+                return
+        
+        # Timeout - force return
+        Py4GW.Console.Log(BOT_NAME, "Timeout waiting for map change from The Crag, forcing return...", 
+                        Py4GW.Console.MessageType.Warning)
+        disable_auto_combat()
+        Party.ReturnToOutpost()
+        yield from Routines.Yield.wait(5000)
+        config.in_match = False
+        return
+    
+    # Not The Crag - proceed with resign routine
+    Py4GW.Console.Log(BOT_NAME, 
+                    "Both teams resigning - executing resignation routine...", 
+                    Py4GW.Console.MessageType.Info)
+    
+    # Disable Aggressive Mode (if it was enabled)
+    if config.aggressive_mode:
+        Py4GW.Console.Log(BOT_NAME, "Disabling Aggressive Mode for resign routine...", 
+                        Py4GW.Console.MessageType.Info)
+        # Note: We don't permanently disable it, just skip aggressive behavior for this match
+    
+    # Losing team switches to Equipment Set 1
+    if not config.is_winning_team:
+        Py4GW.Console.Log(BOT_NAME, "Losing team switching to Equipment Set 1...", 
+                        Py4GW.Console.MessageType.Info)
+        yield from equip_set(1)
+        send_message_to_party("EQUIP_SET_1")
+        yield from Routines.Yield.wait(1000)
+    
+    # Wait for 5 minutes 45 seconds (345 seconds)
+    wait_time_seconds = 345
+    Py4GW.Console.Log(BOT_NAME, 
+                    f"Waiting {wait_time_seconds} seconds before resigning...", 
+                    Py4GW.Console.MessageType.Info)
+    yield from Routines.Yield.wait(wait_time_seconds * 1000)
+    
+    # All players execute resign command
+    Py4GW.Console.Log(BOT_NAME, "Executing resign command for all players...", 
+                    Py4GW.Console.MessageType.Info)
+    
+    # Send resign command to party members
+    send_message_to_party("RESIGN")
+    
+    # Execute resign for self (using HeroAI pattern)
+    from Py4GWCoreLib import Party
+    Party.Resign()
+    
+    yield from Routines.Yield.wait(2000)
+    
+    # Wait until back at Codex Arena outpost
+    Py4GW.Console.Log(BOT_NAME, "Waiting to return to Codex Arena outpost...", 
+                    Py4GW.Console.MessageType.Info)
+    
+    timeout = 60  # 60 second timeout to return to outpost
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout and bot.config.fsm_running:
+        yield from Routines.Yield.wait(2000)
+        
+        # Check if we're back at outpost
+        new_map_id = GLOBAL_CACHE.Map.GetMapID()
+        if new_map_id == CODEX_ARENA_OUTPOST_ID:
+            Py4GW.Console.Log(BOT_NAME, "Successfully returned to Codex Arena outpost!", 
+                            Py4GW.Console.MessageType.Success)
+            config.in_match = False
+            return
+    
+    # Timeout - not back at outpost yet, force return
+    Py4GW.Console.Log(BOT_NAME, "Timeout waiting for return to outpost, forcing return...", 
+                    Py4GW.Console.MessageType.Warning)
+    disable_auto_combat()
+    Party.ReturnToOutpost()
+    yield from Routines.Yield.wait(5000)
+    config.in_match = False
+
+
 def run_codex_match(bot: Botting) -> None:
     """Run a single Codex Arena match cycle."""
     def _run_match():
@@ -1056,6 +1175,21 @@ def run_codex_match(bot: Botting) -> None:
             # Failed to enter match, retry
             Py4GW.Console.Log(BOT_NAME, "Failed to enter match, retrying...", Py4GW.Console.MessageType.Warning)
             yield from Routines.Yield.wait(3000)
+            return
+        
+        # Check if both teams resign mode is enabled
+        if config.both_teams_resign_mode:
+            Py4GW.Console.Log(BOT_NAME, "Both Teams Resign Mode active - executing resign routine...", 
+                            Py4GW.Console.MessageType.Info)
+            yield from resigning_routine_logic(bot)
+            
+            # Mark that first match is complete
+            config.first_match = False
+            
+            # Log current progress
+            Py4GW.Console.Log(BOT_NAME, 
+                            f"Progress: {config.strongboxes_earned}/{config.target_strongboxes} strongboxes ({config.consecutive_wins} consecutive wins)", 
+                            Py4GW.Console.MessageType.Info)
             return
         
         # Execute team-specific logic
@@ -1231,6 +1365,18 @@ def _draw_settings():
                 config.resign_mode = new_resign
                 Py4GW.Console.Log(BOT_NAME, f"Resign Mode {'enabled' if config.resign_mode else 'disabled'}", 
                                 Py4GW.Console.MessageType.Info)
+        
+        # Both Teams Resign Mode toggle
+        PyImGui.separator()
+        new_both_resign = PyImGui.checkbox("Both Teams Resign Mode", config.both_teams_resign_mode)
+        if new_both_resign != config.both_teams_resign_mode:
+            config.both_teams_resign_mode = new_both_resign
+            Py4GW.Console.Log(BOT_NAME, f"Both Teams Resign Mode {'enabled' if config.both_teams_resign_mode else 'disabled'}", 
+                            Py4GW.Console.MessageType.Info)
+        
+        if config.both_teams_resign_mode:
+            PyImGui.text_colored("Both Teams Resign Mode Active!", (1, 1, 0, 1))
+            PyImGui.text_wrapped("When enabled: Check if map is The Crag (act normally), otherwise disable Aggressive Mode, losing team switches to Set 1, wait 5m45s, all resign, wait for outpost.")
     
     PyImGui.separator()
     
