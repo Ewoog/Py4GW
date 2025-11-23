@@ -144,6 +144,8 @@ class CodexConfig:
         self.partner_email = ""  # Email of the other team leader to sync with
         self.partner_email_index = 0  # Index for combo box selection
         self.first_match = True  # Track if this is the first match (for losing team immediate requeue)
+        self.party_invited = False  # Track if party members have been invited
+        self.needs_queue_sync = False  # Track if queue sync is needed (e.g., after desync)
         self.aggressive_mode = False  # Toggle: When enabled, winning team moves to enemy spawn
         self.first_queue_completed = False  # Track if initial queue synchronization is complete
         
@@ -187,6 +189,22 @@ SIGNAL_MAP_VERIFY = 11.0
 
 # Delay (in milliseconds) to wait after map change
 MAP_CHANGE_DELAY_MS = 2000
+
+
+def get_signal_type_name(signal_value: float) -> str:
+    """Get the human-readable name for a signal type value."""
+    if signal_value == SIGNAL_READY_TO_QUEUE:
+        return "READY_TO_QUEUE"
+    elif signal_value == SIGNAL_QUEUE_NOW:
+        return "QUEUE_NOW"
+    elif signal_value == SIGNAL_MATCH_START:
+        return "MATCH_START"
+    elif signal_value == SIGNAL_MATCH_END:
+        return "MATCH_END"
+    elif signal_value == SIGNAL_MAP_VERIFY:
+        return "MAP_VERIFY"
+    else:
+        return "UNKNOWN"
 
 
 def get_my_email() -> str:
@@ -287,15 +305,43 @@ def check_sync_signal() -> tuple[str, int]:
     
     # Only check for sync messages if first queue has not been completed
     if config.first_queue_completed:
-        # Still check for MAP_VERIFY messages
-        msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
+        # Still check for MAP_VERIFY messages, but consume ALL of them
+        # and only return the most recent one to prevent message stacking
+        latest_map_id = 0
+        found_map_verify = False
+        messages_cleared = 0
+        max_iterations = 100  # Safety limit to prevent infinite loops
         
-        if msg and msg.Command == SYNC_QUEUE_COMMAND:
-            # Check bounds before accessing params
-            if len(msg.Params) > 1 and msg.Params[0] == SIGNAL_MAP_VERIFY:
-                map_id = int(msg.Params[1])
+        # Process all pending MAP_VERIFY messages
+        for _ in range(max_iterations):
+            msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
+            
+            if not msg or msg.Command != SYNC_QUEUE_COMMAND:
+                break
+            
+            # Check bounds before accessing params - need at least 2 params
+            if len(msg.Params) >= 2 and msg.Params[0] == SIGNAL_MAP_VERIFY:
+                latest_map_id = int(msg.Params[1])
+                found_map_verify = True
+                messages_cleared += 1
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-                return ("MAP_VERIFY", map_id)
+            else:
+                # Not a MAP_VERIFY message - could be old MATCH_START/MATCH_END from before first_queue_completed
+                # Mark it as finished to clear it from the queue and continue processing
+                signal_type_name = get_signal_type_name(msg.Params[0]) if len(msg.Params) >= 1 else "UNKNOWN"
+                
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Clearing old {signal_type_name} message from queue", 
+                                Py4GW.Console.MessageType.Info)
+                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
+                # Continue to next message instead of breaking
+        
+        if found_map_verify:
+            if messages_cleared > 1:
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Cleared {messages_cleared} stacked MAP_VERIFY messages, using latest map ID: {latest_map_id}", 
+                                Py4GW.Console.MessageType.Info)
+            return ("MAP_VERIFY", latest_map_id)
         
         return ("", 0)
     
@@ -310,21 +356,14 @@ def check_sync_signal() -> tuple[str, int]:
         if len(msg.Params) == 0:
             return ("", 0)
         
-        if msg.Params[0] == SIGNAL_READY_TO_QUEUE:
-            signal_type = "READY_TO_QUEUE"
-        elif msg.Params[0] == SIGNAL_QUEUE_NOW:
-            signal_type = "QUEUE_NOW"
-        elif msg.Params[0] == SIGNAL_MATCH_START:
-            signal_type = "MATCH_START"
-        elif msg.Params[0] == SIGNAL_MATCH_END:
-            signal_type = "MATCH_END"
-        elif msg.Params[0] == SIGNAL_MAP_VERIFY:
-            signal_type = "MAP_VERIFY"
-            if len(msg.Params) > 1:
-                map_id = int(msg.Params[1])
+        signal_type = get_signal_type_name(msg.Params[0])
+        
+        # Get map_id if this is a MAP_VERIFY signal
+        if msg.Params[0] == SIGNAL_MAP_VERIFY and len(msg.Params) > 1:
+            map_id = int(msg.Params[1])
         
         # Mark message as finished
-        if signal_type:
+        if signal_type and signal_type != "UNKNOWN":
             GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
             return (signal_type, map_id)
     
@@ -709,6 +748,9 @@ def wait_for_match_start(bot: Botting, outpost_map_id: int) -> Generator:
                         Py4GW.Console.Log(BOT_NAME, 
                                         f"DESYNC DETECTED! Our Map: {current_map_id}, Partner Map: {partner_map_id}", 
                                         Py4GW.Console.MessageType.Warning)
+                        Py4GW.Console.Log(BOT_NAME, 
+                                        "Both teams will now enter resign protocol (wait 5m45s and resign)...", 
+                                        Py4GW.Console.MessageType.Warning)
                         config.desync_detected = True
                         partner_map_verified = True
                     break
@@ -759,25 +801,6 @@ def winning_team_logic(bot: Botting) -> Generator:
         
         # Get current map ID to determine arena type
         current_map_id = GLOBAL_CACHE.Map.GetMapID()
-        
-        # Handle desync modes if desync was detected
-        if config.desync_detected:
-            if config.is_winning_team and config.resign_mode:
-                # Resign Mode: Winning team equips Set 2 and returns to outpost
-                Py4GW.Console.Log(BOT_NAME, 
-                                "DESYNC - Resign Mode active! Equipping Set 2 and returning to outpost...", 
-                                Py4GW.Console.MessageType.Warning)
-                yield from equip_set(2)
-                send_message_to_party("EQUIP_SET_2")
-                yield from Routines.Yield.wait(5000)
-                from Py4GWCoreLib import Party
-                disable_auto_combat()
-                Party.ReturnToOutpost()
-                yield from Routines.Yield.wait(5000)
-                config.in_match = False
-                config.desync_detected = False
-                # Continue to next iteration - will requeue
-                continue
         
         # Check if Map ID is 829 (Seabed Arena) or 830 (Deldrimor Arena) OR Aggressive Mode is enabled
         is_priest_map = current_map_id == SEABED_ARENA_MAP_ID or current_map_id == DELDRIMOR_ARENA_MAP_ID
@@ -930,23 +953,8 @@ def losing_team_logic(bot: Botting) -> Generator:
     # Get current map ID to detect map changes
     current_map_id = GLOBAL_CACHE.Map.GetMapID()
     
-    # Handle desync modes if desync was detected
-    if config.desync_detected and config.payback_mode:
-        # Payback Mode: Losing team equips Set 1 and goes aggressive
-        Py4GW.Console.Log(BOT_NAME, 
-                        "DESYNC - Payback Mode active! Equipping Set 1 and going aggressive...", 
-                        Py4GW.Console.MessageType.Warning)
-        yield from equip_set(1)
-        send_message_to_party("EQUIP_SET_1")
-        send_message_to_party("ENABLE_HEROAI")
-        bot.config.upkeep.auto_combat.set_now("active", True)
-        # Rush enemy spawn
-        yield from Routines.Yield.wait(30000)  # Wait 30 seconds
-        yield from move_to_enemy_priest(bot, current_map_id)
-        # Then wait for match to end normally
-    else:
-        Py4GW.Console.Log(BOT_NAME, "Losing team in arena, waiting for map change...", 
-                         Py4GW.Console.MessageType.Info)
+    Py4GW.Console.Log(BOT_NAME, "Losing team in arena, waiting for map change...", 
+                     Py4GW.Console.MessageType.Info)
     
     # Wait until map changes (up to 10 minutes)
     timeout = 600  # 10 minute timeout (in seconds)
@@ -991,6 +999,71 @@ def losing_team_logic(bot: Botting) -> Generator:
                         Py4GW.Console.MessageType.Warning)
         config.in_match = False
         config.desync_detected = False
+
+
+def desync_resign_protocol(bot: Botting) -> Generator:
+    """
+    Resign protocol executed by both teams when desync is detected.
+    
+    Process:
+    1. Wait for 5 minutes 45 seconds
+    2. All players execute resign command
+    3. Both teams wait until back at Codex Arena outpost
+    """
+    from Py4GWCoreLib.Routines import Routines
+    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+    from Py4GWCoreLib import Party
+    
+    Py4GW.Console.Log(BOT_NAME, 
+                    "DESYNC - Executing resign protocol for both teams...", 
+                    Py4GW.Console.MessageType.Warning)
+    
+    # Wait for 5 minutes 45 seconds (345 seconds)
+    wait_time_seconds = 345
+    Py4GW.Console.Log(BOT_NAME, 
+                    f"Waiting {wait_time_seconds} seconds before resigning...", 
+                    Py4GW.Console.MessageType.Info)
+    yield from Routines.Yield.wait(wait_time_seconds * 1000)
+    
+    # All players execute resign command
+    Py4GW.Console.Log(BOT_NAME, "Executing resign command for all players...", 
+                    Py4GW.Console.MessageType.Info)
+    
+    # Send resign command to party members
+    send_message_to_party("RESIGN")
+    
+    # Execute resign for self
+    Party.Resign()
+    
+    yield from Routines.Yield.wait(2000)
+    
+    # Wait until back at Codex Arena outpost
+    Py4GW.Console.Log(BOT_NAME, "Waiting to return to Codex Arena outpost...", 
+                    Py4GW.Console.MessageType.Info)
+    
+    timeout = 60  # 60 second timeout to return to outpost
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout and bot.config.fsm_running:
+        yield from Routines.Yield.wait(2000)
+        
+        # Check if we're back at outpost
+        current_map_id = GLOBAL_CACHE.Map.GetMapID()
+        if current_map_id == CODEX_ARENA_OUTPOST_ID:
+            Py4GW.Console.Log(BOT_NAME, "Successfully returned to Codex Arena outpost!", 
+                            Py4GW.Console.MessageType.Success)
+            config.in_match = False
+            config.desync_detected = False
+            return
+    
+    # Timeout - not back at outpost yet, force return
+    Py4GW.Console.Log(BOT_NAME, "Timeout waiting for return to outpost, forcing return...", 
+                    Py4GW.Console.MessageType.Warning)
+    disable_auto_combat()
+    Party.ReturnToOutpost()
+    yield from Routines.Yield.wait(5000)
+    config.in_match = False
+    config.desync_detected = False
 
 
 def resigning_routine_logic(bot: Botting) -> Generator:
@@ -1127,10 +1200,11 @@ def run_codex_match(bot: Botting) -> None:
         yield from travel_to_codex_arena()
         
         # On first match, invite party members if leader
-        if config.is_leader and config.first_match and config.party_members:
-            Py4GW.Console.Log(BOT_NAME, "First match - inviting party members...", 
+        if config.is_leader and not config.party_invited and config.party_members:
+            Py4GW.Console.Log(BOT_NAME, "Inviting party members...", 
                             Py4GW.Console.MessageType.Info)
             yield from invite_party_members()
+            config.party_invited = True
             yield from Routines.Yield.wait(5000)  # Wait for party to form
         
         # Equip appropriate set
@@ -1145,7 +1219,8 @@ def run_codex_match(bot: Botting) -> None:
         
         # Synchronization phase: wait for both teams to be ready
         # Losing team skips synchronization after first match for immediate requeue
-        skip_sync = not config.is_winning_team and not config.first_match
+        # Force sync if needs_queue_sync is True (e.g., after desync)
+        skip_sync = not config.is_winning_team and not config.first_match and not config.needs_queue_sync
         
         if not skip_sync:
             config.ready_to_queue = True
@@ -1172,6 +1247,9 @@ def run_codex_match(bot: Botting) -> None:
             
             # Brief sync delay to ensure both are ready
             yield from Routines.Yield.wait(1000)
+            
+            # Clear needs_queue_sync flag after syncing
+            config.needs_queue_sync = False
         else:
             Py4GW.Console.Log(BOT_NAME, "Losing team re-entering queue immediately (no sync wait)...", 
                             Py4GW.Console.MessageType.Info)
@@ -1192,6 +1270,22 @@ def run_codex_match(bot: Botting) -> None:
             # Failed to enter match, retry
             Py4GW.Console.Log(BOT_NAME, "Failed to enter match, retrying...", Py4GW.Console.MessageType.Warning)
             yield from Routines.Yield.wait(3000)
+            return
+        
+        # Check if desync was detected - if so, execute resign protocol for both teams
+        if config.desync_detected:
+            Py4GW.Console.Log(BOT_NAME, "DESYNC detected - both teams entering resign protocol...", 
+                            Py4GW.Console.MessageType.Warning)
+            yield from desync_resign_protocol(bot)
+            
+            # After resigning and returning to outpost, do a queue sync before re-entering
+            Py4GW.Console.Log(BOT_NAME, "Back at outpost after desync - syncing with partner before re-entering queue...", 
+                            Py4GW.Console.MessageType.Info)
+            
+            # Force queue sync by setting needs_queue_sync flag
+            # This ensures both teams sync before re-entering queue
+            config.needs_queue_sync = True
+            
             return
         
         # Check if both teams resign mode is enabled
