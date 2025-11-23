@@ -38,14 +38,20 @@ DEFAULT_STATUS_INTERVAL = 10  # seconds - interval for printing status updates
 
 class SignalType(Enum):
     """Signal types for bot communication."""
+    # Bot to CC signals
     READY_TO_QUEUE = 1.0
-    QUEUE_NOW = 2.0
+    QUEUE_NOW = 2.0  # Deprecated - CC now sends this
     MATCH_START = 3.0
     MATCH_END = 4.0
     MAP_VERIFY = 11.0
     WIN_COUNT = 12.0
     HEARTBEAT = 99.0  # Keep-alive signal
     STATUS_UPDATE = 100.0  # General status update
+    
+    # CC to Bot commands
+    CMD_QUEUE_NOW = 200.0  # CC tells bots to queue
+    CMD_MATCH_CONFIRMED = 201.0  # CC confirms maps match
+    CMD_RESIGN = 202.0  # CC tells bots to resign (desync detected)
 
 
 @dataclass
@@ -86,6 +92,10 @@ class CommandCenter:
         
         # Message queue for routing
         self.message_queue: List[Dict] = []
+        
+        # Coordination state
+        self.ready_to_queue: set = set()  # Set of client_ids ready to queue
+        self.map_verifications: Dict[str, int] = {}  # {client_id: map_id}
         
         # Setup logging
         self.setup_logging()
@@ -228,12 +238,145 @@ class CommandCenter:
                 bot_state.current_map_id = message.get('current_map_id', bot_state.current_map_id)
                 self.logger.info(f"Status update from {sender_id}: Wins={bot_state.consecutive_wins}, Boxes={bot_state.strongboxes_earned}, InMatch={bot_state.in_match}")
                 
-            elif msg_type in ['READY_TO_QUEUE', 'QUEUE_NOW', 'MATCH_START', 'MATCH_END', 'MAP_VERIFY', 'WIN_COUNT']:
-                # Route synchronization signals to partner
+            elif msg_type == 'READY_TO_QUEUE':
+                # Leader signals they're ready to queue
+                self.handle_ready_to_queue(sender_id)
+                
+            elif msg_type == 'MAP_VERIFY':
+                # Leader sends their map ID for verification
+                map_id = int(message.get('param1', 0))
+                self.handle_map_verify(sender_id, map_id)
+                
+            elif msg_type in ['MATCH_START', 'MATCH_END', 'WIN_COUNT']:
+                # These still get routed to partner for informational purposes
                 self.route_signal(sender_id, message)
+            
+            # GUI commands
+            elif msg_type == 'GUI_RESIGN':
+                self.logger.info("GUI commanded RESIGN for all bots")
+                self.handle_gui_resign()
+                
+            elif msg_type == 'GUI_SWITCH_TEAMS':
+                self.logger.info("GUI commanded SWITCH_TEAMS")
+                self.handle_gui_switch_teams()
+                
+            elif msg_type == 'GUI_FORCE_QUEUE':
+                self.logger.info("GUI commanded FORCE_QUEUE")
+                self.handle_gui_force_queue()
                 
             else:
                 self.logger.warning(f"Unknown message type from {sender_id}: {msg_type}")
+    
+    def handle_ready_to_queue(self, sender_id: str):
+        """Handle READY_TO_QUEUE signal - coordinate both leaders to queue together."""
+        self.ready_to_queue.add(sender_id)
+        self.logger.info(f"{sender_id} is ready to queue ({len(self.ready_to_queue)}/2 ready)")
+        
+        # Check if both leaders are ready
+        if len(self.ready_to_queue) >= 2:
+            self.logger.info("Both leaders ready! Commanding them to queue...")
+            
+            # Send QUEUE_NOW command to both leaders
+            for client_id in list(self.ready_to_queue):
+                self.send_to_client(client_id, {
+                    'type': 'CMD_QUEUE_NOW',
+                    'timestamp': time.time()
+                })
+            
+            # Clear ready state for next queue cycle
+            self.ready_to_queue.clear()
+            self.logger.info("QUEUE_NOW commands sent to both leaders")
+    
+    def handle_map_verify(self, sender_id: str, map_id: int):
+        """Handle MAP_VERIFY signal - verify both leaders are in same match."""
+        self.map_verifications[sender_id] = map_id
+        self.logger.info(f"{sender_id} is on map {map_id} ({len(self.map_verifications)}/2 verified)")
+        
+        # Check if both leaders have reported their maps
+        if len(self.map_verifications) >= 2:
+            # Get both map IDs
+            map_ids = list(self.map_verifications.values())
+            map1, map2 = map_ids[0], map_ids[1]
+            
+            if map1 == map2:
+                # Maps match - confirm to both leaders
+                self.logger.info(f"✓ Maps match (ID: {map1})! Confirming to both leaders...")
+                
+                for client_id in list(self.map_verifications.keys()):
+                    self.send_to_client(client_id, {
+                        'type': 'CMD_MATCH_CONFIRMED',
+                        'map_id': map1,
+                        'timestamp': time.time()
+                    })
+                self.logger.info("Match confirmed - both leaders can proceed")
+            else:
+                # Maps don't match - DESYNC detected
+                self.logger.warning(f"✗ DESYNC DETECTED! Maps don't match: {map1} vs {map2}")
+                self.logger.warning("Commanding both leaders to resign...")
+                
+                for client_id in list(self.map_verifications.keys()):
+                    self.send_to_client(client_id, {
+                        'type': 'CMD_RESIGN',
+                        'reason': 'desync',
+                        'map_ids': [map1, map2],
+                        'timestamp': time.time()
+                    })
+                self.logger.warning("RESIGN commands sent to both leaders")
+            
+            # Clear map verifications for next match
+            self.map_verifications.clear()
+    
+    def handle_gui_resign(self):
+        """Handle GUI resign command - force both bots to resign."""
+        self.logger.warning("GUI RESIGN command - forcing both leaders to resign...")
+        
+        for client_id in list(self.clients.keys()):
+            if not client_id.startswith('GUI_'):  # Don't send to GUI clients
+                self.send_to_client(client_id, {
+                    'type': 'CMD_RESIGN',
+                    'reason': 'gui_manual_command',
+                    'timestamp': time.time()
+                })
+        
+        self.logger.warning("RESIGN commands sent to all leaders")
+    
+    def handle_gui_switch_teams(self):
+        """Handle GUI switch teams command - swap winning/losing teams."""
+        self.logger.info("GUI SWITCH_TEAMS command - swapping team roles...")
+        
+        # Swap is_winning_team for all bots
+        for client_id, (sock, addr, bot_state) in list(self.clients.items()):
+            if not client_id.startswith('GUI_'):  # Don't process GUI clients
+                bot_state.is_winning_team = not bot_state.is_winning_team
+                new_role = "Winning" if bot_state.is_winning_team else "Losing"
+                
+                # Notify the bot of its new role
+                self.send_to_client(client_id, {
+                    'type': 'CMD_SWITCH_TEAMS',
+                    'new_role': new_role,
+                    'is_winning_team': bot_state.is_winning_team,
+                    'timestamp': time.time()
+                })
+                
+                self.logger.info(f"{client_id} is now {new_role} team")
+        
+        self.logger.info("Team switch complete")
+    
+    def handle_gui_force_queue(self):
+        """Handle GUI force queue command - command both leaders to queue immediately."""
+        self.logger.info("GUI FORCE_QUEUE command - forcing leaders to queue now...")
+        
+        for client_id in list(self.clients.keys()):
+            if not client_id.startswith('GUI_'):  # Don't send to GUI clients
+                self.send_to_client(client_id, {
+                    'type': 'CMD_QUEUE_NOW',
+                    'source': 'gui',
+                    'timestamp': time.time()
+                })
+        
+        # Clear ready state since we're forcing queue
+        self.ready_to_queue.clear()
+        self.logger.info("QUEUE_NOW commands sent to all leaders")
                 
     def route_signal(self, sender_id: str, message: Dict):
         """Route a signal from one Leader to its partner."""
@@ -284,6 +427,16 @@ class CommandCenter:
                 client_socket.sendall(data)
             except Exception as e:
                 self.logger.error(f"Error broadcasting to {client_id}: {e}")
+    
+    def get_bot_status_for_gui(self) -> Dict:
+        """Get current bot status for GUI display."""
+        with self.lock:
+            bots = {}
+            for client_id, (_, _, bot_state) in self.clients.items():
+                if not client_id.startswith('GUI_'):  # Don't include GUI clients
+                    bots[client_id] = bot_state.to_dict()
+            
+            return bots
                 
     def monitor_heartbeats(self):
         """Monitor client heartbeats and disconnect stale connections."""

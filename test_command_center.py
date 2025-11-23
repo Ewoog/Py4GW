@@ -43,21 +43,22 @@ def simulate_winning_leader():
     
     print("[Leader1] Sending READY_TO_QUEUE signal...")
     client.send_signal("READY_TO_QUEUE")
-    time.sleep(1)
     
-    # Wait for partner's ready signal
-    print("[Leader1] Waiting for partner to be ready...")
+    # Wait for Command Center to tell us to queue
+    print("[Leader1] Waiting for Command Center to coordinate queue...")
     timeout = TIMEOUT_SECONDS
     start = time.time()
+    queue_command_received = False
     while time.time() - start < timeout:
         msg = client.get_next_message(timeout=0.5)
-        if msg and msg.get('type') == 'READY_TO_QUEUE':
-            print("[Leader1] Partner is ready!")
+        if msg and msg.get('type') == 'CMD_QUEUE_NOW':
+            print("[Leader1] ✓ Received CMD_QUEUE_NOW from Command Center!")
+            queue_command_received = True
             break
     
-    print("[Leader1] Sending QUEUE_NOW signal...")
-    client.send_signal("QUEUE_NOW")
-    time.sleep(1)
+    if not queue_command_received:
+        print("[Leader1] Timeout waiting for queue command!")
+        return
     
     print("[Leader1] Entering match...")
     client.update_state(in_match=True, current_map_id=829)
@@ -70,20 +71,24 @@ def simulate_winning_leader():
     print("[Leader1] Sending MAP_VERIFY signal (map 829)...")
     client.send_signal("MAP_VERIFY", param1=829.0)
     
-    # Wait for partner's map verify
-    print("[Leader1] Waiting for partner's map verification...")
+    # Wait for Command Center's match confirmation or resign command
+    print("[Leader1] Waiting for Command Center's match verification...")
     timeout = TIMEOUT_SECONDS
     start = time.time()
     while time.time() - start < timeout:
         msg = client.get_next_message(timeout=0.5)
-        if msg and msg.get('type') == 'MAP_VERIFY':
-            partner_map = int(msg.get('param1', 0))
-            print(f"[Leader1] Partner is on map {partner_map}")
-            if partner_map == 829:
-                print("[Leader1] Maps match! No desync detected.")
-            else:
-                print("[Leader1] DESYNC! Maps don't match!")
-            break
+        if msg:
+            msg_type = msg.get('type')
+            if msg_type == 'CMD_MATCH_CONFIRMED':
+                map_id = msg.get('map_id', 0)
+                print(f"[Leader1] ✓ Command Center confirmed match (Map ID: {map_id})")
+                break
+            elif msg_type == 'CMD_RESIGN':
+                reason = msg.get('reason', 'unknown')
+                map_ids = msg.get('map_ids', [])
+                print(f"[Leader1] ✗ Command Center ordered RESIGN - {reason}: maps {map_ids}")
+                print("[Leader1] Would resign here in real scenario")
+                break
     
     # Simulate winning
     time.sleep(2)
@@ -132,61 +137,78 @@ def simulate_losing_leader():
     print("[Leader2] Sending READY_TO_QUEUE signal...")
     client.send_signal("READY_TO_QUEUE")
     
-    # Wait for partner's ready and queue signals
-    print("[Leader2] Waiting for partner signals...")
-    queue_received = False
+    # Wait for Command Center to tell us to queue
+    print("[Leader2] Waiting for Command Center to coordinate queue...")
+    queue_command_received = False
+    timeout = TIMEOUT_SECONDS
+    start = time.time()
+    while time.time() - start < timeout:
+        msg = client.get_next_message(timeout=0.5)
+        if msg and msg.get('type') == 'CMD_QUEUE_NOW':
+            print("[Leader2] ✓ Received CMD_QUEUE_NOW from Command Center!")
+            queue_command_received = True
+            break
+    
+    if not queue_command_received:
+        print("[Leader2] Timeout waiting for queue command!")
+        return
+    
+    time.sleep(1)
+    print("[Leader2] Entering match...")
+    client.update_state(in_match=True, current_map_id=829)
+    time.sleep(1)
+    
+    # Wait for match start from partner (informational)
+    print("[Leader2] Waiting for match signals...")
+    timeout = TIMEOUT_SECONDS
+    start = time.time()
+    match_start_received = False
+    while time.time() - start < timeout and not match_start_received:
+        msg = client.get_next_message(timeout=0.5)
+        if msg and msg.get('type') == 'MATCH_START':
+            print("[Leader2] Received MATCH_START from partner!")
+            match_start_received = True
+            break
+    
+    # Send our map verification
+    print("[Leader2] Sending MAP_VERIFY signal (map 829)...")
+    client.send_signal("MAP_VERIFY", param1=829.0)
+    
+    # Wait for Command Center's match confirmation or resign command
+    print("[Leader2] Waiting for Command Center's match verification...")
     timeout = TIMEOUT_SECONDS
     start = time.time()
     while time.time() - start < timeout:
         msg = client.get_next_message(timeout=0.5)
         if msg:
             msg_type = msg.get('type')
-            if msg_type == 'READY_TO_QUEUE':
-                print("[Leader2] Partner is ready!")
-            elif msg_type == 'QUEUE_NOW':
-                print("[Leader2] Received QUEUE_NOW from partner!")
-                queue_received = True
+            if msg_type == 'CMD_MATCH_CONFIRMED':
+                map_id = msg.get('map_id', 0)
+                print(f"[Leader2] ✓ Command Center confirmed match (Map ID: {map_id})")
+                break
+            elif msg_type == 'CMD_RESIGN':
+                reason = msg.get('reason', 'unknown')
+                map_ids = msg.get('map_ids', [])
+                print(f"[Leader2] ✗ Command Center ordered RESIGN - {reason}: maps {map_ids}")
+                print("[Leader2] Would resign here in real scenario")
                 break
     
-    if queue_received:
-        time.sleep(1)
-        print("[Leader2] Entering match...")
-        client.update_state(in_match=True, current_map_id=829)
-        time.sleep(1)
-        
-        # Wait for match start and map verify
-        print("[Leader2] Waiting for match signals...")
-        timeout = TIMEOUT_SECONDS
-        start = time.time()
-        while time.time() - start < timeout:
-            msg = client.get_next_message(timeout=0.5)
-            if msg:
-                msg_type = msg.get('type')
-                if msg_type == 'MATCH_START':
-                    print("[Leader2] Received MATCH_START from partner!")
-                elif msg_type == 'MAP_VERIFY':
-                    partner_map = int(msg.get('param1', 0))
-                    print(f"[Leader2] Partner is on map {partner_map}")
-                    print("[Leader2] Sending our MAP_VERIFY...")
-                    client.send_signal("MAP_VERIFY", param1=829.0)
-                    break
-        
-        # Simulate losing
-        time.sleep(2)
-        print("[Leader2] Match lost. Updating state...")
-        client.update_state(in_match=False, current_map_id=796)
-        time.sleep(1)
-        
-        # Wait for partner's win count
-        print("[Leader2] Waiting for partner's WIN_COUNT...")
-        timeout = TIMEOUT_SECONDS
-        start = time.time()
-        while time.time() - start < timeout:
-            msg = client.get_next_message(timeout=0.5)
-            if msg and msg.get('type') == 'WIN_COUNT':
-                partner_wins = int(msg.get('param1', 0))
-                print(f"[Leader2] Partner has {partner_wins} consecutive wins!")
-                break
+    # Simulate losing
+    time.sleep(2)
+    print("[Leader2] Match lost. Updating state...")
+    client.update_state(in_match=False, current_map_id=796)
+    time.sleep(1)
+    
+    # Wait for partner's win count
+    print("[Leader2] Waiting for partner's WIN_COUNT...")
+    timeout = TIMEOUT_SECONDS
+    start = time.time()
+    while time.time() - start < timeout:
+        msg = client.get_next_message(timeout=0.5)
+        if msg and msg.get('type') == 'WIN_COUNT':
+            partner_wins = int(msg.get('param1', 0))
+            print(f"[Leader2] Partner has {partner_wins} consecutive wins!")
+            break
     
     print("[Leader2] Test complete! Staying connected for monitoring...")
     print("[Leader2] Press Ctrl+C to stop the test and disconnect.")
