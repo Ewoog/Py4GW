@@ -154,12 +154,17 @@ class CommandCenter:
         
         try:
             # First message should be a registration with bot details
-            data = client_socket.recv(self.buffer_size)
-            if not data:
-                self.logger.warning(f"Client {address} disconnected before registration")
-                return
-                
-            message = json.loads(data.decode())
+            # Use buffer to handle newline-delimited messages from the start
+            buffer = b''
+            while b'\n' not in buffer:
+                data = client_socket.recv(self.buffer_size)
+                if not data:
+                    self.logger.warning(f"Client {address} disconnected before registration")
+                    return
+                buffer += data
+            
+            message_data, buffer = buffer.split(b'\n', 1)
+            message = json.loads(message_data.decode())
             
             if message.get('type') == 'REGISTER':
                 client_id = message.get('bot_id')
