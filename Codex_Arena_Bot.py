@@ -1007,10 +1007,13 @@ def run_codex_match(bot: Botting) -> None:
             Py4GW.Console.Log(BOT_NAME, "Equipping Set 2 (Losing Team)", Py4GW.Console.MessageType.Info)
             yield from equip_set(2)
         
-        # Send messages to party members to equip Set 2 and disable HeroAI at start (losing team only)
-        if config.is_leader and config.first_match and config.party_members and not config.is_winning_team:
-            send_message_to_party("EQUIP_SET_2")
-            send_message_to_party("DISABLE_HEROAI")
+        # Send messages to party members to equip appropriate set and configure HeroAI at start
+        if config.is_leader and config.first_match and config.party_members:
+            if config.is_winning_team:
+                send_message_to_party("EQUIP_SET_1")
+            else:
+                send_message_to_party("EQUIP_SET_2")
+                send_message_to_party("DISABLE_HEROAI")
             yield from Routines.Yield.wait(500)  # Brief wait for messages to be sent
         
         # Synchronization phase: wait for both teams to be ready
