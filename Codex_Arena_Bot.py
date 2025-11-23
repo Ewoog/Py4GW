@@ -64,6 +64,9 @@ WAIT_TIME_AGGRESSIVE_CRITICAL = 80  # When at 4/5 wins (about to earn strongbox)
 WAIT_TIME_PRIEST_MAP = 45  # For Priest Maps (Seabed Arena, Deldrimor Arena)
 WAIT_TIME_AGGRESSIVE_NORMAL = 30  # For regular Aggressive Mode
 
+# Message sending wait time (in milliseconds)
+MESSAGE_SEND_WAIT_MS = 500  # Brief wait after sending messages to party members
+
 # Strongbox win tracking constants
 WINS_BEFORE_STRONGBOX = 4  # At 4 wins, the next win (5th) earns a strongbox
 TOTAL_WINS_FOR_STRONGBOX = 5  # Total consecutive wins needed to earn a strongbox
@@ -1009,14 +1012,14 @@ def run_codex_match(bot: Botting) -> None:
         
         # Send messages to party members to equip appropriate set and configure HeroAI at start
         # Note: Losing team disables HeroAI at start to ensure passivity before queue.
-        # Winning team enables HeroAI later when match starts (line 1077) to avoid aggressive behavior in outpost.
+        # Winning team enables HeroAI later in match execution logic to avoid aggressive behavior in outpost.
         if config.is_leader and config.first_match and config.party_members:
             if config.is_winning_team:
                 send_message_to_party("EQUIP_SET_1")
             else:
                 send_message_to_party("EQUIP_SET_2")
                 send_message_to_party("DISABLE_HEROAI")
-            yield from Routines.Yield.wait(500)  # Brief wait for messages to be sent
+            yield from Routines.Yield.wait(MESSAGE_SEND_WAIT_MS)
         
         # Synchronization phase: wait for both teams to be ready
         # Losing team skips synchronization after first match for immediate requeue
