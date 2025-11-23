@@ -1033,11 +1033,12 @@ def resigning_routine_logic(bot: Botting) -> Generator:
                     "Both teams resigning - executing resignation routine...", 
                     Py4GW.Console.MessageType.Info)
     
-    # Disable Aggressive Mode (if it was enabled)
+    # Note: Aggressive Mode is implicitly disabled because resigning_routine_logic is called
+    # instead of winning_team_logic which would normally handle aggressive movement.
+    # The config.aggressive_mode setting is not changed so it can be used in future matches.
     if config.aggressive_mode:
-        Py4GW.Console.Log(BOT_NAME, "Disabling Aggressive Mode for resign routine...", 
+        Py4GW.Console.Log(BOT_NAME, "Skipping Aggressive Mode behavior for resign routine...", 
                         Py4GW.Console.MessageType.Info)
-        # Note: We don't permanently disable it, just skip aggressive behavior for this match
     
     # Losing team switches to Equipment Set 1
     if not config.is_winning_team:
@@ -1062,7 +1063,6 @@ def resigning_routine_logic(bot: Botting) -> Generator:
     send_message_to_party("RESIGN")
     
     # Execute resign for self (using HeroAI pattern)
-    from Py4GWCoreLib import Party
     Party.Resign()
     
     yield from Routines.Yield.wait(2000)
