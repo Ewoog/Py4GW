@@ -287,15 +287,29 @@ def check_sync_signal() -> tuple[str, int]:
     
     # Only check for sync messages if first queue has not been completed
     if config.first_queue_completed:
-        # Still check for MAP_VERIFY messages
-        msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
+        # Still check for MAP_VERIFY messages, but consume ALL of them
+        # and only return the most recent one to prevent message stacking
+        latest_map_id = 0
+        found_map_verify = False
         
-        if msg and msg.Command == SYNC_QUEUE_COMMAND:
+        # Process all pending MAP_VERIFY messages
+        while True:
+            msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
+            
+            if not msg or msg.Command != SYNC_QUEUE_COMMAND:
+                break
+            
             # Check bounds before accessing params
             if len(msg.Params) > 1 and msg.Params[0] == SIGNAL_MAP_VERIFY:
-                map_id = int(msg.Params[1])
+                latest_map_id = int(msg.Params[1])
+                found_map_verify = True
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-                return ("MAP_VERIFY", map_id)
+            else:
+                # Not a MAP_VERIFY message, stop processing
+                break
+        
+        if found_map_verify:
+            return ("MAP_VERIFY", latest_map_id)
         
         return ("", 0)
     
