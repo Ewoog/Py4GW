@@ -18,6 +18,10 @@ import threading
 from codex_socket_client import SocketClient
 
 
+# Test configuration constants
+TIMEOUT_SECONDS = 10  # Standard timeout for waiting on messages
+
+
 def simulate_winning_leader():
     """Simulate the winning team leader bot."""
     client = SocketClient(
@@ -43,7 +47,7 @@ def simulate_winning_leader():
     
     # Wait for partner's ready signal
     print("[Leader1] Waiting for partner to be ready...")
-    timeout = 10
+    timeout = TIMEOUT_SECONDS
     start = time.time()
     while time.time() - start < timeout:
         msg = client.get_next_message(timeout=0.5)
@@ -68,7 +72,7 @@ def simulate_winning_leader():
     
     # Wait for partner's map verify
     print("[Leader1] Waiting for partner's map verification...")
-    timeout = 10
+    timeout = TIMEOUT_SECONDS
     start = time.time()
     while time.time() - start < timeout:
         msg = client.get_next_message(timeout=0.5)
@@ -121,7 +125,7 @@ def simulate_losing_leader():
     # Wait for partner's ready and queue signals
     print("[Leader2] Waiting for partner signals...")
     queue_received = False
-    timeout = 10
+    timeout = TIMEOUT_SECONDS
     start = time.time()
     while time.time() - start < timeout:
         msg = client.get_next_message(timeout=0.5)
@@ -142,7 +146,7 @@ def simulate_losing_leader():
         
         # Wait for match start and map verify
         print("[Leader2] Waiting for match signals...")
-        timeout = 10
+        timeout = TIMEOUT_SECONDS
         start = time.time()
         while time.time() - start < timeout:
             msg = client.get_next_message(timeout=0.5)
@@ -165,7 +169,7 @@ def simulate_losing_leader():
         
         # Wait for partner's win count
         print("[Leader2] Waiting for partner's WIN_COUNT...")
-        timeout = 10
+        timeout = TIMEOUT_SECONDS
         start = time.time()
         while time.time() - start < timeout:
             msg = client.get_next_message(timeout=0.5)

@@ -31,6 +31,11 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 
+# Configuration constants
+DEFAULT_HEARTBEAT_TIMEOUT = 30  # seconds - time before considering a client disconnected
+DEFAULT_STATUS_INTERVAL = 10  # seconds - interval for printing status updates
+
+
 class SignalType(Enum):
     """Signal types for bot communication."""
     READY_TO_QUEUE = 1.0
@@ -64,10 +69,14 @@ class BotState:
 class CommandCenter:
     """Central command center for coordinating Codex Arena bots."""
     
-    def __init__(self, host='127.0.0.1', port=12345, buffer_size=4096):
+    def __init__(self, host='127.0.0.1', port=12345, buffer_size=4096, 
+                 heartbeat_timeout=DEFAULT_HEARTBEAT_TIMEOUT, 
+                 status_interval=DEFAULT_STATUS_INTERVAL):
         self.host = host
         self.port = port
         self.buffer_size = buffer_size
+        self.heartbeat_timeout = heartbeat_timeout
+        self.status_interval = status_interval
         self.server_socket: Optional[socket.socket] = None
         self.running = False
         self.lock = threading.Lock()
@@ -286,7 +295,7 @@ class CommandCenter:
             
             with self.lock:
                 for client_id, (_, _, bot_state) in self.clients.items():
-                    if current_time - bot_state.last_heartbeat > 30:  # 30 second timeout
+                    if current_time - bot_state.last_heartbeat > self.heartbeat_timeout:
                         stale_clients.append(client_id)
                         
             for client_id in stale_clients:
@@ -303,7 +312,7 @@ class CommandCenter:
     def print_status(self):
         """Print current status of all connected bots."""
         while self.running:
-            time.sleep(10)  # Print status every 10 seconds
+            time.sleep(self.status_interval)
             
             with self.lock:
                 if not self.clients:

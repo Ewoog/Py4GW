@@ -20,14 +20,23 @@ from typing import Optional, Dict, Callable
 from queue import Queue, Empty
 
 
+# Configuration constants
+DEFAULT_HEARTBEAT_INTERVAL = 5  # seconds - interval between heartbeat messages
+DEFAULT_REGISTRATION_TIMEOUT = 5.0  # seconds - timeout for registration
+
+
 class SocketClient:
     """Socket client for communicating with the Command Center."""
     
-    def __init__(self, bot_id: str, is_winning_team: bool, host='127.0.0.1', port=12345):
+    def __init__(self, bot_id: str, is_winning_team: bool, host='127.0.0.1', port=12345,
+                 heartbeat_interval=DEFAULT_HEARTBEAT_INTERVAL,
+                 registration_timeout=DEFAULT_REGISTRATION_TIMEOUT):
         self.bot_id = bot_id
         self.is_winning_team = is_winning_team
         self.host = host
         self.port = port
+        self.heartbeat_interval = heartbeat_interval
+        self.registration_timeout = registration_timeout
         self.socket: Optional[socket.socket] = None
         self.connected = False
         self.running = False
@@ -69,7 +78,7 @@ class SocketClient:
             })
             
             # Wait for registration acknowledgment
-            self.socket.settimeout(5.0)
+            self.socket.settimeout(self.registration_timeout)
             data = self.socket.recv(4096)
             response = json.loads(data.decode())
             
@@ -189,7 +198,7 @@ class SocketClient:
     def _heartbeat_loop(self):
         """Send periodic heartbeats to keep connection alive."""
         while self.running and self.connected:
-            time.sleep(5)  # Send heartbeat every 5 seconds
+            time.sleep(self.heartbeat_interval)
             self.send_message({'type': 'HEARTBEAT'})
 
 
