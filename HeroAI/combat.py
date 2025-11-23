@@ -1431,31 +1431,46 @@ class CombatClass:
        
         slot = self.skill_pointer
         skill_id = self.skills[slot].skill_id
+        skill_name = GLOBAL_CACHE.Skill.GetName(skill_id)
+        
+        # Debug logging for Auspicious Incantation
+        if skill_id == self.auspicious_incantation:
+            Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Evaluating Auspicious Incantation at slot {slot}", Py4GW.Console.MessageType.Info)
         
         is_skill_ready = self.IsSkillReady(slot)
             
         if not is_skill_ready:
+            if skill_id == self.auspicious_incantation:
+                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious failed IsSkillReady check", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
         
         is_ooc_skill = self.IsOOCSkill(slot)
 
         if ooc and not is_ooc_skill:
+            if skill_id == self.auspicious_incantation:
+                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious failed OOC check (ooc={ooc}, is_ooc_skill={is_ooc_skill})", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
          
         is_read_to_cast, target_agent_id = self.IsReadyToCast(slot)
  
         if not is_read_to_cast:
+            if skill_id == self.auspicious_incantation:
+                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious failed IsReadyToCast check", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
         
 
         if target_agent_id == 0:
+            if skill_id == self.auspicious_incantation:
+                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious has no target (target_agent_id=0)", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
 
         if not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
+            if skill_id == self.auspicious_incantation:
+                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious target not living (target_agent_id={target_agent_id})", Py4GW.Console.MessageType.Warning)
             return False
         
         # Special check for Arcane Echo: ensure target spell is ready
