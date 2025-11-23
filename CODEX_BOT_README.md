@@ -21,6 +21,7 @@ The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins
 - **Payback Mode**: Losing team equips Set 1 and enables HeroAI when desync detected
 - **Resign Mode**: Winning team returns to outpost with Set 2 when desync detected
 - **Critical Win Equipment Switch**: When winning team is at 4/5 wins, losing team automatically switches to Equipment Set 1 for 40 seconds, then switches back to Equipment Set 2
+- **Command Center** (Optional): External socket-based coordination system for monitoring and multi-machine setups (see [COMMAND_CENTER_README.md](COMMAND_CENTER_README.md))
 
 ## Requirements
 
@@ -306,6 +307,56 @@ Adjust how long the winning team waits in a match:
 yield from Routines.Yield.wait(30000)  # 30 seconds, increase if needed
 ```
 
+## Command Center (Optional)
+
+The Codex Arena Bot now supports an optional external Command Center for enhanced monitoring and coordination. This is particularly useful for:
+
+- **Multi-machine setups**: Run Leaders on different computers
+- **Enhanced monitoring**: See real-time status of all bots in one place
+- **Better debugging**: Full communication logs and diagnostics
+- **Remote operation**: Monitor bots from another location
+
+### Quick Start
+
+1. **Start the Command Center** (in a separate terminal):
+   ```bash
+   python codex_command_center.py
+   ```
+
+2. **Optionally integrate with bots**: The bot works perfectly with the existing shared memory system. Socket integration is optional and provides additional monitoring capabilities.
+
+3. **View monitoring output**: The Command Center displays:
+   - Connection status of Leaders
+   - Real-time message routing
+   - Bot states (wins, strongboxes, map IDs)
+   - Periodic status summaries
+
+For complete documentation, see [COMMAND_CENTER_README.md](COMMAND_CENTER_README.md).
+
+### Command Center Features
+
+- Centralized hub for leader-to-leader communication
+- Real-time monitoring of bot states
+- Message routing and synchronization
+- Event logging (saved to `codex_command_center.log`)
+- Heartbeat monitoring to detect disconnections
+- Support for same-machine or multi-machine setups
+
+### When to Use Command Center
+
+- **Development/Testing**: Great for visibility during bot development
+- **Multi-Machine**: Required if running Leaders on different computers
+- **Debugging**: Helpful for diagnosing synchronization issues
+- **Production**: Optional, provides enhanced monitoring
+
+### Integration
+
+The Command Center is designed as a **non-breaking addition**:
+- Works standalone without modifying the bot
+- Bot continues to use shared memory (ShMem) by default
+- Optional socket integration available (see `codex_socket_integration_example.py`)
+- Can run both systems simultaneously for redundancy
+
 ## Safety Notes
 
 - This bot is for educational purposes
@@ -319,9 +370,15 @@ For issues or questions:
 1. Check the Py4GW documentation
 2. Review console logs for error messages
 3. Ensure all dependencies are properly installed
+4. For Command Center issues, see [COMMAND_CENTER_README.md](COMMAND_CENTER_README.md)
 
 ## Version History
 
+- **1.1.0**: Added Command Center support
+  - External socket-based coordination system
+  - Real-time monitoring and logging
+  - Multi-machine support
+  - Optional socket client integration
 - **1.0.0**: Initial release with basic Codex Arena automation
   - Multibox synchronization
   - Equipment set switching
