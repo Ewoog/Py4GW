@@ -130,7 +130,7 @@ def main():
         if selected_account_index[0] >= len(target_accounts):
             selected_account_index[0] = 0
         
-        changed, selected_account_index[0] = PyImGui.combo(
+        selected_account_index[0] = PyImGui.combo(
             "##account", 
             selected_account_index[0], 
             account_names
@@ -146,7 +146,7 @@ def main():
         if selected_key_index[0] >= len(COMMON_KEYS):
             selected_key_index[0] = 0
         
-        changed, selected_key_index[0] = PyImGui.combo(
+        selected_key_index[0] = PyImGui.combo(
             "##key",
             selected_key_index[0],
             key_names
@@ -156,7 +156,7 @@ def main():
         
         # Repetition count
         PyImGui.text("Repetitions:")
-        changed, repetition_count[0] = PyImGui.slider_int(
+        repetition_count[0] = PyImGui.slider_int(
             "##reps",
             repetition_count[0],
             1,
