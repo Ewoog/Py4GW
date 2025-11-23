@@ -186,12 +186,14 @@ def send_equipment_set_key(sender_email: str, receiver_email: str, equipment_set
     send_function_key(sender_email, receiver_email, equipment_set)
 
 
-# Export all key codes from the Key enum for advanced usage
+# Export public API
+# Note: Key enum is re-exported here for convenience so users can import it from this module
+# rather than from Py4GWCoreLib.enums_src.IO_enums
 __all__ = [
     'CommonKeys',
     'send_keypress',
     'send_keypress_to_all',
     'send_function_key',
     'send_equipment_set_key',
-    'Key',  # Re-export for advanced usage
+    'Key',  # Re-exported from IO_enums for convenience
 ]
