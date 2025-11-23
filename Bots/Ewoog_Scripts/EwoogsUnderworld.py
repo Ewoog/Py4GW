@@ -17,62 +17,33 @@ bot = Botting("Ewoog's Underworld",
 
 
 def create_bot_routine(bot: Botting) -> None:
-    condition = lambda: OnPartyWipe(bot)
-    bot.Events.OnPartyWipeCallback(condition)
     Chantry_of_Secrets(bot)
     Underworld(bot)
 
 
 def Chantry_of_Secrets(bot: Botting) -> None:
     bot.States.AddHeader("CHANTRY_OF_SECRETS")
-    bot.Templates.Multibox_Aggressive()
     bot.Templates.Routines.PrepareForFarm(map_id_to_travel=CHANTRY_OF_SECRETS)
     bot.Party.SetHardMode(False)
     bot.Move.XY(-8936.83, 3576.26, "go to Statue of Grenth")
     bot.States.AddCustomState(lambda: GLOBAL_CACHE.Player.SendChatCommand("kneel"), "kneel")
-    bot.Wait.ForTime(6_000)
+    bot.Wait.ForTime(6000)
     bot.Move.XYAndDialog(-8936.00, 3866.00, 0x85, "ask to enter")
-    bot.Move.XYAndDialog(-8936.00, 3866.00, 0x86, "accept to enter")
-    bot.Wait.ForMapLoad(target_map_id=UNDERWORLD) # we are in the dungeon
-    bot.Wait.ForTime(5_000)
+    bot.Wait.ForMapToChange(72) # we are in the dungeon
+    bot.Wait.ForTime(10000)
 
 def Underworld(bot: Botting) -> None:
     bot.States.AddHeader("UNDERWORLD")
+    bot.Templates.Multibox_Aggressive()
+    #bot.States.AddManagedCoroutine("Upkeep Multibox Consumables", lambda: _upkeep_multibox_consumables(bot))
+    bot.Move.XYAndDialog(281.00, 7229.00, 0x806501)
     bot.Move.FollowAutoPath(UNDERWORLD_PATH, "Kill Route")
     bot.Wait.UntilOutOfCombat()
+    #bot.States.RemoveManagedCoroutine("Upkeep Multibox Consumables")
     bot.Multibox.ResignParty()
     bot.Wait.UntilOnOutpost()
     bot.Wait.ForTime(20000)
     bot.States.JumpToStepName("[H]CHANTRY_OF_SECRETS_1")
-
-
-def _on_party_wipe(bot: "Botting"):
-    global party_wiped
-    party_wiped = True
-    while GLOBAL_CACHE.Agent.IsDead(GLOBAL_CACHE.Player.GetAgentID()):
-        yield from bot.Wait._coro_for_time(1000)
-        if not Routines.Checks.Map.MapValid():
-            # Map invalid - release FSM and exit
-            bot.config.FSM.resume()
-            return
-
-    # Player revived on same map - jump to recovery step
-    print("Player revived, jumping to recovery step")
-    bot.config.FSM.pause()
-    yield
-    bot.config.FSM.jump_to_state_by_name("[H]Start Combat_3")
-    yield
-    bot.config.FSM.resume()
-    yield
-    # bot.States.JumpToStepName("[H]Start Combat_3")
-    # bot.config.FSM.resume()
-
-
-def OnPartyWipe(bot: "Botting"):
-    fsm = bot.config.FSM
-    fsm.pause()
-    fsm.AddManagedCoroutine("OnWipe_OPD", lambda: _on_party_wipe(bot))
-
 
 bot.SetMainRoutine(create_bot_routine)
 
