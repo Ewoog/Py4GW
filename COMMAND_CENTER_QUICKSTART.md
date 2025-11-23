@@ -4,21 +4,26 @@ This guide will help you get started with the Command Center in 5 minutes.
 
 ## What is the Command Center?
 
-The Command Center is an optional external monitoring and coordination system for the Codex Arena Bot. It provides:
+The Command Center is an optional external coordination and monitoring system for the Codex Arena Bot. It provides:
 
-- Real-time visibility into bot states
-- Message routing between Leaders
-- Complete communication logs
-- Support for multi-machine setups
+- **Intelligent Coordination**: Actively coordinates queue timing and verifies map synchronization
+- **Automatic Desync Detection**: Detects when leaders are in different matches and commands resign
+- **Web GUI**: Beautiful interface with manual control buttons
+- **Real-time Monitoring**: Live bot status, wins, strongboxes, match states
+- **Manual Commands**: Force resign, switch teams, force queue via GUI
+- **Complete Logs**: All coordination decisions and commands logged
+- **Multi-machine Support**: Run Leaders on different computers
 
 ## Do I Need It?
 
 **No, it's completely optional!** The Codex Arena Bot works perfectly with its built-in shared memory system. Use the Command Center if you want:
 
+- Intelligent coordination (CC decides when to queue and verifies maps)
+- Automatic desync detection and resolution
+- Manual control via beautiful web GUI
 - Better monitoring and debugging
 - To run Leaders on different computers
 - Enhanced visibility during development
-- Complete communication logs
 
 ## Quick Start (5 Minutes)
 
@@ -37,13 +42,29 @@ INFO - Waiting for Leader bots to connect...
 INFO - Command Center is running. Press Ctrl+C to stop.
 ```
 
-**That's it!** The Command Center is now running and ready to monitor your bots.
+**That's it!** The Command Center is now running and ready to coordinate your bots.
 
-### Step 2: Start Your Codex Bots (Normal Operation)
+### Step 2: (Optional) Start the Web GUI
+
+For manual control and beautiful visual monitoring, open a second terminal:
+
+```bash
+python codex_command_center_gui.py
+```
+
+Then open your browser to: **http://localhost:5000**
+
+You'll see a fancy dashboard with:
+- 📊 Real-time bot status display
+- 🎮 Manual control buttons (Resign, Switch Teams, Force Queue)
+- 📜 Command history log
+- 🟢 Live connection status
+
+### Step 3: Start Your Codex Bots (Normal Operation)
 
 The bots work normally with shared memory. The Command Center is ready if you want to integrate socket mode later.
 
-### Step 3 (Optional): Test the System
+### Step 4 (Optional): Test the System
 
 If you want to see the Command Center in action:
 
