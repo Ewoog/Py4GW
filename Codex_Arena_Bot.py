@@ -314,6 +314,20 @@ def check_sync_signal() -> tuple[str, int]:
             else:
                 # Not a MAP_VERIFY message - could be old MATCH_START/MATCH_END from before first_queue_completed
                 # Mark it as finished to clear it from the queue and continue processing
+                signal_type_name = "UNKNOWN"
+                if len(msg.Params) >= 1:
+                    if msg.Params[0] == SIGNAL_READY_TO_QUEUE:
+                        signal_type_name = "READY_TO_QUEUE"
+                    elif msg.Params[0] == SIGNAL_QUEUE_NOW:
+                        signal_type_name = "QUEUE_NOW"
+                    elif msg.Params[0] == SIGNAL_MATCH_START:
+                        signal_type_name = "MATCH_START"
+                    elif msg.Params[0] == SIGNAL_MATCH_END:
+                        signal_type_name = "MATCH_END"
+                
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Clearing old {signal_type_name} message from queue", 
+                                Py4GW.Console.MessageType.Info)
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
                 # Continue to next message instead of breaking
         
