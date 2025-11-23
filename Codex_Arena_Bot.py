@@ -550,7 +550,7 @@ def equip_set(set_number: int) -> Generator:
     elif set_number == 2:
         key_code = Key.F2.value  # F2 = 0x71
     else:
-        Py4GW.Console.Log(BOT_NAME, f"Invalid equipment set number: {set_number}", 
+        Py4GW.Console.Log(BOT_NAME, f"Invalid equipment set number: {set_number}",
                          Py4GW.Console.MessageType.Warning)
         yield
         return
