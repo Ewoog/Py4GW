@@ -538,9 +538,22 @@ def invite_party_members() -> Generator:
 
 
 def equip_set(set_number: int) -> Generator:
-    """Equip the specified equipment set (1 or 2)."""
+    """Equip the specified equipment set (1 or 2) by pressing F1 or F2."""
     from Py4GWCoreLib.Routines import Routines
-    yield from Routines.Yield.Keybinds.ActivateWeaponSet(set_number)
+    from Py4GWCoreLib.Py4GWcorelib import Keystroke
+    
+    # Press F1 (0x70) for set 1, F2 (0x71) for set 2
+    if set_number == 1:
+        key_code = 0x70  # F1
+    elif set_number == 2:
+        key_code = 0x71  # F2
+    else:
+        Py4GW.Console.Log(BOT_NAME, f"Invalid equipment set number: {set_number}", 
+                         Py4GW.Console.MessageType.Warning)
+        yield
+        return
+    
+    Keystroke.PressAndRelease(key_code)
     yield from Routines.Yield.wait(500)
 
 
