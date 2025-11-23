@@ -44,21 +44,28 @@ INFO - Command Center is running. Press Ctrl+C to stop.
 
 **That's it!** The Command Center is now running and ready to coordinate your bots.
 
-### Step 2: (Optional) Start the Web GUI
+### Step 2: (Optional) Start the GUI
 
-For manual control and beautiful visual monitoring, open a second terminal:
+For manual control and visual monitoring, open a second terminal:
 
+**Option A - Tkinter GUI (Recommended - No dependencies):**
 ```bash
-python codex_command_center_gui.py
+python codex_command_center_gui_tk.py
 ```
 
-Then open your browser to: **http://localhost:5000**
+**Option B - Web GUI (Requires Flask):**
+```bash
+pip install flask  # Install Flask if needed
+python codex_command_center_gui.py
+# Then open browser to http://localhost:5000
+```
 
-You'll see a fancy dashboard with:
+The Tkinter GUI provides:
 - 📊 Real-time bot status display
 - 🎮 Manual control buttons (Resign, Switch Teams, Force Queue)
 - 📜 Command history log
 - 🟢 Live connection status
+- Works without any external dependencies!
 
 ### Step 3: Start Your Codex Bots (Normal Operation)
 
