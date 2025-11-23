@@ -7,26 +7,26 @@ It supports multiboxing with two teams of 4 players each:
 - Losing team (Equipment Set 2)
 
 Features:
-- Teams queue simultaneously using shared memory synchronization OR Command Center
+- Teams queue simultaneously using Command Center socket coordination
 - Winning team plays to win, losing team returns to outpost after match
 - Tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins)
 - Shuts down after earning 5 strongboxes (daily limit)
 - Aggressive Mode: When enabled, winning team rushes enemy spawn on all maps
-- Command Center Mode (NEW): Optional socket-based coordination for multi-machine setups
+- Command Center: Required for bot coordination - runs external coordinator
 
 Setup:
-1. Run this script on the leader of each team (8 accounts total, 2 instances)
-2. Manually invite team members to each party (4 per team)
-3. Toggle "Is Winning Team" in the GUI appropriately for each instance
-4. Optionally toggle "Use Command Center" for socket-based coordination
+1. Start Command Center: python codex_command_center_with_gui.py --gui
+2. Run this script on the leader of each team (8 accounts total, 2 instances)
+3. Manually invite team members to each party (4 per team)
+4. Toggle "Is Winning Team" in the GUI appropriately for each instance
 5. Optionally enable "Aggressive Mode" to rush enemy spawn on all maps
 6. Set up Equipment Set 1 for winning builds, Set 2 for losing builds
-7. Start both bots - they will synchronize and queue together
+7. Start both bots - they will auto-connect to Command Center and synchronize
 
 Requirements:
+- Command Center must be running (codex_command_center_with_gui.py)
 - Both team leaders must be in Codex Arena outpost
 - Equipment sets must be configured beforehand
-- Multiboxing must be enabled with shared memory (or Command Center running)
 """
 
 from Py4GWCoreLib import *
@@ -187,8 +187,7 @@ class CodexConfig:
         # Leader/Support mode
         self.is_leader = True  # Toggle: True = leader (main bot), False = support script
         
-        # Command Center / Socket Mode (NEW)
-        self.use_socket_mode = False  # Toggle: Enable socket-based coordination
+        # Command Center / Socket Mode (Always Enabled)
         self.command_center_host = "127.0.0.1"  # Command Center address
         self.command_center_port = 12345  # Command Center port
         self.socket_bot_id = "Leader"  # Bot ID for socket mode
@@ -289,155 +288,43 @@ def get_available_accounts_with_names() -> list:
 
 
 def send_sync_signal(signal_type: str, param1: float = 0.0):
-    """Send synchronization signal to other accounts.
-    Supports both shared memory and socket communication modes.
-    Only sends signals during initial bot startup and first queue entry."""
+def send_sync_signal(signal_type: str, param1: float = 0.0):
+    """Send synchronization signal via Command Center socket.
+    Command Center handles all coordination logic."""
     
-    # If socket mode is enabled and connected, use socket
-    if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
-        # For socket mode, send directly without checking first_queue_completed
-        # The Command Center handles coordination logic
-        try:
-            send_sync_signal_socket(signal_type, param1)
-        except Exception as e:
-            Py4GW.Console.Log(BOT_NAME, f"Failed to send socket signal: {e}", Py4GW.Console.MessageType.Warning)
+    if not SOCKET_MODE_AVAILABLE:
+        Py4GW.Console.Log(BOT_NAME, "Socket mode not available - codex_socket_client.py not found", 
+                         Py4GW.Console.MessageType.Error)
         return
     
-    # Otherwise, use existing ShMem code
-    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
-    my_email = get_my_email()
-    
-    # Only send if partner email is configured and not empty/whitespace
-    if not config.partner_email or not config.partner_email.strip():
+    if not is_socket_mode_enabled():
+        Py4GW.Console.Log(BOT_NAME, "Not connected to Command Center - cannot send signal", 
+                         Py4GW.Console.MessageType.Warning)
         return
     
-    # Only send sync messages if first queue has not been completed
-    # This prevents message stacking after the initial synchronization
-    # Exception: Always allow WIN_COUNT signals to be sent
-    if config.first_queue_completed and signal_type not in ["MAP_VERIFY", "WIN_COUNT"]:
-        return
-    
-    # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END", "MAP_VERIFY", "WIN_COUNT"
-    signal_value = 0.0
-    if signal_type == "READY_TO_QUEUE":
-        signal_value = SIGNAL_READY_TO_QUEUE
-    elif signal_type == "QUEUE_NOW":
-        signal_value = SIGNAL_QUEUE_NOW
-    elif signal_type == "MATCH_START":
-        signal_value = SIGNAL_MATCH_START
-    elif signal_type == "MATCH_END":
-        signal_value = SIGNAL_MATCH_END
-    elif signal_type == "MAP_VERIFY":
-        signal_value = SIGNAL_MAP_VERIFY
-    elif signal_type == "WIN_COUNT":
-        signal_value = SIGNAL_WIN_COUNT
-    
-    params = (signal_value, param1, 0.0, 0.0)
-    
-    # Send only to the configured partner account
     try:
-        GLOBAL_CACHE.ShMem.SendMessage(my_email, config.partner_email.strip(), SYNC_QUEUE_COMMAND, params)
+        send_sync_signal_socket(signal_type, param1)
     except Exception as e:
-        Py4GW.Console.Log(BOT_NAME, f"Failed to send sync signal: {e}", Py4GW.Console.MessageType.Warning)
+        Py4GW.Console.Log(BOT_NAME, f"Failed to send signal to Command Center: {e}", 
+                         Py4GW.Console.MessageType.Warning)
 
 
 def check_sync_signal() -> tuple[str, int]:
-    """Check for synchronization signals from other accounts.
-    Supports both shared memory and socket communication modes.
-    Only processes signals during initial bot startup and first queue entry.
+    """Check for synchronization signals from Command Center.
     Returns tuple of (signal_type, param_value) where param_value can be map_id or win_count."""
     
-    # If socket mode is enabled and connected, use socket
-    if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
-        try:
-            return check_sync_signal_socket()
-        except Exception as e:
-            Py4GW.Console.Log(BOT_NAME, f"Failed to check socket signal: {e}", Py4GW.Console.MessageType.Warning)
-            return ("", 0)
-    
-    # Otherwise, use existing ShMem code
-    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
-    my_email = get_my_email()
-    
-    # Only check for sync messages if first queue has not been completed
-    if config.first_queue_completed:
-        # Still check for MAP_VERIFY and WIN_COUNT messages, but consume ALL of them
-        # and only return the most recent one to prevent message stacking
-        latest_map_id = 0
-        latest_win_count = 0
-        found_map_verify = False
-        found_win_count = False
-        messages_cleared = 0
-        max_iterations = 100  # Safety limit to prevent infinite loops
-        
-        # Process all pending MAP_VERIFY and WIN_COUNT messages
-        for _ in range(max_iterations):
-            msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
-            
-            if not msg or msg.Command != SYNC_QUEUE_COMMAND:
-                break
-            
-            # Check bounds before accessing params - need at least 2 params
-            if len(msg.Params) >= 2 and msg.Params[0] == SIGNAL_MAP_VERIFY:
-                latest_map_id = int(msg.Params[1])
-                found_map_verify = True
-                messages_cleared += 1
-                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-            elif len(msg.Params) >= 2 and msg.Params[0] == SIGNAL_WIN_COUNT:
-                latest_win_count = int(msg.Params[1])
-                found_win_count = True
-                messages_cleared += 1
-                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-            else:
-                # Not a MAP_VERIFY or WIN_COUNT message - could be old MATCH_START/MATCH_END from before first_queue_completed
-                # Mark it as finished to clear it from the queue and continue processing
-                signal_type_name = get_signal_type_name(msg.Params[0]) if len(msg.Params) >= 1 else "UNKNOWN"
-                
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Clearing old {signal_type_name} message from queue", 
-                                Py4GW.Console.MessageType.Info)
-                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-                # Continue to next message instead of breaking
-        
-        # Prioritize WIN_COUNT over MAP_VERIFY if both are present
-        if found_win_count:
-            if messages_cleared > 1:
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Cleared {messages_cleared} stacked messages, using latest win count: {latest_win_count}", 
-                                Py4GW.Console.MessageType.Info)
-            return ("WIN_COUNT", latest_win_count)
-        elif found_map_verify:
-            if messages_cleared > 1:
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Cleared {messages_cleared} stacked MAP_VERIFY messages, using latest map ID: {latest_map_id}", 
-                                Py4GW.Console.MessageType.Info)
-            return ("MAP_VERIFY", latest_map_id)
-        
+    if not SOCKET_MODE_AVAILABLE:
         return ("", 0)
     
-    # Check for next message
-    msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
+    if not is_socket_mode_enabled():
+        return ("", 0)
     
-    if msg and msg.Command == SYNC_QUEUE_COMMAND:
-        signal_type = ""
-        param_value = 0
-        
-        # Check bounds before accessing params
-        if len(msg.Params) == 0:
-            return ("", 0)
-        
-        signal_type = get_signal_type_name(msg.Params[0])
-        
-        # Get param_value if this is a MAP_VERIFY or WIN_COUNT signal
-        if (msg.Params[0] == SIGNAL_MAP_VERIFY or msg.Params[0] == SIGNAL_WIN_COUNT) and len(msg.Params) > 1:
-            param_value = int(msg.Params[1])
-        
-        # Mark message as finished
-        if signal_type and signal_type != "UNKNOWN":
-            GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-            return (signal_type, param_value)
-    
-    return ("", 0)
+    try:
+        return check_sync_signal_socket()
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Failed to check Command Center signals: {e}", 
+                         Py4GW.Console.MessageType.Warning)
+        return ("", 0)
 
 
 def send_message_to_party(command_type: str, param1: float = 0.0):
@@ -861,8 +748,8 @@ def winning_team_logic(bot: Botting) -> Generator:
                         f"Sent win count ({config.consecutive_wins}) to partner team", 
                         Py4GW.Console.MessageType.Info)
         
-        # Also update Command Center with current state (if socket mode)
-        if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+        # Also update Command Center with current state
+        if SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
             try:
                 from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
                 update_bot_state_socket(
@@ -1040,8 +927,8 @@ def losing_team_logic(bot: Botting) -> Generator:
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Party
     
-    # Update Command Center with current state (if socket mode)
-    if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+    # Update Command Center with current state
+    if SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
         try:
             update_bot_state_socket(
                 consecutive_wins=config.consecutive_wins,
@@ -1473,6 +1360,29 @@ def run_codex_match(bot: Botting) -> None:
 
 def create_bot_routine(bot: Botting) -> None:
     """Setup the bot routine."""
+    
+    # Auto-connect to Command Center on startup
+    if SOCKET_MODE_AVAILABLE:
+        bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"
+        Py4GW.Console.Log(BOT_NAME, 
+                         f"Connecting to Command Center at {config.command_center_host}:{config.command_center_port}...",
+                         Py4GW.Console.MessageType.Info)
+        
+        if enable_socket_mode(bot_id, config.is_winning_team, 
+                            config.command_center_host, config.command_center_port):
+            Py4GW.Console.Log(BOT_NAME, "Successfully connected to Command Center!", 
+                             Py4GW.Console.MessageType.Success)
+        else:
+            Py4GW.Console.Log(BOT_NAME, "Failed to connect to Command Center. Bot requires Command Center to run!", 
+                             Py4GW.Console.MessageType.Error)
+            Py4GW.Console.Log(BOT_NAME, "Start Command Center with: python codex_command_center_with_gui.py --gui", 
+                             Py4GW.Console.MessageType.Info)
+    else:
+        Py4GW.Console.Log(BOT_NAME, "Socket mode not available - codex_socket_client.py not found!", 
+                         Py4GW.Console.MessageType.Error)
+        Py4GW.Console.Log(BOT_NAME, "Bot requires Command Center to run!", 
+                         Py4GW.Console.MessageType.Error)
+    
     bot.States.AddHeader(f"{BOT_NAME}")
     # Add the match loop - it will keep repeating until bot is stopped
     for _ in range(100):  # Run up to 100 matches (more than enough for 10 strongboxes)
@@ -1594,29 +1504,11 @@ def _draw_settings():
             Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
                             Py4GW.Console.MessageType.Info)
         
-        # Command Center Mode toggle
-        if SOCKET_MODE_AVAILABLE:
-            new_socket = PyImGui.checkbox("Use Command Center", config.use_socket_mode)
-            if new_socket != config.use_socket_mode:
-                config.use_socket_mode = new_socket
-                if config.use_socket_mode:
-                    # Attempt to enable socket mode
-                    bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"
-                    if enable_socket_mode(bot_id, config.is_winning_team, 
-                                        config.command_center_host, config.command_center_port):
-                        Py4GW.Console.Log(BOT_NAME, "Command Center mode enabled", 
-                                        Py4GW.Console.MessageType.Info)
-                    else:
-                        config.use_socket_mode = False
-                        Py4GW.Console.Log(BOT_NAME, "Failed to connect to Command Center - falling back to ShMem", 
-                                        Py4GW.Console.MessageType.Warning)
-                else:
-                    disable_socket_mode()
-                    Py4GW.Console.Log(BOT_NAME, "Command Center mode disabled - using ShMem", 
-                                    Py4GW.Console.MessageType.Info)
+        # Command Center connection status (always-on)
+        if SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+            PyImGui.text_colored("Command Center: Connected", (0, 1, 0, 1))
         else:
-            PyImGui.text_colored("Command Center: Not Available", (0.5, 0.5, 0.5, 1))
-            PyImGui.text_wrapped("(codex_socket_client.py not found)")
+            PyImGui.text_colored("Command Center: Not Connected", (1, 0, 0, 1))
         
         PyImGui.separator()
         
