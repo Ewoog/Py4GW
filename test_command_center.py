@@ -95,9 +95,19 @@ def simulate_winning_leader():
     client.send_signal("WIN_COUNT", param1=1.0)
     time.sleep(2)
     
-    print("[Leader1] Disconnecting...")
-    client.disconnect()
-    print("[Leader1] Test complete!")
+    print("[Leader1] Test complete! Staying connected for monitoring...")
+    print("[Leader1] Press Ctrl+C to stop the test and disconnect.")
+    
+    # Keep the leader connected indefinitely
+    try:
+        while True:
+            time.sleep(10)
+            # Periodically update state to show activity
+            client.update_state(consecutive_wins=1, strongboxes_earned=0, in_match=False, current_map_id=796)
+    except KeyboardInterrupt:
+        print("\n[Leader1] Disconnecting...")
+        client.disconnect()
+        print("[Leader1] Disconnected.")
 
 
 def simulate_losing_leader():
@@ -178,11 +188,19 @@ def simulate_losing_leader():
                 print(f"[Leader2] Partner has {partner_wins} consecutive wins!")
                 break
     
-    # Wait a bit longer before disconnecting to ensure Leader1 completes all operations
-    time.sleep(4)
-    print("[Leader2] Disconnecting...")
-    client.disconnect()
-    print("[Leader2] Test complete!")
+    print("[Leader2] Test complete! Staying connected for monitoring...")
+    print("[Leader2] Press Ctrl+C to stop the test and disconnect.")
+    
+    # Keep the leader connected indefinitely
+    try:
+        while True:
+            time.sleep(10)
+            # Periodically update state to show activity
+            client.update_state(consecutive_wins=0, strongboxes_earned=0, in_match=False, current_map_id=796)
+    except KeyboardInterrupt:
+        print("\n[Leader2] Disconnecting...")
+        client.disconnect()
+        print("[Leader2] Disconnected.")
 
 
 def main():
@@ -208,14 +226,26 @@ def main():
     leader1_thread.start()
     leader2_thread.start()
     
-    # Wait for both to complete
-    leader1_thread.join()
-    leader2_thread.join()
-    
+    # Keep main thread alive and wait for Ctrl+C
     print("\n" + "=" * 60)
-    print("Test completed successfully!")
+    print("Test running - Both Leaders are connected and active")
     print("=" * 60)
-    print("\nCheck the Command Center output to see the communication log.")
+    print("\nBoth Leaders will stay connected to the Command Center.")
+    print("Watch the Command Center terminal for real-time status updates.")
+    print("\nPress Ctrl+C to stop the test and disconnect both Leaders.")
+    
+    try:
+        # Keep main thread alive
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n\n" + "=" * 60)
+        print("Shutting down test...")
+        print("=" * 60)
+        print("\nWaiting for Leaders to disconnect gracefully...")
+        time.sleep(2)  # Give threads time to handle KeyboardInterrupt
+        print("Test shutdown complete.")
+
 
 
 if __name__ == '__main__':

@@ -53,7 +53,9 @@ If you want to see the Command Center in action:
    python test_command_center.py
    ```
 3. Press Enter when prompted
-4. Watch the Command Center terminal for real-time communication logs!
+4. Watch both terminals - you'll see real-time communication logs!
+5. Both test Leaders will stay connected indefinitely
+6. Press Ctrl+C to stop the test and disconnect
 
 You'll see messages like:
 ```
@@ -61,7 +63,10 @@ INFO - Registered TestLeader1 (Winning team)
 INFO - Registered TestLeader2 (Losing team)  
 INFO - Routing READY_TO_QUEUE from TestLeader1 to TestLeader2
 INFO - Routing MAP_VERIFY from TestLeader1 to TestLeader2
+INFO - Status update from TestLeader1: Wins=1, Boxes=0, InMatch=False
 ```
+
+The test Leaders remain connected and send periodic heartbeats and status updates until you press Ctrl+C.
 
 ## What Next?
 
