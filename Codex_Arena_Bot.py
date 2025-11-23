@@ -145,6 +145,7 @@ class CodexConfig:
         self.partner_email_index = 0  # Index for combo box selection
         self.first_match = True  # Track if this is the first match (for losing team immediate requeue)
         self.party_invited = False  # Track if party members have been invited
+        self.needs_queue_sync = False  # Track if queue sync is needed (e.g., after desync)
         self.aggressive_mode = False  # Toggle: When enabled, winning team moves to enemy spawn
         self.first_queue_completed = False  # Track if initial queue synchronization is complete
         
@@ -1201,7 +1202,8 @@ def run_codex_match(bot: Botting) -> None:
         
         # Synchronization phase: wait for both teams to be ready
         # Losing team skips synchronization after first match for immediate requeue
-        skip_sync = not config.is_winning_team and not config.first_match
+        # Force sync if needs_queue_sync is True (e.g., after desync)
+        skip_sync = not config.is_winning_team and not config.first_match and not config.needs_queue_sync
         
         if not skip_sync:
             config.ready_to_queue = True
@@ -1228,6 +1230,9 @@ def run_codex_match(bot: Botting) -> None:
             
             # Brief sync delay to ensure both are ready
             yield from Routines.Yield.wait(1000)
+            
+            # Clear needs_queue_sync flag after syncing
+            config.needs_queue_sync = False
         else:
             Py4GW.Console.Log(BOT_NAME, "Losing team re-entering queue immediately (no sync wait)...", 
                             Py4GW.Console.MessageType.Info)
@@ -1260,10 +1265,9 @@ def run_codex_match(bot: Botting) -> None:
             Py4GW.Console.Log(BOT_NAME, "Back at outpost after desync - syncing with partner before re-entering queue...", 
                             Py4GW.Console.MessageType.Info)
             
-            # Force queue sync by setting first_match = True
-            # This forces both teams to sync before re-entering queue
-            # Party members won't be re-invited since party_invited flag is already True
-            config.first_match = True
+            # Force queue sync by setting needs_queue_sync flag
+            # This ensures both teams sync before re-entering queue
+            config.needs_queue_sync = True
             
             return
         
