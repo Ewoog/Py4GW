@@ -298,7 +298,11 @@ def check_sync_signal() -> tuple[str, int]:
         for _ in range(max_iterations):
             msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
             
-            if not msg or msg.Command != SYNC_QUEUE_COMMAND:
+            if not msg:
+                break
+            
+            # Only process SYNC_QUEUE_COMMAND messages
+            if msg.Command != SYNC_QUEUE_COMMAND:
                 break
             
             # Check bounds before accessing params - need at least 2 params
@@ -308,10 +312,10 @@ def check_sync_signal() -> tuple[str, int]:
                 messages_cleared += 1
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
             else:
-                # Not a MAP_VERIFY message, stop processing
-                # Leave non-MAP_VERIFY SYNC_QUEUE_COMMAND messages in the queue
-                # as they may be processed elsewhere
-                break
+                # Not a MAP_VERIFY message - could be old MATCH_START/MATCH_END from before first_queue_completed
+                # Mark it as finished to clear it from the queue and continue processing
+                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
+                # Continue to next message instead of breaking
         
         if found_map_verify:
             if messages_cleared > 1:
