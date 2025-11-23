@@ -256,6 +256,9 @@ class CommandCenter:
                 bot_state.current_map_id = message.get('current_map_id', bot_state.current_map_id)
                 self.logger.info(f"Status update from {sender_id}: Wins={bot_state.consecutive_wins}, Boxes={bot_state.strongboxes_earned}, InMatch={bot_state.in_match}")
                 
+                # Broadcast state update to GUI clients
+                self._broadcast_bot_state_to_gui(sender_id, bot_state)
+                
             elif msg_type == 'READY_TO_QUEUE':
                 # Leader signals they're ready to queue
                 self.handle_ready_to_queue(sender_id)
@@ -380,6 +383,9 @@ class CommandCenter:
                 })
                 
                 self.logger.info(f"{client_id} is now {new_role} team")
+                
+                # Broadcast state update to GUI clients
+                self._broadcast_bot_state_to_gui(client_id, bot_state)
         
         self.logger.info("Team switch complete")
     
@@ -453,8 +459,24 @@ class CommandCenter:
             client_socket.sendall(data)
         except Exception as e:
             self.logger.error(f"Error sending to {client_id}: {e}")
-        except Exception as e:
-            self.logger.error(f"Error sending to {client_id}: {e}")
+    
+    def _broadcast_bot_state_to_gui(self, bot_id: str, bot_state: BotState):
+        """
+        Broadcast bot state update to all GUI clients.
+        Note: This method assumes the caller already holds self.lock!
+        """
+        # Create state update message
+        state_message = {
+            'type': 'BOT_STATE_UPDATE',
+            'bot_id': bot_id,
+            'bot_state': bot_state.to_dict(),
+            'timestamp': time.time()
+        }
+        
+        # Send to all GUI clients
+        for client_id in list(self.clients.keys()):
+            if client_id.startswith('GUI_'):
+                self._send_to_client_unlocked(client_id, state_message)
             
     def broadcast(self, message: Dict, exclude: Optional[str] = None):
         """Broadcast a message to all connected clients."""
