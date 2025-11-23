@@ -292,16 +292,17 @@ def check_sync_signal() -> tuple[str, int]:
         latest_map_id = 0
         found_map_verify = False
         messages_cleared = 0
+        max_iterations = 100  # Safety limit to prevent infinite loops
         
         # Process all pending MAP_VERIFY messages
-        while True:
+        for _ in range(max_iterations):
             msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
             
             if not msg or msg.Command != SYNC_QUEUE_COMMAND:
                 break
             
-            # Check bounds before accessing params
-            if len(msg.Params) > 1 and msg.Params[0] == SIGNAL_MAP_VERIFY:
+            # Check bounds before accessing params - need at least 2 params
+            if len(msg.Params) >= 2 and msg.Params[0] == SIGNAL_MAP_VERIFY:
                 latest_map_id = int(msg.Params[1])
                 found_map_verify = True
                 messages_cleared += 1
