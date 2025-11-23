@@ -915,18 +915,19 @@ Examples:
     )
     
     parser.add_argument(
-        '--gui',
+        '--no-gui',
         action='store_true',
-        help='Launch with graphical interface (default: headless server)'
+        help='Launch without graphical interface (headless server mode)'
     )
     
     args = parser.parse_args()
     
-    if args.gui:
+    # GUI is default - only skip if --no-gui flag is used
+    if not args.no_gui:
         # GUI mode
         if not TKINTER_AVAILABLE:
             print("ERROR: tkinter not available!")
-            print("GUI mode requires tkinter. Install python3-tk or run without --gui flag.")
+            print("GUI mode requires tkinter. Install python3-tk or run with --no-gui flag.")
             return 1
             
         print("=" * 60)

@@ -288,7 +288,6 @@ def get_available_accounts_with_names() -> list:
 
 
 def send_sync_signal(signal_type: str, param1: float = 0.0):
-def send_sync_signal(signal_type: str, param1: float = 0.0):
     """Send synchronization signal via Command Center socket.
     Command Center handles all coordination logic."""
     
