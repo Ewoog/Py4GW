@@ -1516,9 +1516,9 @@ class CombatClass:
                     return False
         
         # Check if this is a target spell for Arcane Echo or Auspicious Incantation
-        # If so, and BOTH Echo AND Auspicious are ready, skip this spell
+        # If so, and the corresponding echo spell is ready, skip this spell to let the echo spell cast first
         # Priority: Auspicious (highest) -> Arcane -> target spell
-        # Allow casting the target spell if at least one of Echo/Auspicious is on cooldown
+        # Allow casting the target spell if the echo spell is on cooldown
         from HeroAI.settings import Settings
         settings = Settings()
         
@@ -1531,17 +1531,13 @@ class CombatClass:
                            skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
                            skill_id != self.arcane_echo)
         
-        # Only skip if the corresponding echo spell(s) are ready
+        # Skip if the corresponding echo spell is ready (let it cast first)
         if is_auspicious_target or is_arcane_target:
             auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
             arcane_ready = Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo)
             
-            # Skip only if both are configured as targets AND both are ready
-            if is_auspicious_target and is_arcane_target and auspicious_ready and arcane_ready:
-                # Both echo spells are ready, let them cast first
-                self.AdvanceSkillPointer()
-                return False
-            elif is_auspicious_target and auspicious_ready:
+            # Check Auspicious first (higher priority)
+            if is_auspicious_target and auspicious_ready:
                 # Auspicious target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
@@ -1549,7 +1545,7 @@ class CombatClass:
                 # Arcane target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
-            # Otherwise, at least one is on cooldown, so allow casting the target spell
+            # Otherwise, the echo spell is on cooldown, so allow casting the target spell
             
         self.in_casting_routine = True
         
