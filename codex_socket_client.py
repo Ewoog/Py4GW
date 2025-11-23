@@ -140,6 +140,7 @@ class SocketClient:
             'param1': param1,
             'timestamp': time.time()
         }
+        self.logger.info(f"Sending {signal_type} signal (param1={param1})")
         return self.send_message(message)
         
     def update_state(self, **kwargs):
