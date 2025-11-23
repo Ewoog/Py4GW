@@ -1009,7 +1009,7 @@ def run_codex_match(bot: Botting) -> None:
         
         # Send messages to party members to equip appropriate set and configure HeroAI at start
         # Note: Losing team disables HeroAI at start to ensure passivity before queue.
-        # Winning team enables HeroAI later when match starts (line 1072) to avoid aggressive behavior in outpost.
+        # Winning team enables HeroAI later when match starts (line 1077) to avoid aggressive behavior in outpost.
         if config.is_leader and config.first_match and config.party_members:
             if config.is_winning_team:
                 send_message_to_party("EQUIP_SET_1")
