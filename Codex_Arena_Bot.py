@@ -1378,7 +1378,7 @@ def run_codex_match(bot: Botting) -> None:
                                     f"Received win count from partner: {win_count}/{TOTAL_WINS_FOR_STRONGBOX}", 
                                     Py4GW.Console.MessageType.Info)
                     break
-                yield from Routines.Yield.wait(500)
+                yield from Routines.Yield.wait(200)  # Check more frequently for better responsiveness
             
             # Disable HeroAI for losing team so they are passive
             send_message_to_party("DISABLE_HEROAI")
