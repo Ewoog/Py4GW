@@ -20,6 +20,7 @@ The bot tracks Strategist's Zaishen Strongboxes earned (1 per 5 consecutive wins
 - **Desync Detection**: GUI displays when teams are in different maps
 - **Payback Mode**: Losing team equips Set 1 and enables HeroAI when desync detected
 - **Resign Mode**: Winning team returns to outpost with Set 2 when desync detected
+- **Critical Win Equipment Switch**: When winning team is at 4/5 wins, losing team automatically switches to Equipment Set 1 for 40 seconds, then switches back to Equipment Set 2
 
 ## Requirements
 
@@ -99,9 +100,30 @@ The bots use Py4GW's shared memory system to communicate:
 2. **Queue Phase**: Once both are ready, they enter the queue simultaneously
 3. **Match Phase**: Leaders track when the match starts and ends
 4. **Map Verification**: Upon entering arena, leaders exchange map IDs to detect desync
-5. **HeroAI Control**: Leaders send commands to party members via Messaging widget
-6. **Repeat**: Process continues until strongbox targets are met
+5. **Win Count Sharing**: Winning team sends their current win count to losing team at start of each match
+6. **HeroAI Control**: Leaders send commands to party members via Messaging widget
+7. **Repeat**: Process continues until strongbox targets are met
    - **Note**: After the first match, the losing team immediately re-enters the queue without waiting for synchronization, allowing for faster cycling
+
+### Critical Win Equipment Switching
+
+When the winning team is at 4/5 consecutive wins (one win away from earning a strongbox):
+
+1. **Winning Team**:
+   - Sends WIN_COUNT signal (value: 4) to the losing team at the start of the match
+   - Proceeds with normal match logic
+
+2. **Losing Team**:
+   - Receives WIN_COUNT signal from winning team
+   - Detects that partner is at 4/5 wins (critical win state)
+   - **Automatically switches to Equipment Set 1** (presses F1)
+   - Sends EQUIP_SET_1 command to all party members
+   - Waits for **40 seconds**
+   - **Switches back to Equipment Set 2** (presses F2)
+   - Sends EQUIP_SET_2 command to all party members
+   - Continues with normal losing team behavior
+
+This feature allows the losing team to temporarily use competitive builds when the winning team is about to earn a strongbox, potentially affecting match dynamics for strategic purposes.
 
 ### Map Verification and Desync Detection
 
@@ -136,6 +158,7 @@ Leaders send commands to party members via **SharedCommandType** messages (handl
 ### Match Logic
 
 **Winning Team:**
+- Sends current win count to partner team at start of each match
 - Enters the match with **HeroAI enabled** for party members
 - **Map Verification**: Checks map ID with partner team
 - **Special Arena Behavior**: In Seabed Arena or Deldrimor Arena, automatically moves to enemy priest location (HeroAI handles combat)
@@ -147,6 +170,8 @@ Leaders send commands to party members via **SharedCommandType** messages (handl
 - Re-queues immediately
 
 **Losing Team:**
+- Receives win count from partner team at match start
+- **Critical Win Detection**: If partner is at 4/5 wins, switches to Equipment Set 1 for 40 seconds, then back to Set 2
 - Enters the match with **HeroAI disabled** for party members (passive play)
 - **Map Verification**: Checks map ID with partner team
 - **Desync Handling**: If Payback Mode is active and desync detected, equips Set 1, enables HeroAI, and goes aggressive
