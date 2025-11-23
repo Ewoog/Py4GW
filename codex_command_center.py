@@ -268,7 +268,8 @@ class CommandCenter:
                 self.logger.warning(f"Unknown message type from {sender_id}: {msg_type}")
     
     def handle_ready_to_queue(self, sender_id: str):
-        """Handle READY_TO_QUEUE signal - coordinate both leaders to queue together."""
+        """Handle READY_TO_QUEUE signal - coordinate both leaders to queue together.
+        Note: This is called from process_message which holds self.lock"""
         self.ready_to_queue.add(sender_id)
         self.logger.info(f"{sender_id} is ready to queue ({len(self.ready_to_queue)}/2 ready)")
         
@@ -276,9 +277,9 @@ class CommandCenter:
         if len(self.ready_to_queue) >= 2:
             self.logger.info("Both leaders ready! Commanding them to queue...")
             
-            # Send QUEUE_NOW command to both leaders
+            # Send QUEUE_NOW command to both leaders (using unlocked version since we hold the lock)
             for client_id in list(self.ready_to_queue):
-                self.send_to_client(client_id, {
+                self._send_to_client_unlocked(client_id, {
                     'type': 'CMD_QUEUE_NOW',
                     'timestamp': time.time()
                 })
@@ -288,7 +289,8 @@ class CommandCenter:
             self.logger.info("QUEUE_NOW commands sent to both leaders")
     
     def handle_map_verify(self, sender_id: str, map_id: int):
-        """Handle MAP_VERIFY signal - verify both leaders are in same match."""
+        """Handle MAP_VERIFY signal - verify both leaders are in same match.
+        Note: This is called from process_message which holds self.lock"""
         self.map_verifications[sender_id] = map_id
         self.logger.info(f"{sender_id} is on map {map_id} ({len(self.map_verifications)}/2 verified)")
         
@@ -303,7 +305,7 @@ class CommandCenter:
                 self.logger.info(f"✓ Maps match (ID: {map1})! Confirming to both leaders...")
                 
                 for client_id in list(self.map_verifications.keys()):
-                    self.send_to_client(client_id, {
+                    self._send_to_client_unlocked(client_id, {
                         'type': 'CMD_MATCH_CONFIRMED',
                         'map_id': map1,
                         'timestamp': time.time()
@@ -315,7 +317,7 @@ class CommandCenter:
                 self.logger.warning("Commanding both leaders to resign...")
                 
                 for client_id in list(self.map_verifications.keys()):
-                    self.send_to_client(client_id, {
+                    self._send_to_client_unlocked(client_id, {
                         'type': 'CMD_RESIGN',
                         'reason': 'desync',
                         'map_ids': [map1, map2],
@@ -410,6 +412,20 @@ class CommandCenter:
                 
             client_socket, _, _ = self.clients[client_id]
             
+        try:
+            data = json.dumps(message).encode()
+            client_socket.sendall(data)
+        except Exception as e:
+            self.logger.error(f"Error sending to {client_id}: {e}")
+    
+    def _send_to_client_unlocked(self, client_id: str, message: Dict):
+        """Send a message to a specific client (lock must already be held)."""
+        if client_id not in self.clients:
+            self.logger.warning(f"Cannot send to {client_id}: not connected")
+            return
+            
+        client_socket, _, _ = self.clients[client_id]
+        
         try:
             data = json.dumps(message).encode()
             client_socket.sendall(data)
