@@ -1516,7 +1516,7 @@ class CombatClass:
                     return False
         
         # Check if this is a target spell for Arcane Echo or Auspicious Incantation
-        # If so, and BOTH Echo AND Auspicious spells are available, skip this spell
+        # If so, and BOTH Echo AND Auspicious are ready, skip this spell
         # Priority: Auspicious (highest) -> Arcane -> target spell
         # Allow casting the target spell if at least one of Echo/Auspicious is on cooldown
         from HeroAI.settings import Settings
@@ -1531,7 +1531,7 @@ class CombatClass:
                            skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
                            skill_id != self.arcane_echo)
         
-        # Only skip if BOTH are ready (meaning we want the chain to happen)
+        # Only skip if the corresponding echo spell(s) are ready
         if is_auspicious_target or is_arcane_target:
             auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
             arcane_ready = Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo)
@@ -1541,12 +1541,12 @@ class CombatClass:
                 # Both echo spells are ready, let them cast first
                 self.AdvanceSkillPointer()
                 return False
-            elif is_auspicious_target and auspicious_ready and not is_arcane_target:
-                # Only Auspicious target and it's ready, let it cast first
+            elif is_auspicious_target and auspicious_ready:
+                # Auspicious target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
-            elif is_arcane_target and arcane_ready and not is_auspicious_target:
-                # Only Arcane target and it's ready, let it cast first
+            elif is_arcane_target and arcane_ready:
+                # Arcane target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
             # Otherwise, at least one is on cooldown, so allow casting the target spell
