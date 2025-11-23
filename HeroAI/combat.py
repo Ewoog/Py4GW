@@ -1532,20 +1532,22 @@ class CombatClass:
                            skill_id != self.arcane_echo)
         
         # Skip if the corresponding echo spell is ready (let it cast first)
-        if is_auspicious_target or is_arcane_target:
+        # Check Auspicious first (higher priority)
+        if is_auspicious_target:
             auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
-            arcane_ready = Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo)
-            
-            # Check Auspicious first (higher priority)
-            if is_auspicious_target and auspicious_ready:
+            if auspicious_ready:
                 # Auspicious target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
-            elif is_arcane_target and arcane_ready:
+        
+        if is_arcane_target:
+            arcane_ready = Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo)
+            if arcane_ready:
                 # Arcane target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
-            # Otherwise, the echo spell is on cooldown, so allow casting the target spell
+        
+        # Otherwise, the echo spell is on cooldown, so allow casting the target spell
             
         self.in_casting_routine = True
         
