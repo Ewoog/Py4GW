@@ -571,7 +571,7 @@ def UsePcon(index, message):
 
 # region PressKey
 def PressKey(index, message):
-    ConsoleLog(MODULE_NAME, f"Processing PressKey message: {message}", Console.MessageType.Info, False)
+    ConsoleLog(MODULE_NAME, f"Processing PressKey message: {message}", Console.MessageType.Info, True)
     GLOBAL_CACHE.ShMem.MarkMessageAsRunning(message.ReceiverEmail, index)
 
     key_id = int(message.Params[0])
@@ -581,6 +581,8 @@ def PressKey(index, message):
         # Check if this is a ControlAction code (0x80-0xFF range for Guild Wars control actions)
         # Use UIManager for control actions, Keystroke for regular keys
         is_control_action = key_id >= 0x80
+        
+        ConsoleLog(MODULE_NAME, f"PressKey: key_id=0x{key_id:02X}, is_control_action={is_control_action}, repetition={repetition}", Console.MessageType.Info, True)
         
         for _ in range(repetition):
             if is_control_action:
@@ -595,7 +597,7 @@ def PressKey(index, message):
                 yield from Routines.Yield.wait(100)
 
     GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
-    ConsoleLog(MODULE_NAME, "PressKey message processed and finished.", Console.MessageType.Info, False)
+    ConsoleLog(MODULE_NAME, "PressKey message processed and finished.", Console.MessageType.Info, True)
 
 
 # endregion
@@ -795,17 +797,17 @@ def PickUpLoot(index, message):
 
 # region DisableHeroAI / EnableHeroAI
 def MessageDisableHeroAI(index, message):
-    ConsoleLog(MODULE_NAME, f"Processing DisableHeroAI message: {message}", Console.MessageType.Info, False)
+    ConsoleLog(MODULE_NAME, f"Processing DisableHeroAI message: {message}", Console.MessageType.Info, True)
     GLOBAL_CACHE.ShMem.MarkMessageAsRunning(message.ReceiverEmail, index)
     account_email = message.ReceiverEmail
     yield from SnapshotHeroAIOptions(account_email)
     yield from DisableHeroAIOptions(account_email)
     GLOBAL_CACHE.ShMem.MarkMessageAsFinished(account_email, index)
-    ConsoleLog(MODULE_NAME, "DisableHeroAI message processed and finished.", Console.MessageType.Info, False)
+    ConsoleLog(MODULE_NAME, "DisableHeroAI message processed and finished.", Console.MessageType.Info, True)
 
 
 def MessageEnableHeroAI(index, message):
-    ConsoleLog(MODULE_NAME, f"Processing EnableHeroAI message: {message}", Console.MessageType.Info, False)
+    ConsoleLog(MODULE_NAME, f"Processing EnableHeroAI message: {message}", Console.MessageType.Info, True)
     GLOBAL_CACHE.ShMem.MarkMessageAsRunning(message.ReceiverEmail, index)
     account_email = message.ReceiverEmail
     if message.Params[0]:
@@ -813,7 +815,7 @@ def MessageEnableHeroAI(index, message):
     else:
         yield from RestoreHeroAISnapshot(account_email)
     GLOBAL_CACHE.ShMem.MarkMessageAsFinished(account_email, index)
-    ConsoleLog(MODULE_NAME, "EnableHeroAI message processed and finished.", Console.MessageType.Info, False)
+    ConsoleLog(MODULE_NAME, "EnableHeroAI message processed and finished.", Console.MessageType.Info, True)
 # endregion
 
 # region SetWindowGeometry
