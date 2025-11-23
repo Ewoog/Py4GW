@@ -157,6 +157,9 @@ class CodexConfig:
         self.desync_detected = False  # Flag for map desync detection
         self.last_partner_map_id = 0  # Last known partner map ID
         
+        # Partner win tracking
+        self.partner_consecutive_wins = 0  # Track partner team's consecutive wins
+        
         # Payback and Resign modes
         self.payback_mode = False  # Toggle: Losing team goes aggressive on desync
         self.resign_mode = False  # Toggle: Winning team resigns on desync
@@ -185,6 +188,7 @@ SIGNAL_QUEUE_NOW = 2.0
 SIGNAL_MATCH_START = 3.0
 SIGNAL_MATCH_END = 4.0
 SIGNAL_MAP_VERIFY = 11.0
+SIGNAL_WIN_COUNT = 12.0
 
 
 # Delay (in milliseconds) to wait after map change
@@ -203,6 +207,8 @@ def get_signal_type_name(signal_value: float) -> str:
         return "MATCH_END"
     elif signal_value == SIGNAL_MAP_VERIFY:
         return "MAP_VERIFY"
+    elif signal_value == SIGNAL_WIN_COUNT:
+        return "WIN_COUNT"
     else:
         return "UNKNOWN"
 
@@ -259,7 +265,7 @@ def get_available_accounts_with_names() -> list:
         return []
 
 
-def send_sync_signal(signal_type: str):
+def send_sync_signal(signal_type: str, param1: float = 0.0):
     """Send synchronization signal to other accounts.
     Only sends signals during initial bot startup and first queue entry."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -271,10 +277,11 @@ def send_sync_signal(signal_type: str):
     
     # Only send sync messages if first queue has not been completed
     # This prevents message stacking after the initial synchronization
-    if config.first_queue_completed and signal_type not in ["MAP_VERIFY"]:
+    # Exception: Always allow WIN_COUNT signals to be sent
+    if config.first_queue_completed and signal_type not in ["MAP_VERIFY", "WIN_COUNT"]:
         return
     
-    # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END", "MAP_VERIFY"
+    # Signal types: "READY_TO_QUEUE", "QUEUE_NOW", "MATCH_START", "MATCH_END", "MAP_VERIFY", "WIN_COUNT"
     signal_value = 0.0
     if signal_type == "READY_TO_QUEUE":
         signal_value = SIGNAL_READY_TO_QUEUE
@@ -286,8 +293,10 @@ def send_sync_signal(signal_type: str):
         signal_value = SIGNAL_MATCH_END
     elif signal_type == "MAP_VERIFY":
         signal_value = SIGNAL_MAP_VERIFY
+    elif signal_type == "WIN_COUNT":
+        signal_value = SIGNAL_WIN_COUNT
     
-    params = (signal_value, 0.0, 0.0, 0.0)
+    params = (signal_value, param1, 0.0, 0.0)
     
     # Send only to the configured partner account
     try:
@@ -299,20 +308,22 @@ def send_sync_signal(signal_type: str):
 def check_sync_signal() -> tuple[str, int]:
     """Check for synchronization signals from other accounts.
     Only processes signals during initial bot startup and first queue entry.
-    Returns tuple of (signal_type, map_id)."""
+    Returns tuple of (signal_type, param_value) where param_value can be map_id or win_count."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
     # Only check for sync messages if first queue has not been completed
     if config.first_queue_completed:
-        # Still check for MAP_VERIFY messages, but consume ALL of them
+        # Still check for MAP_VERIFY and WIN_COUNT messages, but consume ALL of them
         # and only return the most recent one to prevent message stacking
         latest_map_id = 0
+        latest_win_count = 0
         found_map_verify = False
+        found_win_count = False
         messages_cleared = 0
         max_iterations = 100  # Safety limit to prevent infinite loops
         
-        # Process all pending MAP_VERIFY messages
+        # Process all pending MAP_VERIFY and WIN_COUNT messages
         for _ in range(max_iterations):
             msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
             
@@ -325,8 +336,13 @@ def check_sync_signal() -> tuple[str, int]:
                 found_map_verify = True
                 messages_cleared += 1
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
+            elif len(msg.Params) >= 2 and msg.Params[0] == SIGNAL_WIN_COUNT:
+                latest_win_count = int(msg.Params[1])
+                found_win_count = True
+                messages_cleared += 1
+                GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
             else:
-                # Not a MAP_VERIFY message - could be old MATCH_START/MATCH_END from before first_queue_completed
+                # Not a MAP_VERIFY or WIN_COUNT message - could be old MATCH_START/MATCH_END from before first_queue_completed
                 # Mark it as finished to clear it from the queue and continue processing
                 signal_type_name = get_signal_type_name(msg.Params[0]) if len(msg.Params) >= 1 else "UNKNOWN"
                 
@@ -336,7 +352,14 @@ def check_sync_signal() -> tuple[str, int]:
                 GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
                 # Continue to next message instead of breaking
         
-        if found_map_verify:
+        # Prioritize WIN_COUNT over MAP_VERIFY if both are present
+        if found_win_count:
+            if messages_cleared > 1:
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Cleared {messages_cleared} stacked messages, using latest win count: {latest_win_count}", 
+                                Py4GW.Console.MessageType.Info)
+            return ("WIN_COUNT", latest_win_count)
+        elif found_map_verify:
             if messages_cleared > 1:
                 Py4GW.Console.Log(BOT_NAME, 
                                 f"Cleared {messages_cleared} stacked MAP_VERIFY messages, using latest map ID: {latest_map_id}", 
@@ -350,7 +373,7 @@ def check_sync_signal() -> tuple[str, int]:
     
     if msg and msg.Command == SYNC_QUEUE_COMMAND:
         signal_type = ""
-        map_id = 0
+        param_value = 0
         
         # Check bounds before accessing params
         if len(msg.Params) == 0:
@@ -358,14 +381,14 @@ def check_sync_signal() -> tuple[str, int]:
         
         signal_type = get_signal_type_name(msg.Params[0])
         
-        # Get map_id if this is a MAP_VERIFY signal
-        if msg.Params[0] == SIGNAL_MAP_VERIFY and len(msg.Params) > 1:
-            map_id = int(msg.Params[1])
+        # Get param_value if this is a MAP_VERIFY or WIN_COUNT signal
+        if (msg.Params[0] == SIGNAL_MAP_VERIFY or msg.Params[0] == SIGNAL_WIN_COUNT) and len(msg.Params) > 1:
+            param_value = int(msg.Params[1])
         
         # Mark message as finished
         if signal_type and signal_type != "UNKNOWN":
             GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
-            return (signal_type, map_id)
+            return (signal_type, param_value)
     
     return ("", 0)
 
@@ -785,6 +808,12 @@ def winning_team_logic(bot: Botting) -> Generator:
     # Winning team stays in explorable map after victories and is automatically re-queued
     # Loop through multiple matches without returning to outpost
     while bot.config.fsm_running:
+        # Send current win count to partner team so they know if we're at 4/5 wins
+        send_sync_signal("WIN_COUNT", float(config.consecutive_wins))
+        Py4GW.Console.Log(BOT_NAME, 
+                        f"Sent win count ({config.consecutive_wins}) to partner team", 
+                        Py4GW.Console.MessageType.Info)
+        
         # Check if we should shut down (earned 5 strongboxes)
         if config.strongboxes_earned >= config.target_strongboxes:
             Py4GW.Console.Log(BOT_NAME, 
@@ -949,6 +978,25 @@ def losing_team_logic(bot: Botting) -> Generator:
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Party
+    
+    # Check if partner team is at 4/5 wins - if so, switch equipment sets
+    if config.partner_consecutive_wins == WINS_BEFORE_STRONGBOX:
+        Py4GW.Console.Log(BOT_NAME, 
+                        f"Partner team at {WINS_BEFORE_STRONGBOX}/{TOTAL_WINS_FOR_STRONGBOX} wins - switching to Equipment Set 1 for 40 seconds...", 
+                        Py4GW.Console.MessageType.Info)
+        
+        # Switch to Equipment Set 1
+        yield from equip_set(1)
+        send_message_to_party("EQUIP_SET_1")
+        
+        # Wait for 40 seconds
+        yield from Routines.Yield.wait(40000)
+        
+        # Switch back to Equipment Set 2
+        Py4GW.Console.Log(BOT_NAME, "Switching back to Equipment Set 2...", 
+                        Py4GW.Console.MessageType.Info)
+        yield from equip_set(2)
+        send_message_to_party("EQUIP_SET_2")
     
     # Get current map ID to detect map changes
     current_map_id = GLOBAL_CACHE.Map.GetMapID()
@@ -1314,6 +1362,24 @@ def run_codex_match(bot: Botting) -> None:
             # Winning team logic handles multiple matches internally and only returns when done
             # No need to log progress or wait here
         else:
+            # Check for partner's win count (losing team only)
+            # Give a brief moment for the signal to arrive
+            yield from Routines.Yield.wait(500)
+            
+            # Check for WIN_COUNT signal from partner
+            timeout = 5  # 5 second timeout
+            start_check = time.time()
+            
+            while time.time() - start_check < timeout and bot.config.fsm_running:
+                signal, win_count = check_sync_signal()
+                if signal == "WIN_COUNT":
+                    config.partner_consecutive_wins = win_count
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    f"Received win count from partner: {win_count}/{TOTAL_WINS_FOR_STRONGBOX}", 
+                                    Py4GW.Console.MessageType.Info)
+                    break
+                yield from Routines.Yield.wait(200)  # Check more frequently for better responsiveness
+            
             # Disable HeroAI for losing team so they are passive
             send_message_to_party("DISABLE_HEROAI")
             Py4GW.Console.Log(BOT_NAME, "Playing as losing team (HeroAI disabled for party)...", Py4GW.Console.MessageType.Info)
