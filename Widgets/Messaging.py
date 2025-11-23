@@ -571,11 +571,15 @@ def UsePcon(index, message):
 
 # region PressKey
 def PressKey(index, message):
+    # Ensure this is always treated as a generator
+    if False:
+        yield
+    
     try:
-        ConsoleLog(MODULE_NAME, f"Processing PressKey message: {message}", Console.MessageType.Info, True)
+        ConsoleLog(MODULE_NAME, "Processing PressKey message", Console.MessageType.Info, True)
         GLOBAL_CACHE.ShMem.MarkMessageAsRunning(message.ReceiverEmail, index)
 
-        ConsoleLog(MODULE_NAME, f"PressKey: Params={message.Params}", Console.MessageType.Info, True)
+        ConsoleLog(MODULE_NAME, f"PressKey: Reading params", Console.MessageType.Info, True)
         
         key_id = int(message.Params[0])
         repetition = int(message.Params[1]) if len(message.Params) > 1 else 1
@@ -607,7 +611,9 @@ def PressKey(index, message):
         GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
         ConsoleLog(MODULE_NAME, "PressKey message processed and finished.", Console.MessageType.Info, True)
     except Exception as e:
+        import traceback
         ConsoleLog(MODULE_NAME, f"PressKey ERROR: {e}", Console.MessageType.Warning, True)
+        ConsoleLog(MODULE_NAME, f"PressKey TRACEBACK: {traceback.format_exc()}", Console.MessageType.Warning, True)
         GLOBAL_CACHE.ShMem.MarkMessageAsFinished(message.ReceiverEmail, index)
 
 
