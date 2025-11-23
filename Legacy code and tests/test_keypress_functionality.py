@@ -28,14 +28,14 @@ def test_keypress_helper_import():
 def test_common_keys_enum():
     """Test that CommonKeys enum has expected values"""
     try:
-        from Widgets.MultiBoxing.keypress_helper import CommonKeys
+        from Widgets.MultiBoxing.keypress_helper import CommonKeys, Key
         
-        # Test some expected keys
-        assert CommonKeys.F1 == 0x70, "F1 key code incorrect"
-        assert CommonKeys.F2 == 0x71, "F2 key code incorrect"
-        assert CommonKeys.ENTER == 0x0D, "ENTER key code incorrect"
-        assert CommonKeys.ESCAPE == 0x1B, "ESCAPE key code incorrect"
-        assert CommonKeys.NUM_1 == 0x31, "NUM_1 key code incorrect"
+        # Test some expected keys (using actual Key enum for consistency)
+        assert CommonKeys.F1 == Key.F1.value, f"F1 key code incorrect: expected {Key.F1.value}, got {CommonKeys.F1}"
+        assert CommonKeys.F2 == Key.F2.value, f"F2 key code incorrect: expected {Key.F2.value}, got {CommonKeys.F2}"
+        assert CommonKeys.ENTER == Key.Enter.value, f"ENTER key code incorrect: expected {Key.Enter.value}, got {CommonKeys.ENTER}"
+        assert CommonKeys.ESCAPE == Key.Escape.value, f"ESCAPE key code incorrect: expected {Key.Escape.value}, got {CommonKeys.ESCAPE}"
+        assert CommonKeys.NUM_1 == Key.One.value, f"NUM_1 key code incorrect: expected {Key.One.value}, got {CommonKeys.NUM_1}"
         
         print("✓ CommonKeys enum has correct values")
         return True

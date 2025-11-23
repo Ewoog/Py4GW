@@ -8,7 +8,7 @@ The Messaging widget system supports sending key press commands between clients 
 
 - **Remote Key Control**: One client can request another to press any key
 - **Repetition Support**: Keys can be pressed multiple times with a single command
-- **All Keys Are Supported**: Function keys, number keys, letters, control keys, etc.
+- **All Keys are Supported**: Function keys, number keys, letters, control keys, etc.
 - **Synchronization**: Built-in delays between repetitions for reliable execution
 
 ## How It Works

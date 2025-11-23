@@ -159,8 +159,8 @@ def send_function_key(sender_email: str, receiver_email: str, function_key_numbe
     if function_key_number < 1 or function_key_number > 12:
         raise ValueError(f"Function key number must be between 1 and 12, got {function_key_number}")
     
-    # F1 = 0x70, F2 = 0x71, ..., F12 = 0x7B
-    key_code = 0x70 + (function_key_number - 1)
+    # Calculate key code: F1 is the base, subsequent keys increment by 1
+    key_code = Key.F1.value + (function_key_number - 1)
     send_keypress(sender_email, receiver_email, key_code)
 
 

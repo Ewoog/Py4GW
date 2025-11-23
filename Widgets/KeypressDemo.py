@@ -8,7 +8,9 @@ Use this as a reference for implementing key press functionality in your own wid
 """
 
 import PyImGui
-from Py4GWCoreLib import GLOBAL_CACHE, Console, ConsoleLog
+from Py4GWCoreLib import GLOBAL_CACHE
+from Py4GWCoreLib import Console
+from Py4GWCoreLib import ConsoleLog
 from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
 from Py4GWCoreLib.enums_src.IO_enums import Key
 
