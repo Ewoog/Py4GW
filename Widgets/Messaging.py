@@ -1255,10 +1255,17 @@ def SkipCutscene(index, message):
 # region ProcessMessages
 def ProcessMessages():
     account_email = GLOBAL_CACHE.Player.GetAccountEmail()
+    
+    # Debug: Log when checking for messages
+    # ConsoleLog(MODULE_NAME, f"Checking messages for {account_email}", Console.MessageType.Info, False)
+    
     index, message = GLOBAL_CACHE.ShMem.GetNextMessage(account_email)
 
     if index == -1 or message is None:
         return
+    
+    # Debug: Log when a message is found
+    ConsoleLog(MODULE_NAME, f"Found message {index} for {account_email}: Command={SharedCommandType(message.Command).name}", Console.MessageType.Info, True)
 
     match message.Command:
         case SharedCommandType.TravelToMap:
