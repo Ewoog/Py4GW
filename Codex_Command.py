@@ -1543,6 +1543,32 @@ def _draw_settings():
             Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
                             Py4GW.Console.MessageType.Info)
         
+        # Command Center Mode toggle
+        if SOCKET_MODE_AVAILABLE:
+            new_socket = PyImGui.checkbox("Use Command Center", config.use_socket_mode)
+            if new_socket != config.use_socket_mode:
+                config.use_socket_mode = new_socket
+                if config.use_socket_mode:
+                    # Attempt to enable socket mode
+                    bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"
+                    if enable_socket_mode(bot_id, config.is_winning_team, 
+                                        config.command_center_host, config.command_center_port):
+                        Py4GW.Console.Log(BOT_NAME, "Command Center mode enabled", 
+                                        Py4GW.Console.MessageType.Info)
+                    else:
+                        config.use_socket_mode = False
+                        Py4GW.Console.Log(BOT_NAME, "Failed to connect to Command Center - falling back to ShMem", 
+                                        Py4GW.Console.MessageType.Warning)
+                else:
+                    disable_socket_mode()
+                    Py4GW.Console.Log(BOT_NAME, "Command Center mode disabled - using ShMem", 
+                                    Py4GW.Console.MessageType.Info)
+        else:
+            PyImGui.text_colored("Command Center: Not Available", (0.5, 0.5, 0.5, 1))
+            PyImGui.text_wrapped("(codex_socket_client.py not found)")
+        
+        PyImGui.separator()
+        
         # Aggressive Mode toggle
         new_aggressive = PyImGui.checkbox("Aggressive Mode", config.aggressive_mode)
         if new_aggressive != config.aggressive_mode:
