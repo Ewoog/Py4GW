@@ -1253,11 +1253,16 @@ def SkipCutscene(index, message):
 # endregion
 
 # region ProcessMessages
+_process_messages_called = False  # One-time flag to log when ProcessMessages is first called
+
 def ProcessMessages():
+    global _process_messages_called
     account_email = GLOBAL_CACHE.Player.GetAccountEmail()
     
-    # Debug: Log when checking for messages
-    # ConsoleLog(MODULE_NAME, f"Checking messages for {account_email}", Console.MessageType.Info, False)
+    # Debug: Log once when ProcessMessages is first called
+    if not _process_messages_called:
+        ConsoleLog(MODULE_NAME, f"ProcessMessages first call for {account_email}", Console.MessageType.Info, True)
+        _process_messages_called = True
     
     index, message = GLOBAL_CACHE.ShMem.GetNextMessage(account_email)
 
