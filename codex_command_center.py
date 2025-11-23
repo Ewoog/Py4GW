@@ -400,27 +400,30 @@ class CommandCenter:
         self.logger.info("QUEUE_NOW commands sent to all leaders")
                 
     def route_signal(self, sender_id: str, message: Dict):
-        """Route a signal from one Leader to its partner."""
+        """
+        Route a signal from one Leader to its partner.
+        
+        NOTE: This method assumes the caller already holds self.lock!
+        """
         msg_type = message.get('type')
         
-        with self.lock:
-            if sender_id not in self.clients:
-                return
-                
-            _, _, sender_state = self.clients[sender_id]
+        if sender_id not in self.clients:
+            return
             
-            # Find the partner (opposite team)
-            partner_id = None
-            for client_id, (_, _, state) in self.clients.items():
-                if client_id != sender_id and state.is_winning_team != sender_state.is_winning_team:
-                    partner_id = client_id
-                    break
-                    
-            if partner_id:
-                self.logger.info(f"Routing {msg_type} from {sender_id} to {partner_id}")
-                self.send_to_client(partner_id, message)
-            else:
-                self.logger.warning(f"No partner found for {sender_id}, cannot route {msg_type}")
+        _, _, sender_state = self.clients[sender_id]
+        
+        # Find the partner (opposite team)
+        partner_id = None
+        for client_id, (_, _, state) in self.clients.items():
+            if client_id != sender_id and state.is_winning_team != sender_state.is_winning_team:
+                partner_id = client_id
+                break
+                
+        if partner_id:
+            self.logger.info(f"Routing {msg_type} from {sender_id} to {partner_id}")
+            self._send_to_client_unlocked(partner_id, message)
+        else:
+            self.logger.warning(f"No partner found for {sender_id}, cannot route {msg_type}")
                 
     def send_to_client(self, client_id: str, message: Dict):
         """Send a message to a specific client."""
