@@ -336,6 +336,7 @@ def send_message_to_party(command_type: str, param1: float = 0.0):
     Party members should run the Messaging.py widget to receive these commands."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
+    from Py4GWCoreLib.enums_src.IO_enums import Key
     my_email = get_my_email()
     
     if not config.party_members:
@@ -350,13 +351,13 @@ def send_message_to_party(command_type: str, param1: float = 0.0):
     elif command_type == "RESIGN":
         command = SharedCommandType.Resign
     elif command_type == "EQUIP_SET_1":
-        # Use PressKey to send F1 for equipment set 1
+        # Use PressKey to send F1 for equipment set 1 (following KeypressDemo.py pattern)
         command = SharedCommandType.PressKey
-        params = (0x70, 0.0, 0.0, 0.0)  # F1 key code
+        params = (float(Key.F1.value), 1.0, 0.0, 0.0)  # F1 key code, 1 repetition
     elif command_type == "EQUIP_SET_2":
-        # Use PressKey to send F2 for equipment set 2
+        # Use PressKey to send F2 for equipment set 2 (following KeypressDemo.py pattern)
         command = SharedCommandType.PressKey
-        params = (0x71, 0.0, 0.0, 0.0)  # F2 key code
+        params = (float(Key.F2.value), 1.0, 0.0, 0.0)  # F2 key code, 1 repetition
     elif command_type == "ENABLE_HEROAI":
         command = SharedCommandType.EnableHeroAI
         params = (1.0, 0.0, 0.0, 0.0)  # 1.0 = enable
@@ -538,9 +539,23 @@ def invite_party_members() -> Generator:
 
 
 def equip_set(set_number: int) -> Generator:
-    """Equip the specified equipment set (1 or 2)."""
+    """Equip the specified equipment set (1 or 2) by pressing F1 or F2."""
     from Py4GWCoreLib.Routines import Routines
-    yield from Routines.Yield.Keybinds.ActivateWeaponSet(set_number)
+    from Py4GWCoreLib.Py4GWcorelib import Keystroke
+    from Py4GWCoreLib.enums_src.IO_enums import Key
+    
+    # Press F1 for set 1, F2 for set 2 (following KeypressDemo.py pattern)
+    if set_number == 1:
+        key_code = Key.F1.value  # F1 = 0x70
+    elif set_number == 2:
+        key_code = Key.F2.value  # F2 = 0x71
+    else:
+        Py4GW.Console.Log(BOT_NAME, f"Invalid equipment set number: {set_number}",
+                         Py4GW.Console.MessageType.Warning)
+        yield
+        return
+    
+    Keystroke.PressAndRelease(key_code)
     yield from Routines.Yield.wait(500)
 
 
@@ -1122,9 +1137,11 @@ def run_codex_match(bot: Botting) -> None:
         if config.is_winning_team:
             Py4GW.Console.Log(BOT_NAME, "Equipping Set 1 (Winning Team)", Py4GW.Console.MessageType.Info)
             yield from equip_set(1)
+            send_message_to_party("EQUIP_SET_1")
         else:
             Py4GW.Console.Log(BOT_NAME, "Equipping Set 2 (Losing Team)", Py4GW.Console.MessageType.Info)
             yield from equip_set(2)
+            send_message_to_party("EQUIP_SET_2")
         
         # Synchronization phase: wait for both teams to be ready
         # Losing team skips synchronization after first match for immediate requeue
