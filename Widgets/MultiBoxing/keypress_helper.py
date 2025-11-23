@@ -20,7 +20,7 @@ Example usage:
 """
 
 from enum import IntEnum
-from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+from Py4GWCoreLib import GLOBAL_CACHE
 from Py4GWCoreLib.enums_src.Multiboxing_enums import SharedCommandType
 from Py4GWCoreLib.enums_src.IO_enums import Key
 
