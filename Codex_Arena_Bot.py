@@ -1186,7 +1186,7 @@ def run_codex_match(bot: Botting) -> None:
         
         # On first match, invite party members if leader
         if config.is_leader and not config.party_invited and config.party_members:
-            Py4GW.Console.Log(BOT_NAME, "First match - inviting party members...", 
+            Py4GW.Console.Log(BOT_NAME, "Inviting party members...", 
                             Py4GW.Console.MessageType.Info)
             yield from invite_party_members()
             config.party_invited = True
