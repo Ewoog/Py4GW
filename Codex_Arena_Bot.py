@@ -189,6 +189,22 @@ SIGNAL_MAP_VERIFY = 11.0
 MAP_CHANGE_DELAY_MS = 2000
 
 
+def get_signal_type_name(signal_value: float) -> str:
+    """Get the human-readable name for a signal type value."""
+    if signal_value == SIGNAL_READY_TO_QUEUE:
+        return "READY_TO_QUEUE"
+    elif signal_value == SIGNAL_QUEUE_NOW:
+        return "QUEUE_NOW"
+    elif signal_value == SIGNAL_MATCH_START:
+        return "MATCH_START"
+    elif signal_value == SIGNAL_MATCH_END:
+        return "MATCH_END"
+    elif signal_value == SIGNAL_MAP_VERIFY:
+        return "MAP_VERIFY"
+    else:
+        return "UNKNOWN"
+
+
 def get_my_email() -> str:
     """Get the current account email."""
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
@@ -298,11 +314,7 @@ def check_sync_signal() -> tuple[str, int]:
         for _ in range(max_iterations):
             msg_index, msg = GLOBAL_CACHE.ShMem.PreviewNextMessage(my_email, include_running=False)
             
-            if not msg:
-                break
-            
-            # Only process SYNC_QUEUE_COMMAND messages
-            if msg.Command != SYNC_QUEUE_COMMAND:
+            if not msg or msg.Command != SYNC_QUEUE_COMMAND:
                 break
             
             # Check bounds before accessing params - need at least 2 params
@@ -314,16 +326,7 @@ def check_sync_signal() -> tuple[str, int]:
             else:
                 # Not a MAP_VERIFY message - could be old MATCH_START/MATCH_END from before first_queue_completed
                 # Mark it as finished to clear it from the queue and continue processing
-                signal_type_name = "UNKNOWN"
-                if len(msg.Params) >= 1:
-                    if msg.Params[0] == SIGNAL_READY_TO_QUEUE:
-                        signal_type_name = "READY_TO_QUEUE"
-                    elif msg.Params[0] == SIGNAL_QUEUE_NOW:
-                        signal_type_name = "QUEUE_NOW"
-                    elif msg.Params[0] == SIGNAL_MATCH_START:
-                        signal_type_name = "MATCH_START"
-                    elif msg.Params[0] == SIGNAL_MATCH_END:
-                        signal_type_name = "MATCH_END"
+                signal_type_name = get_signal_type_name(msg.Params[0]) if len(msg.Params) >= 1 else "UNKNOWN"
                 
                 Py4GW.Console.Log(BOT_NAME, 
                                 f"Clearing old {signal_type_name} message from queue", 
@@ -351,21 +354,14 @@ def check_sync_signal() -> tuple[str, int]:
         if len(msg.Params) == 0:
             return ("", 0)
         
-        if msg.Params[0] == SIGNAL_READY_TO_QUEUE:
-            signal_type = "READY_TO_QUEUE"
-        elif msg.Params[0] == SIGNAL_QUEUE_NOW:
-            signal_type = "QUEUE_NOW"
-        elif msg.Params[0] == SIGNAL_MATCH_START:
-            signal_type = "MATCH_START"
-        elif msg.Params[0] == SIGNAL_MATCH_END:
-            signal_type = "MATCH_END"
-        elif msg.Params[0] == SIGNAL_MAP_VERIFY:
-            signal_type = "MAP_VERIFY"
-            if len(msg.Params) > 1:
-                map_id = int(msg.Params[1])
+        signal_type = get_signal_type_name(msg.Params[0])
+        
+        # Get map_id if this is a MAP_VERIFY signal
+        if msg.Params[0] == SIGNAL_MAP_VERIFY and len(msg.Params) > 1:
+            map_id = int(msg.Params[1])
         
         # Mark message as finished
-        if signal_type:
+        if signal_type and signal_type != "UNKNOWN":
             GLOBAL_CACHE.ShMem.MarkMessageAsFinished(my_email, msg_index)
             return (signal_type, map_id)
     
