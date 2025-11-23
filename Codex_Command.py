@@ -290,7 +290,20 @@ def get_available_accounts_with_names() -> list:
 
 def send_sync_signal(signal_type: str, param1: float = 0.0):
     """Send synchronization signal to other accounts.
+    Supports both shared memory and socket communication modes.
     Only sends signals during initial bot startup and first queue entry."""
+    
+    # If socket mode is enabled and connected, use socket
+    if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+        # For socket mode, send directly without checking first_queue_completed
+        # The Command Center handles coordination logic
+        try:
+            send_sync_signal_socket(signal_type, param1)
+        except Exception as e:
+            Py4GW.Console.Log(BOT_NAME, f"Failed to send socket signal: {e}", Py4GW.Console.MessageType.Warning)
+        return
+    
+    # Otherwise, use existing ShMem code
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
@@ -330,8 +343,19 @@ def send_sync_signal(signal_type: str, param1: float = 0.0):
 
 def check_sync_signal() -> tuple[str, int]:
     """Check for synchronization signals from other accounts.
+    Supports both shared memory and socket communication modes.
     Only processes signals during initial bot startup and first queue entry.
     Returns tuple of (signal_type, param_value) where param_value can be map_id or win_count."""
+    
+    # If socket mode is enabled and connected, use socket
+    if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+        try:
+            return check_sync_signal_socket()
+        except Exception as e:
+            Py4GW.Console.Log(BOT_NAME, f"Failed to check socket signal: {e}", Py4GW.Console.MessageType.Warning)
+            return ("", 0)
+    
+    # Otherwise, use existing ShMem code
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     my_email = get_my_email()
     
@@ -837,6 +861,20 @@ def winning_team_logic(bot: Botting) -> Generator:
                         f"Sent win count ({config.consecutive_wins}) to partner team", 
                         Py4GW.Console.MessageType.Info)
         
+        # Also update Command Center with current state (if socket mode)
+        if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+            try:
+                from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+                update_bot_state_socket(
+                    consecutive_wins=config.consecutive_wins,
+                    strongboxes_earned=config.strongboxes_earned,
+                    in_match=config.in_match,
+                    current_map_id=GLOBAL_CACHE.Map.GetMapID()
+                )
+            except Exception as e:
+                Py4GW.Console.Log(BOT_NAME, f"Failed to update Command Center state: {e}", 
+                                 Py4GW.Console.MessageType.Warning)
+        
         # Check if we should shut down (earned 5 strongboxes)
         if config.strongboxes_earned >= config.target_strongboxes:
             Py4GW.Console.Log(BOT_NAME, 
@@ -1001,6 +1039,19 @@ def losing_team_logic(bot: Botting) -> Generator:
     from Py4GWCoreLib.Routines import Routines
     from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
     from Py4GWCoreLib import Party
+    
+    # Update Command Center with current state (if socket mode)
+    if config.use_socket_mode and SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+        try:
+            update_bot_state_socket(
+                consecutive_wins=config.consecutive_wins,
+                strongboxes_earned=config.strongboxes_earned,
+                in_match=config.in_match,
+                current_map_id=GLOBAL_CACHE.Map.GetMapID()
+            )
+        except Exception as e:
+            Py4GW.Console.Log(BOT_NAME, f"Failed to update Command Center state: {e}", 
+                             Py4GW.Console.MessageType.Warning)
     
     # Check if partner team is at 4/5 wins - if so, switch equipment sets
     if config.partner_consecutive_wins == WINS_BEFORE_STRONGBOX:
