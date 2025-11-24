@@ -339,8 +339,8 @@ def check_command_center_commands():
         if not client:
             return
         
-        # Check for messages with a short timeout
-        message = client.get_next_message(timeout=0.05)
+        # Check for messages with a very short timeout (called every frame)
+        message = client.get_next_message(timeout=0.001)
         
         if message:
             msg_type = message.get('type', '')
@@ -357,12 +357,6 @@ def check_command_center_commands():
                                 f"Command Center switched teams: {old_role} -> {new_role}", 
                                 Py4GW.Console.MessageType.Warning)
                 
-                # Update the bot_id for the socket connection
-                new_bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"
-                Py4GW.Console.Log(BOT_NAME, 
-                                f"Bot ID updated to: {new_bot_id}", 
-                                Py4GW.Console.MessageType.Info)
-                
             elif msg_type == 'CMD_RESIGN':
                 # Handle resign command from Command Center
                 reason = message.get('reason', 'unknown')
@@ -377,11 +371,6 @@ def check_command_center_commands():
                     Party.Resign()
                     Py4GW.Console.Log(BOT_NAME, "Resigned per Command Center order", 
                                     Py4GW.Console.MessageType.Info)
-                
-            elif msg_type == 'CMD_QUEUE_NOW':
-                # This is already handled by check_sync_signal for "QUEUE_NOW"
-                # but we can log it here if needed
-                pass
                 
     except Exception as e:
         Py4GW.Console.Log(BOT_NAME, f"Error checking Command Center commands: {e}", 
