@@ -329,16 +329,20 @@ def check_sync_signal() -> tuple[str, int]:
 
 def check_command_center_commands():
     """Check for commands from Command Center (like CMD_SWITCH_TEAMS, CMD_RESIGN, etc.)
-    and handle them appropriately."""
+    and handle them appropriately.
+    
+    Returns:
+        The message type if a command was processed, None otherwise.
+    """
     
     if not SOCKET_MODE_AVAILABLE or not is_socket_mode_enabled():
-        return
+        return None
     
     try:
         from codex_socket_client import get_client
         client = get_client()
         if not client:
-            return
+            return None
         
         # Check for messages with zero timeout for non-blocking behavior (called every frame)
         message = client.get_next_message(timeout=0)
@@ -355,7 +359,7 @@ def check_command_center_commands():
                     Py4GW.Console.Log(BOT_NAME, 
                                     "CMD_SWITCH_TEAMS message missing is_winning_team field", 
                                     Py4GW.Console.MessageType.Error)
-                    return
+                    return None
                 
                 old_role = "Winning" if config.is_winning_team else "Losing"
                 config.is_winning_team = new_is_winning_team
@@ -363,6 +367,7 @@ def check_command_center_commands():
                 Py4GW.Console.Log(BOT_NAME, 
                                 f"Command Center switched teams: {old_role} -> {new_role}", 
                                 Py4GW.Console.MessageType.Warning)
+                return msg_type
                 
             elif msg_type == 'CMD_RESIGN':
                 # Handle resign command from Command Center
@@ -383,10 +388,20 @@ def check_command_center_commands():
                     except Exception as resign_error:
                         Py4GW.Console.Log(BOT_NAME, f"Failed to resign: {resign_error}", 
                                         Py4GW.Console.MessageType.Error)
+                return msg_type
+            
+            elif msg_type == 'CMD_QUEUE_NOW':
+                # Handle queue now command from Command Center
+                Py4GW.Console.Log(BOT_NAME, 
+                                "Command Center ordered QUEUE NOW!", 
+                                Py4GW.Console.MessageType.Success)
+                return msg_type
                 
     except Exception as e:
         Py4GW.Console.Log(BOT_NAME, f"Error checking Command Center commands: {e}", 
                          Py4GW.Console.MessageType.Warning)
+    
+    return None
 
 
 def send_message_to_party(command_type: str, param1: float = 0.0):
@@ -1297,23 +1312,35 @@ def run_codex_match(bot: Botting) -> None:
             config.ready_to_queue = True
             send_sync_signal("READY_TO_QUEUE")
             
-            Py4GW.Console.Log(BOT_NAME, "Waiting for other team to be ready...", Py4GW.Console.MessageType.Info)
+            Py4GW.Console.Log(BOT_NAME, "Waiting for Command Center to synchronize queue...", Py4GW.Console.MessageType.Info)
             
-            # Wait for confirmation from other team OR timeout
+            # Wait for CMD_QUEUE_NOW command from Command Center OR timeout
             timeout = 120  # 2 minute timeout (in seconds)
             start_time = time.time()
-            other_team_ready = False
+            queue_now_received = False
             
             while time.time() - start_time < timeout:
+                # Check for Command Center commands (including CMD_QUEUE_NOW)
+                cmd = check_command_center_commands()
+                if cmd == "CMD_QUEUE_NOW":
+                    queue_now_received = True
+                    Py4GW.Console.Log(BOT_NAME, "Received QUEUE NOW command from Command Center!", Py4GW.Console.MessageType.Success)
+                    break
+                
+                # Also check for traditional sync signals (fallback for compatibility)
+                # This maintains backward compatibility with direct bot-to-bot coordination
+                # when Command Center is not being used. In the typical case with Command Center,
+                # the CMD_QUEUE_NOW command above will be received and we'll break out of the loop.
                 signal, _ = check_sync_signal()
                 if signal == "READY_TO_QUEUE":
-                    other_team_ready = True
-                    Py4GW.Console.Log(BOT_NAME, "Other team is ready!", Py4GW.Console.MessageType.Info)
-                    break
+                    Py4GW.Console.Log(BOT_NAME, "Other team is ready (legacy signal)", Py4GW.Console.MessageType.Info)
+                    # Don't break - wait for CMD_QUEUE_NOW from Command Center
+                    # If Command Center is not running, the timeout will trigger and bot will proceed anyway
+                
                 yield from Routines.Yield.wait(500)
             
-            if not other_team_ready:
-                Py4GW.Console.Log(BOT_NAME, "Timeout waiting for other team. Proceeding anyway...", 
+            if not queue_now_received:
+                Py4GW.Console.Log(BOT_NAME, "Timeout waiting for Command Center QUEUE NOW command. Proceeding anyway...", 
                                 Py4GW.Console.MessageType.Warning)
             
             # Brief sync delay to ensure both are ready
