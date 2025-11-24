@@ -1328,10 +1328,14 @@ def run_codex_match(bot: Botting) -> None:
                     break
                 
                 # Also check for traditional sync signals (fallback for compatibility)
+                # This maintains backward compatibility with direct bot-to-bot coordination
+                # when Command Center is not being used. In the typical case with Command Center,
+                # the CMD_QUEUE_NOW command above will be received and we'll break out of the loop.
                 signal, _ = check_sync_signal()
                 if signal == "READY_TO_QUEUE":
                     Py4GW.Console.Log(BOT_NAME, "Other team is ready (legacy signal)", Py4GW.Console.MessageType.Info)
                     # Don't break - wait for CMD_QUEUE_NOW from Command Center
+                    # If Command Center is not running, the timeout will trigger and bot will proceed anyway
                 
                 yield from Routines.Yield.wait(500)
             
