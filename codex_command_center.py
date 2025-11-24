@@ -351,12 +351,13 @@ class CommandCenter:
             self.map_verifications.clear()
     
     def handle_gui_resign(self):
-        """Handle GUI resign command - force both bots to resign."""
+        """Handle GUI resign command - force both bots to resign.
+        Note: This is called from process_message which holds self.lock"""
         self.logger.warning("GUI RESIGN command - forcing both leaders to resign...")
         
         for client_id in list(self.clients.keys()):
             if not client_id.startswith('GUI_'):  # Don't send to GUI clients
-                self.send_to_client(client_id, {
+                self._send_to_client_unlocked(client_id, {
                     'type': 'CMD_RESIGN',
                     'reason': 'gui_manual_command',
                     'timestamp': time.time()
@@ -365,7 +366,8 @@ class CommandCenter:
         self.logger.warning("RESIGN commands sent to all leaders")
     
     def handle_gui_switch_teams(self):
-        """Handle GUI switch teams command - swap winning/losing teams."""
+        """Handle GUI switch teams command - swap winning/losing teams.
+        Note: This is called from process_message which holds self.lock"""
         self.logger.info("GUI SWITCH_TEAMS command - swapping team roles...")
         
         # Swap is_winning_team for all bots
@@ -374,8 +376,8 @@ class CommandCenter:
                 bot_state.is_winning_team = not bot_state.is_winning_team
                 new_role = "Winning" if bot_state.is_winning_team else "Losing"
                 
-                # Notify the bot of its new role
-                self.send_to_client(client_id, {
+                # Notify the bot of its new role (using unlocked version since we hold the lock)
+                self._send_to_client_unlocked(client_id, {
                     'type': 'CMD_SWITCH_TEAMS',
                     'new_role': new_role,
                     'is_winning_team': bot_state.is_winning_team,
@@ -390,12 +392,13 @@ class CommandCenter:
         self.logger.info("Team switch complete")
     
     def handle_gui_force_queue(self):
-        """Handle GUI force queue command - command both leaders to queue immediately."""
+        """Handle GUI force queue command - command both leaders to queue immediately.
+        Note: This is called from process_message which holds self.lock"""
         self.logger.info("GUI FORCE_QUEUE command - forcing leaders to queue now...")
         
         for client_id in list(self.clients.keys()):
             if not client_id.startswith('GUI_'):  # Don't send to GUI clients
-                self.send_to_client(client_id, {
+                self._send_to_client_unlocked(client_id, {
                     'type': 'CMD_QUEUE_NOW',
                     'source': 'gui',
                     'timestamp': time.time()
@@ -474,9 +477,12 @@ class CommandCenter:
         }
         
         # Send to all GUI clients
-        for client_id in list(self.clients.keys()):
-            if client_id.startswith('GUI_'):
-                self._send_to_client_unlocked(client_id, state_message)
+        gui_clients = [cid for cid in self.clients.keys() if cid.startswith('GUI_')]
+        self.logger.info(f"Broadcasting state update for {bot_id} to {len(gui_clients)} GUI client(s)")
+        
+        for client_id in gui_clients:
+            self._send_to_client_unlocked(client_id, state_message)
+            self.logger.info(f"  Sent state update to {client_id}")
             
     def broadcast(self, message: Dict, exclude: Optional[str] = None):
         """Broadcast a message to all connected clients."""
