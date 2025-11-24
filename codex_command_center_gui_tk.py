@@ -189,11 +189,19 @@ class CommandCenterGUI:
                 'is_winning_team': False,
                 'is_gui': True
             }
-            self.cc_socket.sendall(json.dumps(registration).encode())
+            self.cc_socket.sendall((json.dumps(registration) + '\n').encode())
             
-            # Wait for ACK
-            data = self.cc_socket.recv(4096)
-            response = json.loads(data.decode())
+            # Wait for ACK - use buffer to handle newline-delimited messages
+            buffer = b''
+            while b'\n' not in buffer:
+                data = self.cc_socket.recv(4096)
+                if not data:
+                    self.log("Connection closed before registration ACK")
+                    return
+                buffer += data
+            
+            message_data, _ = buffer.split(b'\n', 1)
+            response = json.loads(message_data.decode())
             
             if response.get('type') == 'REGISTER_ACK':
                 self.connected = True
@@ -211,6 +219,7 @@ class CommandCenterGUI:
             
     def receive_loop(self):
         """Receive messages from Command Center."""
+        buffer = b''
         while self.running and self.connected:
             try:
                 data = self.cc_socket.recv(4096)
@@ -218,15 +227,49 @@ class CommandCenterGUI:
                     self.connected = False
                     self.log("Connection closed by server")
                     break
-                    
-                # For now, just log received messages
-                # In full implementation, this would update bot state
+                
+                # Add received data to buffer
+                buffer += data
+                
+                # Process all complete messages (delimited by newline)
+                while b'\n' in buffer:
+                    message_data, buffer = buffer.split(b'\n', 1)
+                    if message_data:  # Skip empty lines
+                        try:
+                            message = json.loads(message_data.decode())
+                            self.process_message(message)
+                        except json.JSONDecodeError as e:
+                            self.log(f"Invalid JSON received: {e}")
                 
             except Exception as e:
                 if self.running:
                     self.log(f"Receive error: {e}")
                     self.connected = False
                 break
+    
+    def process_message(self, message):
+        """Process a message received from Command Center."""
+        msg_type = message.get('type')
+        
+        if msg_type == 'BOT_STATE_UPDATE':
+            # Update bot state in our local dictionary
+            bot_id = message.get('bot_id')
+            bot_state = message.get('bot_state')
+            
+            if bot_id and bot_state:
+                self.bots[bot_id] = bot_state
+                
+                # Log the update
+                team = "Winning" if bot_state.get('is_winning_team') else "Losing"
+                self.log(f"{bot_id} updated: {team} team")
+        
+        elif msg_type == 'REGISTER_ACK':
+            # Already handled in connect_to_cc, but log it here too
+            pass
+        
+        else:
+            # Log unknown message types for debugging
+            self.log(f"Received message: {msg_type}")
                 
     def send_command(self, command_type, **kwargs):
         """Send a command to the Command Center."""
@@ -241,7 +284,7 @@ class CommandCenterGUI:
                 **kwargs
             }
             
-            self.cc_socket.sendall(json.dumps(message).encode())
+            self.cc_socket.sendall((json.dumps(message) + '\n').encode())
             
             # Log command
             self.log(f"Sent: {command_type}")

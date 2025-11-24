@@ -32,6 +32,7 @@ Requirements:
 from Py4GWCoreLib import *
 import PyImGui, Py4GW
 import time
+import os
 from typing import Generator, Any
 
 # Command Center socket support (optional)
@@ -324,6 +325,68 @@ def check_sync_signal() -> tuple[str, int]:
         Py4GW.Console.Log(BOT_NAME, f"Failed to check Command Center signals: {e}", 
                          Py4GW.Console.MessageType.Warning)
         return ("", 0)
+
+
+def check_command_center_commands():
+    """Check for commands from Command Center (like CMD_SWITCH_TEAMS, CMD_RESIGN, etc.)
+    and handle them appropriately."""
+    
+    if not SOCKET_MODE_AVAILABLE or not is_socket_mode_enabled():
+        return
+    
+    try:
+        from codex_socket_client import get_client
+        client = get_client()
+        if not client:
+            return
+        
+        # Check for messages with zero timeout for non-blocking behavior (called every frame)
+        message = client.get_next_message(timeout=0)
+        
+        if message:
+            msg_type = message.get('type', '')
+            
+            if msg_type == 'CMD_SWITCH_TEAMS':
+                # Handle team switch command from Command Center
+                new_role = message.get('new_role', '')
+                new_is_winning_team = message.get('is_winning_team')
+                
+                if new_is_winning_team is None:
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    "CMD_SWITCH_TEAMS message missing is_winning_team field", 
+                                    Py4GW.Console.MessageType.Error)
+                    return
+                
+                old_role = "Winning" if config.is_winning_team else "Losing"
+                config.is_winning_team = new_is_winning_team
+                
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Command Center switched teams: {old_role} -> {new_role}", 
+                                Py4GW.Console.MessageType.Warning)
+                
+            elif msg_type == 'CMD_RESIGN':
+                # Handle resign command from Command Center
+                from Py4GWCoreLib import Party
+                
+                reason = message.get('reason', 'unknown')
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Command Center ordered RESIGN: {reason}", 
+                                Py4GW.Console.MessageType.Warning)
+                
+                # Execute resign if in match
+                if config.in_match:
+                    try:
+                        send_message_to_party("RESIGN")
+                        Party.Resign()
+                        Py4GW.Console.Log(BOT_NAME, "Resigned per Command Center order", 
+                                        Py4GW.Console.MessageType.Info)
+                    except Exception as resign_error:
+                        Py4GW.Console.Log(BOT_NAME, f"Failed to resign: {resign_error}", 
+                                        Py4GW.Console.MessageType.Error)
+                
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Error checking Command Center commands: {e}", 
+                         Py4GW.Console.MessageType.Warning)
 
 
 def send_message_to_party(command_type: str, param1: float = 0.0):
@@ -1362,7 +1425,9 @@ def create_bot_routine(bot: Botting) -> None:
     
     # Auto-connect to Command Center on startup
     if SOCKET_MODE_AVAILABLE:
-        bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"
+        # Use process ID to make each bot unique even when both are winning/losing team
+        process_id = os.getpid()
+        bot_id = f"Leader{'W' if config.is_winning_team else 'L'}_{process_id}"
         Py4GW.Console.Log(BOT_NAME, 
                          f"Connecting to Command Center at {config.command_center_host}:{config.command_center_port}...",
                          Py4GW.Console.MessageType.Info)
@@ -1502,6 +1567,23 @@ def _draw_settings():
             config.is_winning_team = new_value
             Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
                             Py4GW.Console.MessageType.Info)
+            
+            # Notify Command Center of the team role change
+            if SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+                try:
+                    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+                    update_bot_state_socket(
+                        consecutive_wins=config.consecutive_wins,
+                        strongboxes_earned=config.strongboxes_earned,
+                        in_match=config.in_match,
+                        current_map_id=GLOBAL_CACHE.Map.GetMapID(),
+                        is_winning_team=config.is_winning_team
+                    )
+                    Py4GW.Console.Log(BOT_NAME, "Updated Command Center with new team role", 
+                                    Py4GW.Console.MessageType.Info)
+                except Exception as e:
+                    Py4GW.Console.Log(BOT_NAME, f"Failed to update Command Center: {e}", 
+                                    Py4GW.Console.MessageType.Warning)
         
         # Command Center connection status (always-on)
         if SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
@@ -1602,6 +1684,9 @@ def configure():
 
 def main():
     """Main update function - called every frame."""
+    # Check for Command Center commands (like team switches)
+    check_command_center_commands()
+    
     bot.Update()
     bot.UI.draw_window()
 
