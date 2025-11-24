@@ -1504,6 +1504,67 @@ def UnlockMercenaryHeroes(bot: Botting) -> None:
     bot.Map.Travel(target_map_id=248)  # GTOB
     bot.Move.XY(-4231.87, -8965.95)
     bot.Dialogs.WithModel(225, 0x800004) # Unlock Mercenary Heroes
+
+def NunduBayVialSpam(bot: Botting) -> None:
+    bot.Map.Travel(target_map_id=477)
+    
+    def harbinger_in_spirit_range():
+        from Py4GWCoreLib.Py4GWcorelib import Utils
+        enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+        for agent_id in enemy_array:
+            model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+            if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                player_pos = GLOBAL_CACHE.Player.GetXY()
+                harbinger_pos = GLOBAL_CACHE.Agent.GetXY(agent_id)
+                distance = Utils.Distance(player_pos, harbinger_pos)
+                if distance <= Range.Spirit.value:
+                    return True
+        return False
+    
+    bot.Move.FollowModel(5286, 200, harbinger_in_spirit_range)
+    
+    def WaitForHarbinger():
+        while True:
+            enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+            for agent_id in enemy_array:
+                model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+                if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                    player_pos = GLOBAL_CACHE.Player.GetXY()
+                    harbinger_pos = GLOBAL_CACHE.Agent.GetXY(agent_id)
+                    from Py4GWCoreLib.Py4GWcorelib import Utils
+                    distance = Utils.Distance(player_pos, harbinger_pos)
+                    if distance <= Range.Spellcast.value:
+                        return
+            yield from Routines.Yield.wait(500)
+    
+    def SpamVialOnHarbinger():
+        vial_skill_id = GLOBAL_CACHE.Skill.GetID("Vial_of_Purified_Water")
+        vial_slot = 0
+        for slot in range(1, 9):
+            if GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(slot) == vial_skill_id:
+                vial_slot = slot
+                break
+        
+        enemy_array = GLOBAL_CACHE.AgentArray.GetEnemyArray()
+        for agent_id in enemy_array:
+            model_id = GLOBAL_CACHE.Agent.GetModelID(agent_id)
+            if model_id in [5405, 5409] and GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                if vial_slot > 0:
+                    while GLOBAL_CACHE.Agent.IsAlive(agent_id):
+                        skill_data = GLOBAL_CACHE.SkillBar.GetSkillData(vial_slot)
+                        if skill_data.recharge == 0:
+                            yield from Routines.Yield.Agents.ChangeTarget(agent_id)
+                            yield from Routines.Yield.wait(100)
+                            GLOBAL_CACHE.SkillBar.UseSkill(vial_slot, agent_id)
+                            yield from Routines.Yield.wait(250)
+                        else:
+                            yield from Routines.Yield.wait(100)
+                        yield
+                return
+        yield
+    
+    bot.States.AddCustomState(WaitForHarbinger, "Wait for Harbinger")
+    bot.States.AddCustomState(SpamVialOnHarbinger, "Spam Vial on Harbinger")
 #region MAIN
 selected_step = 0
 filter_header_steps = True
