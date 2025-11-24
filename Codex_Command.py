@@ -1425,13 +1425,18 @@ def create_bot_routine(bot: Botting) -> None:
     # Auto-connect to Command Center on startup
     if SOCKET_MODE_AVAILABLE:
         # Use character name instead of generic "LeaderW/LeaderL"
-        from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
-        char_name = GLOBAL_CACHE.Player.GetName()
-        if not char_name or char_name.strip() == "":
-            # Fallback to old naming if character name not available
-            char_name = f"Leader{'W' if config.is_winning_team else 'L'}"
+        # Wrap in try-except in case player isn't loaded yet
+        bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"  # Default fallback
+        try:
+            from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+            char_name = GLOBAL_CACHE.Player.GetName()
+            if char_name and char_name.strip() != "":
+                bot_id = char_name
+        except Exception as e:
+            # Player not loaded yet or error getting name, use fallback
+            Py4GW.Console.Log(BOT_NAME, f"Could not get character name (using fallback): {e}", 
+                            Py4GW.Console.MessageType.Warning)
         
-        bot_id = char_name
         Py4GW.Console.Log(BOT_NAME, 
                          f"Connecting to Command Center at {config.command_center_host}:{config.command_center_port}...",
                          Py4GW.Console.MessageType.Info)
