@@ -32,6 +32,7 @@ Requirements:
 from Py4GWCoreLib import *
 import PyImGui, Py4GW
 import time
+import os
 from typing import Generator, Any
 
 # Command Center socket support (optional)
@@ -1424,7 +1425,9 @@ def create_bot_routine(bot: Botting) -> None:
     
     # Auto-connect to Command Center on startup
     if SOCKET_MODE_AVAILABLE:
-        bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"
+        # Use process ID to make each bot unique even when both are winning/losing team
+        process_id = os.getpid()
+        bot_id = f"Leader{'W' if config.is_winning_team else 'L'}_{process_id}"
         Py4GW.Console.Log(BOT_NAME, 
                          f"Connecting to Command Center at {config.command_center_host}:{config.command_center_port}...",
                          Py4GW.Console.MessageType.Info)
