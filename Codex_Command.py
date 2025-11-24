@@ -1564,6 +1564,23 @@ def _draw_settings():
             config.is_winning_team = new_value
             Py4GW.Console.Log(BOT_NAME, f"Team role changed to: {'Winning' if config.is_winning_team else 'Losing'}", 
                             Py4GW.Console.MessageType.Info)
+            
+            # Notify Command Center of the team role change
+            if SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():
+                try:
+                    from Py4GWCoreLib.GlobalCache import GLOBAL_CACHE
+                    update_bot_state_socket(
+                        consecutive_wins=config.consecutive_wins,
+                        strongboxes_earned=config.strongboxes_earned,
+                        in_match=config.in_match,
+                        current_map_id=GLOBAL_CACHE.Map.GetMapID(),
+                        is_winning_team=config.is_winning_team
+                    )
+                    Py4GW.Console.Log(BOT_NAME, "Updated Command Center with new team role", 
+                                    Py4GW.Console.MessageType.Info)
+                except Exception as e:
+                    Py4GW.Console.Log(BOT_NAME, f"Failed to update Command Center: {e}", 
+                                    Py4GW.Console.MessageType.Warning)
         
         # Command Center connection status (always-on)
         if SOCKET_MODE_AVAILABLE and is_socket_mode_enabled():

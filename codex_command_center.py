@@ -254,6 +254,15 @@ class CommandCenter:
                 bot_state.strongboxes_earned = message.get('strongboxes_earned', bot_state.strongboxes_earned)
                 bot_state.in_match = message.get('in_match', bot_state.in_match)
                 bot_state.current_map_id = message.get('current_map_id', bot_state.current_map_id)
+                
+                # Update is_winning_team if provided in the message
+                if 'is_winning_team' in message:
+                    old_team = "Winning" if bot_state.is_winning_team else "Losing"
+                    bot_state.is_winning_team = message.get('is_winning_team')
+                    new_team = "Winning" if bot_state.is_winning_team else "Losing"
+                    if old_team != new_team:
+                        self.logger.info(f"{sender_id} changed team role: {old_team} -> {new_team}")
+                
                 self.logger.info(f"Status update from {sender_id}: Wins={bot_state.consecutive_wins}, Boxes={bot_state.strongboxes_earned}, InMatch={bot_state.in_match}")
                 
                 # Broadcast state update to GUI clients

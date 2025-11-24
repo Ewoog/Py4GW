@@ -59,7 +59,8 @@ class SocketClient:
             'consecutive_wins': 0,
             'strongboxes_earned': 0,
             'in_match': False,
-            'current_map_id': 0
+            'current_map_id': 0,
+            'is_winning_team': is_winning_team
         }
         
     def connect(self) -> bool:
@@ -146,6 +147,10 @@ class SocketClient:
     def update_state(self, **kwargs):
         """Update bot state and send to Command Center."""
         self.state.update(kwargs)
+        
+        # Update is_winning_team attribute if provided
+        if 'is_winning_team' in kwargs:
+            self.is_winning_team = kwargs['is_winning_team']
         
         message = {
             'type': 'STATUS_UPDATE',
