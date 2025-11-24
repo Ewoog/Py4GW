@@ -1331,43 +1331,32 @@ class CombatClass:
             skill_id = self.skills[slot].skill_id
             skill_name = GLOBAL_CACHE.Skill.GetName(skill_id)
             
-            Py4GW.Console.Log("EchoFollowup", f"Pending follow-up detected: slot={slot}, skill={skill_name} (ID:{skill_id})", Py4GW.Console.MessageType.Info)
-            
             # Check if we're still in aftercast from the previous spell (Echo/Auspicious)
             # If so, wait for it to complete before casting the follow-up
             if self.in_casting_routine:
                 # Still in aftercast, return False to wait
-                elapsed = self.aftercast_timer.GetElapsedTime()
-                Py4GW.Console.Log("EchoFollowup", f"Waiting for aftercast to complete (elapsed: {elapsed}ms, target: {self.aftercast}ms)", Py4GW.Console.MessageType.Warning)
                 return False
             
             # Not in aftercast anymore, attempt to cast the follow-up immediately
             # We skip most checks here because we already validated the skill was ready before casting Echo/Auspicious
             
-            Py4GW.Console.Log("EchoFollowup", "Aftercast complete, proceeding with follow-up cast checks", Py4GW.Console.MessageType.Info)
-            
             # Only do minimal validation: check if player can cast and target is valid
             if GLOBAL_CACHE.Agent.IsCasting(GLOBAL_CACHE.Player.GetAgentID()):
                 # Player is casting, wait
-                Py4GW.Console.Log("EchoFollowup", "Player is currently casting, waiting...", Py4GW.Console.MessageType.Warning)
                 return False
             
             if GLOBAL_CACHE.SkillBar.GetCasting() != 0:
                 # Something is being cast, wait
-                casting_skill = GLOBAL_CACHE.SkillBar.GetCasting()
-                Py4GW.Console.Log("EchoFollowup", f"SkillBar shows casting in progress (skill: {casting_skill}), waiting...", Py4GW.Console.MessageType.Warning)
                 return False
             
             # Get target for the follow-up skill
             target_agent_id = self.GetAppropiateTarget(slot)
             if target_agent_id == 0 or not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
                 # Target not valid, clear pending and continue
-                Py4GW.Console.Log("EchoFollowup", f"Target not valid (ID: {target_agent_id}), clearing pending follow-up", Py4GW.Console.MessageType.Error)
                 self.pending_followup_skill_slot = -1
                 return False
             
             # Cast the follow-up skill immediately
-            Py4GW.Console.Log("EchoFollowup", f"CASTING FOLLOW-UP: {skill_name} on target {target_agent_id}", Py4GW.Console.MessageType.Success)
             self.in_casting_routine = True
             
             if self.fast_casting_exists:
@@ -1390,9 +1379,6 @@ class CombatClass:
             # Check if the follow-up skill we just cast is Arcane Echo or Auspicious Incantation
             # If so, it also needs to set up its own follow-up skill
             if skill_id == self.arcane_echo or skill_id == self.auspicious_incantation:
-                echo_spell_name = GLOBAL_CACHE.Skill.GetName(skill_id)
-                Py4GW.Console.Log("EchoFollowup", f"Follow-up was {echo_spell_name}, setting up its follow-up...", Py4GW.Console.MessageType.Info)
-                
                 from HeroAI.settings import Settings
                 settings = Settings()
                 
@@ -1405,8 +1391,6 @@ class CombatClass:
                 nested_followup_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(nested_followup_skillbar_slot + 1)
                 
                 if nested_followup_skill_id > 0 and nested_followup_skill_id != skill_id:
-                    nested_followup_skill_name = GLOBAL_CACHE.Skill.GetName(nested_followup_skill_id)
-                    
                     # Find the prioritized slot index for this skill ID
                     nested_followup_prioritized_slot = -1
                     for i in range(len(self.skills)):
@@ -1415,62 +1399,45 @@ class CombatClass:
                             break
                     
                     if nested_followup_prioritized_slot >= 0:
-                        Py4GW.Console.Log("EchoFollowup", f"Setting up nested follow-up: {nested_followup_skill_name} at prioritized slot {nested_followup_prioritized_slot}", Py4GW.Console.MessageType.Info)
                         self.pending_followup_skill_slot = nested_followup_prioritized_slot
                         self.followup_skill_timer.Reset()
                         self.followup_skill_timer.Start()
                         # Don't clear pending or reset pointer here - let the nested follow-up cast next
-                        Py4GW.Console.Log("EchoFollowup", "Follow-up cast complete, nested follow-up pending", Py4GW.Console.MessageType.Success)
                         return True
             
             # Clear the pending follow-up
             self.pending_followup_skill_slot = -1
             self.ResetSkillPointer()
-            Py4GW.Console.Log("EchoFollowup", "Follow-up cast complete, pending cleared", Py4GW.Console.MessageType.Success)
             return True
        
         slot = self.skill_pointer
         skill_id = self.skills[slot].skill_id
         skill_name = GLOBAL_CACHE.Skill.GetName(skill_id)
         
-        # Debug logging for Auspicious Incantation
-        if skill_id == self.auspicious_incantation:
-            Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Evaluating Auspicious Incantation at slot {slot}", Py4GW.Console.MessageType.Info)
-        
         is_skill_ready = self.IsSkillReady(slot)
             
         if not is_skill_ready:
-            if skill_id == self.auspicious_incantation:
-                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious failed IsSkillReady check", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
         
         is_ooc_skill = self.IsOOCSkill(slot)
 
         if ooc and not is_ooc_skill:
-            if skill_id == self.auspicious_incantation:
-                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious failed OOC check (ooc={ooc}, is_ooc_skill={is_ooc_skill})", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
          
         is_read_to_cast, target_agent_id = self.IsReadyToCast(slot)
  
         if not is_read_to_cast:
-            if skill_id == self.auspicious_incantation:
-                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious failed IsReadyToCast check", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
         
 
         if target_agent_id == 0:
-            if skill_id == self.auspicious_incantation:
-                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious has no target (target_agent_id=0)", Py4GW.Console.MessageType.Warning)
             self.AdvanceSkillPointer()
             return False
 
         if not GLOBAL_CACHE.Agent.IsLiving(target_agent_id):
-            if skill_id == self.auspicious_incantation:
-                Py4GW.Console.Log("EchoFollowup", f"[DEBUG] Auspicious target not living (target_agent_id={target_agent_id})", Py4GW.Console.MessageType.Warning)
             return False
         
         # Special check for Arcane Echo: ensure target spell is ready
@@ -1479,15 +1446,10 @@ class CombatClass:
             settings = Settings()
             followup_skillbar_slot = settings.ArcaneEchoSkillSlot  # This is the SKILLBAR slot (0-7), not prioritized index
             
-            Py4GW.Console.Log("EchoFollowup", f"Pre-cast check for Arcane Echo (configured skillbar slot={followup_skillbar_slot})", Py4GW.Console.MessageType.Info)
-            
             # Get the skill ID from the skillbar slot (1-based for GetSkillIDBySlot)
             followup_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(followup_skillbar_slot + 1)
             
             if followup_skill_id > 0:
-                followup_skill_name = GLOBAL_CACHE.Skill.GetName(followup_skill_id)
-                Py4GW.Console.Log("EchoFollowup", f"Target skill in skillbar slot {followup_skillbar_slot}: {followup_skill_name} (ID: {followup_skill_id})", Py4GW.Console.MessageType.Info)
-                
                 # Priority check: If Auspicious Incantation is configured to target Arcane Echo and is ready,
                 # skip Arcane Echo to let Auspicious cast first
                 # 
@@ -1507,22 +1469,15 @@ class CombatClass:
                         # Auspicious targets Arcane Echo slot
                         is_auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
                         if is_auspicious_ready:
-                            Py4GW.Console.Log("EchoFollowup", f"Auspicious Incantation is ready and targeting Arcane Echo - giving priority to Auspicious, skipping Arcane Echo", Py4GW.Console.MessageType.Info)
                             self.ResetSkillPointer()  # Reset to start so Auspicious gets a chance to cast
                             return False
                 
                 # Check if the followup skill is ready (not on cooldown)
                 is_ready = Routines.Checks.Skills.IsSkillIDReady(followup_skill_id)
-                Py4GW.Console.Log("EchoFollowup", f"Target spell {followup_skill_name} ready check: {is_ready}", Py4GW.Console.MessageType.Info)
                 
                 if not is_ready:
-                    Py4GW.Console.Log("EchoFollowup", f"Target spell {followup_skill_name} NOT READY - skipping Arcane Echo cast", Py4GW.Console.MessageType.Warning)
                     self.AdvanceSkillPointer()
                     return False
-                else:
-                    Py4GW.Console.Log("EchoFollowup", f"Target spell {followup_skill_name} is ready - proceeding with Arcane Echo cast", Py4GW.Console.MessageType.Success)
-            else:
-                Py4GW.Console.Log("EchoFollowup", f"No skill found in skillbar slot {followup_skillbar_slot}", Py4GW.Console.MessageType.Error)
         
         # Special check for Auspicious Incantation: ensure we have enough energy for both
         # Auspicious Incantation AND the target spell
@@ -1531,19 +1486,13 @@ class CombatClass:
             settings = Settings()
             followup_skillbar_slot = settings.AuspiciousIncantationSkillSlot  # This is skillbar slot (0-7)
             
-            Py4GW.Console.Log("EchoFollowup", f"Pre-cast check for Auspicious Incantation (configured skillbar slot={followup_skillbar_slot})", Py4GW.Console.MessageType.Info)
-            
             # Get the skill ID from the skillbar slot (1-based for GetSkillIDBySlot)
             followup_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(followup_skillbar_slot + 1)
             
             if followup_skill_id > 0:
-                followup_skill_name = GLOBAL_CACHE.Skill.GetName(followup_skill_id)
-                Py4GW.Console.Log("EchoFollowup", f"Target skill in skillbar slot {followup_skillbar_slot}: {followup_skill_name} (ID: {followup_skill_id})", Py4GW.Console.MessageType.Info)
-                
                 # Check if the followup skill is ready (not on cooldown)
                 is_ready = Routines.Checks.Skills.IsSkillIDReady(followup_skill_id)
                 if not is_ready:
-                    Py4GW.Console.Log("EchoFollowup", f"Target spell {followup_skill_name} NOT READY - skipping Auspicious Incantation cast", Py4GW.Console.MessageType.Warning)
                     self.AdvanceSkillPointer()
                     return False
                 
@@ -1562,54 +1511,49 @@ class CombatClass:
                 
                 total_energy_needed = auspicious_cost + followup_cost
                 
-                Py4GW.Console.Log("EchoFollowup", f"Energy check: Current={current_energy:.0f}, Needed={total_energy_needed:.0f} (Auspicious={auspicious_cost:.0f} + Target={followup_cost:.0f})", Py4GW.Console.MessageType.Info)
-                
                 if current_energy < total_energy_needed:
-                    Py4GW.Console.Log("EchoFollowup", f"Not enough energy - skipping Auspicious Incantation cast", Py4GW.Console.MessageType.Warning)
                     self.AdvanceSkillPointer()
                     return False
-                else:
-                    Py4GW.Console.Log("EchoFollowup", f"Energy sufficient - proceeding with Auspicious Incantation cast", Py4GW.Console.MessageType.Success)
-            else:
-                Py4GW.Console.Log("EchoFollowup", f"No skill found in skillbar slot {followup_skillbar_slot}", Py4GW.Console.MessageType.Error)
         
         # Check if this is a target spell for Arcane Echo or Auspicious Incantation
-        # If so, and the Echo/Auspicious spell is available, skip this spell
+        # If so, and the corresponding echo spell is ready, skip this spell to let the echo spell cast first
         # Priority: Auspicious (highest) -> Arcane -> target spell
+        # Allow casting the target spell if the echo spell is on cooldown
         from HeroAI.settings import Settings
         settings = Settings()
         
-        # Check if current skill is the Auspicious target and Auspicious is ready
-        if (settings.AuspiciousIncantationSkillSlot < len(self.skills) and 
-            skill_id == self.skills[settings.AuspiciousIncantationSkillSlot].skill_id and
-            skill_id != self.auspicious_incantation):
-            # Check if Auspicious Incantation is ready
-            if Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation):
-                # Skip this spell, let Auspicious cast first
+        # Get the skill IDs from the configured skillbar slots
+        auspicious_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(settings.AuspiciousIncantationSkillSlot + 1)
+        arcane_target_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(settings.ArcaneEchoSkillSlot + 1)
+        
+        # Check if current skill is the target for Auspicious OR Arcane Echo
+        is_auspicious_target = (auspicious_target_skill_id > 0 and 
+                                skill_id == auspicious_target_skill_id and
+                                skill_id != self.auspicious_incantation)
+        
+        is_arcane_target = (arcane_target_skill_id > 0 and 
+                           skill_id == arcane_target_skill_id and
+                           skill_id != self.arcane_echo)
+        
+        # Skip if the corresponding echo spell is ready (let it cast first)
+        # Check Auspicious first (higher priority)
+        if is_auspicious_target:
+            auspicious_ready = Routines.Checks.Skills.IsSkillIDReady(self.auspicious_incantation)
+            if auspicious_ready:
+                # Auspicious target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
         
-        # Check if current skill is the Arcane Echo target and Arcane Echo is ready
-        if (settings.ArcaneEchoSkillSlot < len(self.skills) and 
-            skill_id == self.skills[settings.ArcaneEchoSkillSlot].skill_id and
-            skill_id != self.arcane_echo):
-            # Check if Arcane Echo is ready
-            if Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo):
-                # Skip this spell, let Arcane Echo cast first
+        if is_arcane_target:
+            arcane_ready = Routines.Checks.Skills.IsSkillIDReady(self.arcane_echo)
+            if arcane_ready:
+                # Arcane target and it's ready, let it cast first
                 self.AdvanceSkillPointer()
                 return False
+        
+        # Otherwise, the echo spell is on cooldown, so allow casting the target spell
             
         self.in_casting_routine = True
-        
-        # Log when we're about to cast a skill (to detect if other skills are being cast when they shouldn't)
-        skill_name = GLOBAL_CACHE.Skill.GetName(skill_id)
-        if self.pending_followup_skill_slot >= 0:
-            # This should NEVER happen - if there's a pending follow-up, we should have handled it above
-            Py4GW.Console.Log("EchoFollowup", f"ERROR: Casting {skill_name} while pending_followup_skill_slot={self.pending_followup_skill_slot}! This is a bug!", Py4GW.Console.MessageType.Error)
-        
-        if skill_id == self.arcane_echo or skill_id == self.auspicious_incantation:
-            Py4GW.Console.Log("EchoFollowup", f"Casting {skill_name} (will set up follow-up after)", Py4GW.Console.MessageType.Info)
-
         
         if self.fast_casting_exists:
             activation, recharge = Routines.Checks.Skills.apply_fast_casting(skill_id, self.fast_casting_level)
@@ -1633,9 +1577,6 @@ class CombatClass:
         # Check if we just cast Arcane Echo or Auspicious Incantation
         # If so, schedule the configured follow-up skill to be cast next
         if skill_id == self.arcane_echo or skill_id == self.auspicious_incantation:
-            echo_spell_name = GLOBAL_CACHE.Skill.GetName(skill_id)
-            Py4GW.Console.Log("EchoFollowup", f"Just cast {echo_spell_name}, setting up follow-up...", Py4GW.Console.MessageType.Info)
-            
             from HeroAI.settings import Settings
             settings = Settings()
             
@@ -1644,14 +1585,10 @@ class CombatClass:
             else:  # auspicious_incantation
                 followup_skillbar_slot = settings.AuspiciousIncantationSkillSlot  # This is skillbar slot (0-7)
             
-            Py4GW.Console.Log("EchoFollowup", f"Configured follow-up skillbar slot: {followup_skillbar_slot}", Py4GW.Console.MessageType.Info)
-            
             # Get the skill ID from the skillbar slot
             followup_skill_id = GLOBAL_CACHE.SkillBar.GetSkillIDBySlot(followup_skillbar_slot + 1)  # +1 because GetSkillIDBySlot uses 1-based indexing
             
             if followup_skill_id > 0 and followup_skill_id != skill_id:
-                followup_skill_name = GLOBAL_CACHE.Skill.GetName(followup_skill_id)
-                
                 # Find the prioritized slot index for this skill ID
                 followup_prioritized_slot = -1
                 for i in range(len(self.skills)):
@@ -1660,18 +1597,9 @@ class CombatClass:
                         break
                 
                 if followup_prioritized_slot >= 0:
-                    Py4GW.Console.Log("EchoFollowup", f"Found {followup_skill_name} at prioritized slot {followup_prioritized_slot} (skillbar slot {followup_skillbar_slot})", Py4GW.Console.MessageType.Info)
                     self.pending_followup_skill_slot = followup_prioritized_slot
                     self.followup_skill_timer.Reset()
                     self.followup_skill_timer.Start()
-                    Py4GW.Console.Log("EchoFollowup", f"PENDING FOLLOW-UP SET: Will cast {followup_skill_name} next (aftercast: {self.aftercast}ms)", Py4GW.Console.MessageType.Success)
-                else:
-                    Py4GW.Console.Log("EchoFollowup", f"Could not find {followup_skill_name} in prioritized skill list!", Py4GW.Console.MessageType.Error)
-            else:
-                if followup_skill_id == 0:
-                    Py4GW.Console.Log("EchoFollowup", f"No skill in skillbar slot {followup_skillbar_slot}", Py4GW.Console.MessageType.Error)
-                elif followup_skill_id == skill_id:
-                    Py4GW.Console.Log("EchoFollowup", f"Follow-up skill is same as Echo spell, not setting pending", Py4GW.Console.MessageType.Error)
         
         self.ResetSkillPointer()
         return True
