@@ -374,10 +374,14 @@ def check_command_center_commands():
                 
                 # Execute resign if in match
                 if config.in_match:
-                    send_message_to_party("RESIGN")
-                    Party.Resign()
-                    Py4GW.Console.Log(BOT_NAME, "Resigned per Command Center order", 
-                                    Py4GW.Console.MessageType.Info)
+                    try:
+                        send_message_to_party("RESIGN")
+                        Party.Resign()
+                        Py4GW.Console.Log(BOT_NAME, "Resigned per Command Center order", 
+                                        Py4GW.Console.MessageType.Info)
+                    except Exception as resign_error:
+                        Py4GW.Console.Log(BOT_NAME, f"Failed to resign: {resign_error}", 
+                                        Py4GW.Console.MessageType.Error)
                 
     except Exception as e:
         Py4GW.Console.Log(BOT_NAME, f"Error checking Command Center commands: {e}", 
