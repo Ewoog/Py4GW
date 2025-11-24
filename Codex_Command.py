@@ -339,8 +339,8 @@ def check_command_center_commands():
         if not client:
             return
         
-        # Check for messages with a very short timeout (called every frame)
-        message = client.get_next_message(timeout=0.001)
+        # Check for messages with zero timeout for non-blocking behavior (called every frame)
+        message = client.get_next_message(timeout=0)
         
         if message:
             msg_type = message.get('type', '')
@@ -348,7 +348,13 @@ def check_command_center_commands():
             if msg_type == 'CMD_SWITCH_TEAMS':
                 # Handle team switch command from Command Center
                 new_role = message.get('new_role', '')
-                new_is_winning_team = message.get('is_winning_team', config.is_winning_team)
+                new_is_winning_team = message.get('is_winning_team')
+                
+                if new_is_winning_team is None:
+                    Py4GW.Console.Log(BOT_NAME, 
+                                    "CMD_SWITCH_TEAMS message missing is_winning_team field", 
+                                    Py4GW.Console.MessageType.Error)
+                    return
                 
                 old_role = "Winning" if config.is_winning_team else "Losing"
                 config.is_winning_team = new_is_winning_team
@@ -359,6 +365,8 @@ def check_command_center_commands():
                 
             elif msg_type == 'CMD_RESIGN':
                 # Handle resign command from Command Center
+                from Py4GWCoreLib import Party
+                
                 reason = message.get('reason', 'unknown')
                 Py4GW.Console.Log(BOT_NAME, 
                                 f"Command Center ordered RESIGN: {reason}", 
@@ -366,7 +374,6 @@ def check_command_center_commands():
                 
                 # Execute resign if in match
                 if config.in_match:
-                    from Py4GWCoreLib import Party
                     send_message_to_party("RESIGN")
                     Party.Resign()
                     Py4GW.Console.Log(BOT_NAME, "Resigned per Command Center order", 
