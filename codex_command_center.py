@@ -242,9 +242,26 @@ class CommandCenter:
                 pass
                 
     def process_message(self, sender_id: str, message: Dict):
-        """Process a message from a Leader bot."""
+        """Process a message from a Leader bot or GUI."""
         msg_type = message.get('type')
         
+        # Handle GUI commands first (they don't need to be in clients dictionary)
+        if msg_type == 'GUI_RESIGN':
+            self.logger.info("GUI commanded RESIGN for all bots")
+            self.handle_gui_resign()
+            return
+            
+        elif msg_type == 'GUI_SWITCH_TEAMS':
+            self.logger.info("GUI commanded SWITCH_TEAMS")
+            self.handle_gui_switch_teams()
+            return
+            
+        elif msg_type == 'GUI_FORCE_QUEUE':
+            self.logger.info("GUI commanded FORCE_QUEUE")
+            self.handle_gui_force_queue()
+            return
+        
+        # For all other messages, sender must be a registered client
         with self.lock:
             if sender_id not in self.clients:
                 return
@@ -279,19 +296,6 @@ class CommandCenter:
             elif msg_type in ['MATCH_START', 'MATCH_END', 'WIN_COUNT']:
                 # These still get routed to partner for informational purposes
                 self.route_signal(sender_id, message)
-            
-            # GUI commands
-            elif msg_type == 'GUI_RESIGN':
-                self.logger.info("GUI commanded RESIGN for all bots")
-                self.handle_gui_resign()
-                
-            elif msg_type == 'GUI_SWITCH_TEAMS':
-                self.logger.info("GUI commanded SWITCH_TEAMS")
-                self.handle_gui_switch_teams()
-                
-            elif msg_type == 'GUI_FORCE_QUEUE':
-                self.logger.info("GUI commanded FORCE_QUEUE")
-                self.handle_gui_force_queue()
                 
             else:
                 self.logger.warning(f"Unknown message type from {sender_id}: {msg_type}")
