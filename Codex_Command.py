@@ -326,6 +326,68 @@ def check_sync_signal() -> tuple[str, int]:
         return ("", 0)
 
 
+def check_command_center_commands():
+    """Check for commands from Command Center (like CMD_SWITCH_TEAMS, CMD_RESIGN, etc.)
+    and handle them appropriately."""
+    
+    if not SOCKET_MODE_AVAILABLE or not is_socket_mode_enabled():
+        return
+    
+    try:
+        from codex_socket_client import get_client
+        client = get_client()
+        if not client:
+            return
+        
+        # Check for messages with a short timeout
+        message = client.get_next_message(timeout=0.05)
+        
+        if message:
+            msg_type = message.get('type', '')
+            
+            if msg_type == 'CMD_SWITCH_TEAMS':
+                # Handle team switch command from Command Center
+                new_role = message.get('new_role', '')
+                new_is_winning_team = message.get('is_winning_team', config.is_winning_team)
+                
+                old_role = "Winning" if config.is_winning_team else "Losing"
+                config.is_winning_team = new_is_winning_team
+                
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Command Center switched teams: {old_role} -> {new_role}", 
+                                Py4GW.Console.MessageType.Warning)
+                
+                # Update the bot_id for the socket connection
+                new_bot_id = f"Leader{'W' if config.is_winning_team else 'L'}"
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Bot ID updated to: {new_bot_id}", 
+                                Py4GW.Console.MessageType.Info)
+                
+            elif msg_type == 'CMD_RESIGN':
+                # Handle resign command from Command Center
+                reason = message.get('reason', 'unknown')
+                Py4GW.Console.Log(BOT_NAME, 
+                                f"Command Center ordered RESIGN: {reason}", 
+                                Py4GW.Console.MessageType.Warning)
+                
+                # Execute resign if in match
+                if config.in_match:
+                    from Py4GWCoreLib import Party
+                    send_message_to_party("RESIGN")
+                    Party.Resign()
+                    Py4GW.Console.Log(BOT_NAME, "Resigned per Command Center order", 
+                                    Py4GW.Console.MessageType.Info)
+                
+            elif msg_type == 'CMD_QUEUE_NOW':
+                # This is already handled by check_sync_signal for "QUEUE_NOW"
+                # but we can log it here if needed
+                pass
+                
+    except Exception as e:
+        Py4GW.Console.Log(BOT_NAME, f"Error checking Command Center commands: {e}", 
+                         Py4GW.Console.MessageType.Warning)
+
+
 def send_message_to_party(command_type: str, param1: float = 0.0):
     """Send a SharedCommandType message to all party members.
     Party members should run the Messaging.py widget to receive these commands."""
@@ -1602,6 +1664,9 @@ def configure():
 
 def main():
     """Main update function - called every frame."""
+    # Check for Command Center commands (like team switches)
+    check_command_center_commands()
+    
     bot.Update()
     bot.UI.draw_window()
 
