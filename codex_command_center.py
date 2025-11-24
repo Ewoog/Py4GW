@@ -11,12 +11,13 @@ Features:
 - Real-time monitoring of bot states
 - Command routing and synchronization
 - Event logging and diagnostics
-- Web dashboard for monitoring (optional future enhancement)
+- Tkinter GUI for visual monitoring and control (default)
 
 Usage:
-    python codex_command_center.py [--host HOST] [--port PORT]
+    python codex_command_center.py [--host HOST] [--port PORT] [--no-gui]
     
     Default: HOST=127.0.0.1, PORT=12345
+    --no-gui: Run in headless mode without GUI
 """
 
 import socket
@@ -29,6 +30,15 @@ from datetime import datetime
 from typing import Dict, Optional, List, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+# Try to import tkinter for GUI mode
+TKINTER_AVAILABLE = False
+try:
+    import tkinter as tk
+    from tkinter import ttk, scrolledtext, messagebox
+    TKINTER_AVAILABLE = True
+except ImportError:
+    pass
 
 
 # Configuration constants
@@ -232,9 +242,26 @@ class CommandCenter:
                 pass
                 
     def process_message(self, sender_id: str, message: Dict):
-        """Process a message from a Leader bot."""
+        """Process a message from a Leader bot or GUI."""
         msg_type = message.get('type')
         
+        # Handle GUI commands first (they don't need to be in clients dictionary)
+        if msg_type == 'GUI_RESIGN':
+            self.logger.info("GUI commanded RESIGN for all bots")
+            self.handle_gui_resign()
+            return
+            
+        elif msg_type == 'GUI_SWITCH_TEAMS':
+            self.logger.info("GUI commanded SWITCH_TEAMS")
+            self.handle_gui_switch_teams()
+            return
+            
+        elif msg_type == 'GUI_FORCE_QUEUE':
+            self.logger.info("GUI commanded FORCE_QUEUE")
+            self.handle_gui_force_queue()
+            return
+        
+        # For all other messages, sender must be a registered client
         with self.lock:
             if sender_id not in self.clients:
                 return
@@ -281,19 +308,6 @@ class CommandCenter:
             elif msg_type in ['MATCH_START', 'MATCH_END', 'WIN_COUNT']:
                 # These still get routed to partner for informational purposes
                 self.route_signal(sender_id, message)
-            
-            # GUI commands
-            elif msg_type == 'GUI_RESIGN':
-                self.logger.info("GUI commanded RESIGN for all bots")
-                self.handle_gui_resign()
-                
-            elif msg_type == 'GUI_SWITCH_TEAMS':
-                self.logger.info("GUI commanded SWITCH_TEAMS")
-                self.handle_gui_switch_teams()
-                
-            elif msg_type == 'GUI_FORCE_QUEUE':
-                self.logger.info("GUI commanded FORCE_QUEUE")
-                self.handle_gui_force_queue()
                 
             else:
                 self.logger.warning(f"Unknown message type from {sender_id}: {msg_type}")
@@ -616,6 +630,246 @@ class CommandCenter:
         self.logger.info("Command Center shutdown complete")
 
 
+class CommandCenterGUI:
+    """Tkinter GUI for Command Center control and monitoring."""
+    
+    def __init__(self, host='127.0.0.1', port=12345, command_center=None):
+        self.host = host
+        self.port = port
+        self.command_center = command_center  # Direct reference to CC server
+        self.connected = True  # Always connected in embedded mode
+        self.running = True
+        
+        # Bot state
+        self.bots = {}
+        self.command_history = []
+        
+        # Create main window
+        self.root = tk.Tk()
+        self.root.title("⚔️ Codex Arena Command Center ⚔️")
+        self.root.geometry("900x700")
+        self.root.configure(bg='#2d3748')
+        
+        # Style configuration
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('TFrame', background='#2d3748')
+        style.configure('TLabel', background='#2d3748', foreground='white', font=('Arial', 10))
+        style.configure('Title.TLabel', font=('Arial', 16, 'bold'))
+        style.configure('Header.TLabel', font=('Arial', 12, 'bold'))
+        style.configure('Status.TLabel', font=('Arial', 10, 'bold'))
+        
+        self.create_widgets()
+        
+        # Start update loop
+        self.update_loop()
+        
+    def create_widgets(self):
+        """Create all GUI widgets."""
+        
+        # Header
+        header_frame = ttk.Frame(self.root)
+        header_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        title_label = ttk.Label(header_frame, text="⚔️ Codex Arena Command Center ⚔️", 
+                               style='Title.TLabel')
+        title_label.pack()
+        
+        self.status_label = ttk.Label(header_frame, text="🟢 Connected", 
+                                     style='Status.TLabel', foreground='#10b981')
+        self.status_label.pack()
+        
+        # Main content area
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # Left panel - Bot Status
+        left_frame = ttk.Frame(main_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        ttk.Label(left_frame, text="📊 Bot Status", style='Header.TLabel').pack(anchor=tk.W)
+        
+        # Bot status area with scrollbar
+        bot_frame = tk.Frame(left_frame, bg='#1a202c', relief=tk.SUNKEN, bd=2)
+        bot_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        self.bot_text = scrolledtext.ScrolledText(bot_frame, height=15, width=45,
+                                                   bg='#1a202c', fg='white',
+                                                   font=('Courier New', 9),
+                                                   relief=tk.FLAT)
+        self.bot_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.bot_text.insert('1.0', 'No bots connected\n')
+        self.bot_text.config(state=tk.DISABLED)
+        
+        # Right panel - Controls
+        right_frame = ttk.Frame(main_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        ttk.Label(right_frame, text="🎮 Manual Controls", style='Header.TLabel').pack(anchor=tk.W)
+        
+        # Control buttons
+        controls_frame = ttk.Frame(right_frame)
+        controls_frame.pack(fill=tk.X, pady=5)
+        
+        # Resign button
+        resign_btn = tk.Button(controls_frame, text="⚠️ Force Resign", 
+                              bg='#ef4444', fg='white', font=('Arial', 10, 'bold'),
+                              activebackground='#dc2626', cursor='hand2',
+                              command=self.cmd_resign, pady=10)
+        resign_btn.pack(fill=tk.X, pady=2)
+        
+        # Switch Teams button
+        switch_btn = tk.Button(controls_frame, text="🔄 Switch Teams",
+                              bg='#8b5cf6', fg='white', font=('Arial', 10, 'bold'),
+                              activebackground='#7c3aed', cursor='hand2',
+                              command=self.cmd_switch_teams, pady=10)
+        switch_btn.pack(fill=tk.X, pady=2)
+        
+        # Force Queue button
+        queue_btn = tk.Button(controls_frame, text="▶️ Force Queue",
+                             bg='#10b981', fg='white', font=('Arial', 10, 'bold'),
+                             activebackground='#059669', cursor='hand2',
+                             command=self.cmd_force_queue, pady=10)
+        queue_btn.pack(fill=tk.X, pady=2)
+        
+        # Command reference
+        ref_frame = tk.LabelFrame(right_frame, text="Command Reference", 
+                                 bg='#374151', fg='white', font=('Arial', 9, 'bold'))
+        ref_frame.pack(fill=tk.X, pady=5)
+        
+        ref_text = tk.Text(ref_frame, height=6, bg='#374151', fg='white',
+                          font=('Arial', 8), relief=tk.FLAT, wrap=tk.WORD)
+        ref_text.pack(fill=tk.X, padx=5, pady=5)
+        ref_text.insert('1.0', 
+                       "• Force Resign: Both teams resign immediately\n"
+                       "• Switch Teams: Swap winning/losing roles\n"
+                       "• Force Queue: Command both to queue now\n\n"
+                       "Commands are sent to all connected bots\n"
+                       "through the Command Center.")
+        ref_text.config(state=tk.DISABLED)
+        
+        # Bottom panel - Command Log
+        log_frame = ttk.Frame(self.root)
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        
+        ttk.Label(log_frame, text="📜 Command History", style='Header.TLabel').pack(anchor=tk.W)
+        
+        # Log area
+        log_text_frame = tk.Frame(log_frame, bg='#1a202c', relief=tk.SUNKEN, bd=2)
+        log_text_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        self.log_text = scrolledtext.ScrolledText(log_text_frame, height=8,
+                                                   bg='#1a202c', fg='#a0aec0',
+                                                   font=('Courier New', 9),
+                                                   relief=tk.FLAT)
+        self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.log_text.insert('1.0', 'Command history will appear here...\n')
+        self.log_text.config(state=tk.DISABLED)
+        
+    def send_command(self, command_type, **kwargs):
+        """Send a command to the Command Center."""
+        if not self.command_center:
+            messagebox.showerror("Error", "Command Center not available")
+            return False
+            
+        try:
+            # Call command center methods directly
+            message = {
+                'type': f'GUI_{command_type}',
+                'timestamp': time.time(),
+                **kwargs
+            }
+            
+            # Process through command center
+            self.command_center.process_message('GUI_Monitor', message)
+            
+            # Log command
+            self.log(f"Sent: {command_type}")
+            return True
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to send command: {e}")
+            return False
+            
+    def cmd_resign(self):
+        """Force Resign command."""
+        if messagebox.askyesno("Confirm", "Force both teams to resign?"):
+            self.send_command('RESIGN', reason='manual_gui_command')
+            
+    def cmd_switch_teams(self):
+        """Switch Teams command."""
+        if messagebox.askyesno("Confirm", "Switch winning/losing team roles?"):
+            self.send_command('SWITCH_TEAMS')
+            
+    def cmd_force_queue(self):
+        """Force Queue command."""
+        if messagebox.askyesno("Confirm", "Force both teams to queue now?"):
+            self.send_command('FORCE_QUEUE')
+            
+    def log(self, message):
+        """Add message to log."""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        log_msg = f"[{timestamp}] {message}\n"
+        
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.insert('1.0', log_msg)
+        self.log_text.config(state=tk.DISABLED)
+        
+    def update_status_display(self):
+        """Update the bot status display."""
+        # Get current bot status from command center
+        if self.command_center:
+            self.bots = self.command_center.get_bot_status_for_gui()
+        
+        self.bot_text.config(state=tk.NORMAL)
+        self.bot_text.delete('1.0', tk.END)
+        
+        if not self.bots:
+            self.bot_text.insert('1.0', 'No bots connected\n\n')
+            self.bot_text.insert(tk.END, 'Waiting for Leader bots to connect...')
+        else:
+            for bot_id, bot_info in self.bots.items():
+                team = "Winning" if bot_info.get('is_winning_team') else "Losing"
+                wins = bot_info.get('consecutive_wins', 0)
+                boxes = bot_info.get('strongboxes_earned', 0)
+                in_match = "Yes" if bot_info.get('in_match') else "No"
+                map_id = bot_info.get('current_map_id', 'N/A')
+                
+                self.bot_text.insert(tk.END, f"{'='*40}\n")
+                self.bot_text.insert(tk.END, f"{bot_id} ({team} Team)\n")
+                self.bot_text.insert(tk.END, f"{'='*40}\n")
+                self.bot_text.insert(tk.END, f"  Consecutive Wins: {wins}\n")
+                self.bot_text.insert(tk.END, f"  Strongboxes:      {boxes}\n")
+                self.bot_text.insert(tk.END, f"  In Match:         {in_match}\n")
+                self.bot_text.insert(tk.END, f"  Map ID:           {map_id}\n\n")
+        
+        self.bot_text.config(state=tk.DISABLED)
+        
+    def update_loop(self):
+        """Main update loop for GUI."""
+        # Update connection status
+        if self.connected:
+            self.status_label.config(text="🟢 Connected", foreground='#10b981')
+        else:
+            self.status_label.config(text="🔴 Disconnected", foreground='#ef4444')
+            
+        # Update bot display
+        self.update_status_display()
+        
+        # Schedule next update
+        self.root.after(1000, self.update_loop)
+        
+    def run(self):
+        """Start the GUI main loop."""
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.root.mainloop()
+        
+    def on_closing(self):
+        """Handle window closing."""
+        self.running = False
+        self.root.destroy()
+
+
 def main():
     """Main entry point for the command center."""
     parser = argparse.ArgumentParser(
@@ -623,8 +877,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                           # Start with default settings (127.0.0.1:12345)
-  %(prog)s --host 0.0.0.0 --port 8888  # Listen on all interfaces, port 8888
+  %(prog)s                           # Start with GUI (default)
+  %(prog)s --no-gui                  # Headless server mode
+  %(prog)s --host 0.0.0.0 --port 8888  # Custom host/port with GUI
         """
     )
     
@@ -641,11 +896,65 @@ Examples:
         help='Port to listen on (default: 12345)'
     )
     
+    parser.add_argument(
+        '--no-gui',
+        action='store_true',
+        help='Launch without graphical interface (headless server mode)'
+    )
+    
     args = parser.parse_args()
     
-    # Create and run the command center
-    command_center = CommandCenter(host=args.host, port=args.port)
-    command_center.run()
+    # GUI is default - only skip if --no-gui flag is used
+    if not args.no_gui:
+        # GUI mode
+        if not TKINTER_AVAILABLE:
+            print("ERROR: tkinter not available!")
+            print("GUI mode requires tkinter. Install python3-tk or run with --no-gui flag.")
+            print("On Ubuntu/Debian: sudo apt-get install python3-tk")
+            print("On Windows: tkinter is included with Python")
+            return 1
+            
+        print("=" * 60)
+        print("Codex Arena Bot - Command Center with GUI")
+        print("=" * 60)
+        print()
+        print("Starting Command Center server...")
+        
+        # Create command center in background thread
+        command_center = CommandCenter(host=args.host, port=args.port)
+        
+        def run_cc():
+            command_center.run()
+        
+        cc_thread = threading.Thread(target=run_cc, daemon=True)
+        cc_thread.start()
+        
+        # Give server time to start
+        time.sleep(1)
+        
+        print("Starting GUI...")
+        print()
+        
+        # Create and run GUI
+        gui = CommandCenterGUI(host=args.host, port=args.port, command_center=command_center)
+        try:
+            gui.run()
+        finally:
+            command_center.shutdown()
+            
+    else:
+        # Headless server mode
+        print("=" * 60)
+        print("Codex Arena Bot - Command Center (Headless)")
+        print("=" * 60)
+        print()
+        print("Starting server...")
+        print(f"Host: {args.host}")
+        print(f"Port: {args.port}")
+        print()
+        
+        command_center = CommandCenter(host=args.host, port=args.port)
+        command_center.run()
 
 
 if __name__ == '__main__':

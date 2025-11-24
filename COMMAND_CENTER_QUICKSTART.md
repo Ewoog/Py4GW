@@ -27,12 +27,26 @@ The Command Center is an optional external coordination and monitoring system fo
 
 ## Quick Start (5 Minutes)
 
-### Step 1: Start the Command Center
+### Step 1: Start the Command Center with GUI
 
 Open a terminal/command prompt and run:
 
 ```bash
 python codex_command_center.py
+```
+
+**The GUI will launch automatically!** You'll see a window with:
+- 📊 Real-time bot status display
+- 🎮 Manual control buttons (Resign, Switch Teams, Force Queue)
+- 📜 Command history log
+- 🟢 Live connection status
+
+The Command Center server runs in the background while the GUI provides visual monitoring.
+
+**Headless Mode (No GUI):**
+If you prefer to run without the GUI (e.g., on a server), use:
+```bash
+python codex_command_center.py --no-gui
 ```
 
 You should see:
@@ -42,36 +56,18 @@ INFO - Waiting for Leader bots to connect...
 INFO - Command Center is running. Press Ctrl+C to stop.
 ```
 
-**That's it!** The Command Center is now running and ready to coordinate your bots.
-
-### Step 2: (Optional) Start the GUI
-
-For manual control and visual monitoring, open a second terminal:
-
-**Option A - Tkinter GUI (Recommended - No dependencies):**
-```bash
-python codex_command_center_gui_tk.py
-```
-
-**Option B - Web GUI (Requires Flask):**
+**Alternative - Web GUI (Requires Flask):**
 ```bash
 pip install flask  # Install Flask if needed
 python codex_command_center_gui.py
 # Then open browser to http://localhost:5000
 ```
 
-The Tkinter GUI provides:
-- 📊 Real-time bot status display
-- 🎮 Manual control buttons (Resign, Switch Teams, Force Queue)
-- 📜 Command history log
-- 🟢 Live connection status
-- Works without any external dependencies!
-
-### Step 3: Start Your Codex Bots (Normal Operation)
+### Step 2: Start Your Codex Bots (Normal Operation)
 
 The bots work normally with shared memory. The Command Center is ready if you want to integrate socket mode later.
 
-### Step 4 (Optional): Test the System
+### Step 3 (Optional): Test the System
 
 If you want to see the Command Center in action:
 
