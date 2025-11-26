@@ -973,7 +973,7 @@ class MesmerSkills:
         skill.SkillType = SkillType.Spell.value
         skill.TargetAllegiance = Skilltarget.OtherAlly.value
         skill.Nature = SkillNature.Buff.value
-        skill.Conditions.TargetingStrict = True
+        skill.Conditions.TargetingStrict = False  # Allow fallback targeting
         skill_data[skill.SkillID] = skill
 
         skill = CustomSkill()
